@@ -52,7 +52,9 @@ end
 _coroutine.wrap = function(f)
   local thread = coroutine.create(f)
   return function(...)
-    return select(2, coroutine.resume(thread, ...))
+    local result, reason = coroutine.resume(thread, ...)
+    assert(result, reason)
+    return reason
   end
 end
 
