@@ -1,1 +1,4 @@
-
+tile.oc.cable.name="Kabel"
+option.oc.address="Adres"
+option.oc.componentName="Nazwa komponentu"
+tile.oc.charger.name="Ładowarka"
