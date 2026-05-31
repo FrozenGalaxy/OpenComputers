@@ -1,11 +1,13 @@
 ## Fixes/improvements
 
 * [#3784] Added three new robot names (airone01)
+* Fixed Blood Altars (Blood Magic) returning the incorrect value for getSacrificeMultiplier. (hinyb)
 * Fixed client leak in Sound.
 * Fixed clipboard length not being validated on the server side.
 * Fixed server leaks in Player, SideTracker and StaticSimpleEnvironment. (Alexdoru)
+* glGetError() is no longer called if logging GL errors is disabled. (mitchej123)
 * Improved Polish translation.
 
 ## List of contributors
 
-airone01, Alexdoru, asie
+airone01, Alexdoru, asie, hinyb, mitchej123
