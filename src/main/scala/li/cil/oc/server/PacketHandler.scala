@@ -2,9 +2,7 @@ package li.cil.oc.server
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent
 import cpw.mods.fml.common.network.FMLNetworkEvent.ServerCustomPacketEvent
-import li.cil.oc.Localization
-import li.cil.oc.OpenComputers
-import li.cil.oc.api
+import li.cil.oc.{Localization, OpenComputers, Settings, api}
 import li.cil.oc.api.internal.Server
 import li.cil.oc.api.machine.Machine
 import li.cil.oc.common.Achievement
@@ -193,6 +191,7 @@ object PacketHandler extends CommonPacketHandler {
   def onClipboard(p: PacketParser): Unit = {
     val address = p.readUTF()
     val copy = p.readUTF()
+    if (copy.length > Settings.get.maxClipboardTextLength) return
     ComponentTracker.get(p.player.worldObj, address) match {
       case Some(buffer: api.internal.TextBuffer) => buffer.clipboard(copy, p.player.asInstanceOf[EntityPlayer])
       case _ => // Invalid Packet

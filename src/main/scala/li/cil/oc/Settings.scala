@@ -503,6 +503,9 @@ class Settings(val config: Config) {
 
   // >= 1.8.8
   val httpUserAgent = config.getString("internet.httpUserAgent")
+
+  // >= 1.8.10
+  val maxClipboardTextLength = config.getInt("misc.maxClipboardTextLength")
 }
 
 object Settings {
