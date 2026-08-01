@@ -712,6 +712,11 @@ object PacketHandler extends CommonPacketHandler {
 
   def onTextBufferMulti(p: PacketParser): Unit =
     if (p.player != null) ComponentTracker.get(p.player.level, p.readUTF()) match {
+      case Some(buffer: li.cil.oc.common.component.TextBuffer) if !buffer.isInitialized =>
+        // The client registers a buffer before its authoritative init snapshot
+        // arrives. Incremental updates generated in that window are already
+        // represented by the snapshot and may require a color depth the
+        // default client buffer does not support yet.
       case Some(buffer: api.internal.TextBuffer) =>
         try while (true) {
           p.readPacketType() match {

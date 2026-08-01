@@ -100,6 +100,8 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
     relativeLitArea = -1 // Recompute lit area, avoid screens blanking out until something changes.
   }
 
+  def isInitialized: Boolean = syncCooldown < 0
+
   private final lazy val deviceInfo = Map(
     DeviceAttribute.Class -> DeviceClass.Display,
     DeviceAttribute.Description -> "Text buffer",
