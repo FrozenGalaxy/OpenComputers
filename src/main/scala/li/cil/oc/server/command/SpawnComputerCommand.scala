@@ -32,7 +32,7 @@ object SpawnComputerCommand {
 
     player.pick(MaxDistance, 0.0f, false) match {
       case hit: BlockHitResult if hit.getType == HitResult.Type.BLOCK =>
-        val casePos = hit.getBlockPos.relative(hit.getDirection)
+        val casePos = (hit.getBlockPos.relative(hit.getDirection): net.minecraft.core.BlockPos)
         val screenPos = casePos.above()
         val keyboardPos = screenPos.above()
 
