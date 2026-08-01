@@ -2,13 +2,15 @@ package li.cil.oc.common
 
 import com.google.common.cache.Cache
 import com.google.common.cache.CacheBuilder
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
 import li.cil.oc.api.network.ManagedEnvironment
-import net.minecraft.world.World
-import net.minecraftforge.event.world.WorldEvent
+import net.minecraft.resources.ResourceKey
+import net.minecraft.world.level.Level
+import net.neoforged.neoforge.event.level.LevelEvent
+import net.neoforged.bus.api.SubscribeEvent
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.JavaConverters.asJavaIterable
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
 
 /**
@@ -17,39 +19,41 @@ import scala.collection.mutable
  * containers. For now this is only used for screens / text buffer components.
  */
 abstract class ComponentTracker {
-  private val worlds = mutable.Map.empty[Int, Cache[String, ManagedEnvironment]]
+  private val worlds = mutable.Map.empty[ResourceKey[Level], Cache[String, ManagedEnvironment]]
 
-  private def components(world: World) = {
-    worlds.getOrElseUpdate(world.provider.dimensionId,
+  private def components(level: Level) = {
+    worlds.getOrElseUpdate(level.dimension,
       com.google.common.cache.CacheBuilder.newBuilder().
         weakValues().
         asInstanceOf[CacheBuilder[String, ManagedEnvironment]].
         build[String, ManagedEnvironment]())
   }
 
-  def add(world: World, address: String, component: ManagedEnvironment) {
+  def add(level: Level, address: String, component: ManagedEnvironment): Unit = {
     this.synchronized {
-      components(world).put(address, component)
+      components(level).put(address, component)
     }
   }
 
-  def remove(world: World, component: ManagedEnvironment) {
+  def remove(level: Level, component: ManagedEnvironment): Unit = {
     this.synchronized {
-      components(world).invalidateAll(asJavaIterable(components(world).asMap().filter(_._2 == component).map(_._1)))
-      components(world).cleanUp()
+      components(level).invalidateAll(asJavaIterable(components(level).asMap().filter(_._2 == component).keys))
+      components(level).cleanUp()
     }
   }
 
-  def get(world: World, address: String): Option[ManagedEnvironment] = this.synchronized {
-    components(world).cleanUp()
-    Option(components(world).getIfPresent(address))
+  def get(level: Level, address: String): Option[ManagedEnvironment] = this.synchronized {
+    components(level).cleanUp()
+    Option(components(level).getIfPresent(address))
   }
 
-  @SubscribeEvent
-  def onWorldUnload(e: WorldEvent.Unload): Unit = clear(e.world)
+  def worldUnloaded(e: LevelEvent.Unload): Unit = e.getLevel match {
+    case level: Level => clear(level)
+    case _ =>
+  }
 
-  protected def clear(world: World): Unit = this.synchronized {
-    components(world).invalidateAll()
-    components(world).cleanUp()
+  protected def clear(level: Level): Unit = this.synchronized {
+    components(level).invalidateAll()
+    components(level).cleanUp()
   }
 }

@@ -15,16 +15,17 @@ import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.util.BlockPosition
-import net.minecraft.entity.Entity
-import net.minecraft.entity.IMerchant
-import net.minecraft.util.Vec3
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.item.trading.Merchant
 
-class UpgradeTrading(val host: EnvironmentHost) extends prefab.ManagedEnvironment with traits.WorldAware with DeviceInfo {
+class UpgradeTrading(val host: EnvironmentHost) extends AbstractManagedEnvironment with traits.LevelAware with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("trading").
     create()
@@ -42,22 +43,22 @@ class UpgradeTrading(val host: EnvironmentHost) extends prefab.ManagedEnvironmen
 
   def maxRange = Settings.get.tradingRange
 
-  def isInRange(entity: Entity) = Vec3.createVectorHelper(entity.posX, entity.posY, entity.posZ).distanceTo(position.toVec3) <= maxRange
+  def isInRange(entity: Entity) = new Vec3(entity.getX, entity.getY, entity.getZ).distanceTo(position.toVec3) <= maxRange
 
   @Callback(doc = "function():table -- Returns a table of trades in range as userdata objects.")
   def getTrades(context: Context, args: Arguments): Array[AnyRef] = {
-    val merchants = entitiesInBounds[Entity](position.bounds.expand(maxRange, maxRange, maxRange)).
+    val merchants = entitiesInBounds[Entity](classOf[Entity], position.bounds.inflate(maxRange, maxRange, maxRange)).
       filter(isInRange).
-      collect { case merchant: IMerchant => merchant }
+      collect { case merchant: Entity with Merchant => merchant }
     var nextId = 1
     val idMap = mutable.Map[UUID, Int]()
-    for (id: UUID <- merchants.collect { case merchant: IMerchant => merchant.getPersistentID }.sorted) {
+    for (id: UUID <- merchants.collect { case merchant: Merchant => merchant.getUUID }.sorted) {
       idMap.put(id, nextId)
       nextId += 1
     }
     // sorting the result is not necessary, but will help the merchant trades line up nicely by merchant
-    result(merchants.sortBy(m => m.getPersistentID).flatMap(merchant => merchant.getRecipes(null).indices.map(index => {
-      new Trade(this, merchant, index, idMap(merchant.getPersistentID))
+    result(merchants.sortBy(m => m.getUUID).flatMap(merchant => merchant.getOffers.indices.map(index => {
+      new Trade(this, merchant, index, idMap(merchant.getUUID))
     })))
   }
 }

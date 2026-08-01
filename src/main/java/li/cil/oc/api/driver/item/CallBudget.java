@@ -1,6 +1,6 @@
 package li.cil.oc.api.driver.item;
 
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Common functionality provided by parts that influence a machine's speed.
@@ -13,7 +13,7 @@ import net.minecraft.item.ItemStack;
  * <br>
  * A processor and memory implementation may choose not to implement this
  * interface. If no component providing a call budget it present in a machine,
- * a value of <tt>1.0</tt> will be used, i.e. the "default" speed modifier.
+ * a value of {@code 1.0} will be used, i.e. the "default" speed modifier.
  */
 public interface CallBudget {
     /**

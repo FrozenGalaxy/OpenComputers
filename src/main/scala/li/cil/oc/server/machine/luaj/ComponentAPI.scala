@@ -5,10 +5,10 @@ import li.cil.oc.util.ScalaClosure._
 import li.cil.repack.org.luaj.vm2.LuaValue
 import li.cil.repack.org.luaj.vm2.Varargs
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 
 class ComponentAPI(owner: LuaJLuaArchitecture) extends LuaJAPI(owner) {
-  override def initialize() {
+  override def initialize(): Unit = {
     // Component interaction stuff.
     val component = LuaValue.tableOf()
 

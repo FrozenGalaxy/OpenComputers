@@ -1,47 +1,55 @@
 package li.cil.oc.server.network
 
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
 import li.cil.oc.Settings
-import li.cil.oc.common.tileentity.Waypoint
+import li.cil.oc.common.blockentity.Waypoint
 import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.RTree
-import net.minecraftforge.event.world.ChunkEvent
-import net.minecraftforge.event.world.WorldEvent
+import net.neoforged.bus.api.SubscribeEvent
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
+import net.minecraft.world.level.Level
+import net.minecraft.resources.ResourceKey
+import net.neoforged.neoforge.event.level.LevelEvent
+import net.neoforged.neoforge.event.level.ChunkEvent
 
 object Waypoints {
-  val dimensions = mutable.Map.empty[Int, RTree[Waypoint]]
+  val dimensions = mutable.Map.empty[ResourceKey[Level], RTree[Waypoint]]
 
   @SubscribeEvent
-  def onWorldUnload(e: WorldEvent.Unload) {
-    if (!e.world.isRemote) {
-      dimensions.remove(e.world.provider.dimensionId)
+  def onWorldUnload(e: LevelEvent.Unload): Unit = {
+    if (!e.getLevel.isClientSide) {
+      e.getLevel match {
+        case level: Level => dimensions.remove(level.dimension)
+        case _ =>
+      }
     }
   }
 
   @SubscribeEvent
-  def onWorldLoad(e: WorldEvent.Load) {
-    if (!e.world.isRemote) {
-      dimensions.remove(e.world.provider.dimensionId)
+  def onWorldLoad(e: LevelEvent.Load): Unit = {
+    if (!e.getLevel.isClientSide) {
+      e.getLevel match {
+        case level: Level => dimensions.remove(level.dimension)
+        case _ =>
+      }
     }
   }
 
   // Safety clean up, in case some tile entities didn't properly leave the net.
   @SubscribeEvent
-  def onChunkUnload(e: ChunkEvent.Unload) {
-    e.getChunk.chunkTileEntityMap.values.foreach {
+  def onChunkUnloaded(e: ChunkEvent.Unload): Unit = {
+    e.getChunk.getBlockEntitiesPos.map(e.getChunk.getBlockEntity).foreach {
       case waypoint: Waypoint => remove(waypoint)
       case _ =>
     }
   }
 
-  def add(waypoint: Waypoint): Unit = if (!waypoint.isInvalid && waypoint.world != null && !waypoint.world.isRemote) {
+  def add(waypoint: Waypoint): Unit = if (!waypoint.isRemoved && waypoint.getEnvironmentLevel != null && !waypoint.getEnvironmentLevel.isClientSide) {
     dimensions.getOrElseUpdate(dimension(waypoint), new RTree[Waypoint](Settings.get.rTreeMaxEntries)((waypoint) => (waypoint.x + 0.5, waypoint.y + 0.5, waypoint.z + 0.5))).add(waypoint)
   }
 
-  def remove(waypoint: Waypoint): Unit = if (waypoint.world != null && !waypoint.world.isRemote) {
+  def remove(waypoint: Waypoint): Unit = if (waypoint.getEnvironmentLevel != null && !waypoint.getEnvironmentLevel.isClientSide) {
     dimensions.get(dimension(waypoint)) match {
       case Some(set) => set.remove(waypoint)
       case _ =>
@@ -49,13 +57,13 @@ object Waypoints {
   }
 
   def findWaypoints(pos: BlockPosition, range: Double): Iterable[Waypoint] = {
-    dimensions.get(pos.world.get.provider.dimensionId) match {
+    dimensions.get(pos.world.get.dimension) match {
       case Some(set) =>
-        val bounds = pos.bounds.expand(range * 0.5, range * 0.5, range * 0.5)
+        val bounds = pos.bounds.inflate(range * 0.5, range * 0.5, range * 0.5)
         set.query((bounds.minX, bounds.minY, bounds.minZ), (bounds.maxX, bounds.maxY, bounds.maxZ))
       case _ => Iterable.empty
     }
   }
 
-  private def dimension(waypoint: Waypoint) = waypoint.world.provider.dimensionId
+  private def dimension(waypoint: Waypoint) = waypoint.getEnvironmentLevel.dimension
 }

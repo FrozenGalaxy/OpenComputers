@@ -1,41 +1,46 @@
 package li.cil.oc.client.gui
 
-import li.cil.oc.Localization
-import li.cil.oc.Settings
-import li.cil.oc.api
-import li.cil.oc.client.Textures
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, PoseStack, Tesselator, VertexFormat}
+import li.cil.oc.{Localization, Settings}
+import li.cil.oc.api.internal.TextBuffer
 import li.cil.oc.client.gui.widget.ProgressBar
 import li.cil.oc.client.renderer.TextBufferRenderCache
 import li.cil.oc.client.renderer.gui.BufferRenderer
-import li.cil.oc.client.{PacketSender => ClientPacketSender}
-import li.cil.oc.common.container
-import li.cil.oc.common.tileentity
-import li.cil.oc.integration.opencomputers
-import li.cil.oc.util.RenderState
+import li.cil.oc.client.{ComponentTracker, Textures, PacketSender => ClientPacketSender}
+import li.cil.oc.common.menu
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiButton
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.entity.player.InventoryPlayer
-import org.lwjgl.input.Keyboard
-import org.lwjgl.input.Mouse
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.components.events.ContainerEventHandler
+import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.player.Inventory
+import org.lwjgl.glfw.GLFW
+import scala.jdk.CollectionConverters._
 
-import scala.collection.convert.WrapAsJava._
+class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
+  extends DynamicGuiContainer(state, playerInventory, name)
+  with traits.InputBuffer with ContainerEventHandler {
 
-class Robot(playerInventory: InventoryPlayer, val robot: tileentity.Robot) extends DynamicGuiContainer(new container.Robot(playerInventory, robot)) with traits.InputBuffer {
-  override protected val buffer = robot.components.collect {
-    case Some(buffer: api.internal.TextBuffer) => buffer
-  }.headOption.orNull
+  override def containerTick(): Unit = {
+    super.containerTick()
+  }
 
-  override protected val hasKeyboard = robot.info.components.map(api.Driver.driverFor(_, robot.getClass)).contains(opencomputers.DriverKeyboard)
+  override protected val buffer: TextBuffer = inventoryContainer.info.screenBuffer
+    .flatMap(ComponentTracker.get(Minecraft.getInstance.level, _))
+    .collectFirst {
+      case buffer: TextBuffer => buffer
+    }.orNull
+
+  override protected val hasKeyboard: Boolean = inventoryContainer.info.hasKeyboard
 
   private val withScreenHeight = 256
   private val noScreenHeight = 108
 
   private val deltaY = if (buffer != null) 0 else withScreenHeight - noScreenHeight
 
-  xSize = 256
-  ySize = 256 - deltaY
+  imageWidth = 256
+  imageHeight = 256 - deltaY
 
   protected var powerButton: ImageButton = _
 
@@ -43,11 +48,11 @@ class Robot(playerInventory: InventoryPlayer, val robot: tileentity.Robot) exten
 
   // Scroll offset for robot inventory.
   private var inventoryOffset = 0
-  private var isDragging = false
+  var isScrolling = false
 
-  private def canScroll = robot.inventorySize > 16
+  private def canScroll = inventoryContainer.info.mainInvSize > 16
 
-  private def maxOffset = robot.inventorySize / 4 - 4
+  private def maxOffset = inventoryContainer.info.mainInvSize / 4 - 4
 
   private val slotSize = 18
 
@@ -58,9 +63,9 @@ class Robot(playerInventory: InventoryPlayer, val robot: tileentity.Robot) exten
 
   private def bufferRenderHeight = math.min(maxBufferHeight, TextBufferRenderCache.renderer.charRenderHeight * Settings.screenResolutionsByTier(0)._2)
 
-  override protected def bufferX = (8 + (maxBufferWidth - bufferRenderWidth) / 2).toInt
+  override protected def bufferX: Int = (8 + (maxBufferWidth - bufferRenderWidth) / 2).toInt
 
-  override protected def bufferY = (8 + (maxBufferHeight - bufferRenderHeight) / 2).toInt
+  override protected def bufferY: Int = (8 + (maxBufferHeight - bufferRenderHeight) / 2).toInt
 
   private val inventoryX = 169
   private val inventoryY = 155 - deltaY
@@ -68,147 +73,143 @@ class Robot(playerInventory: InventoryPlayer, val robot: tileentity.Robot) exten
   private val scrollX = inventoryX + slotSize * 4 + 2
   private val scrollY = inventoryY
   private val scrollWidth = 8
-  private val scrollHeight = 94
+  private val scrollHeight = 92
 
-  private val power = addWidget(new ProgressBar(26, 156 - deltaY))
+  private val power = addCustomWidget(new ProgressBar(26, 156 - deltaY))
 
   private val selectionSize = 20
   private val selectionsStates = 17
-  private val selectionStepV = 1 / selectionsStates.toDouble
+  private val selectionStepV = 1 / selectionsStates.toFloat
 
-  protected override def actionPerformed(button: GuiButton) {
-    if (button.id == 0) {
-      ClientPacketSender.sendComputerPower(robot, !robot.isRunning)
+  override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
+    powerButton.toggled = inventoryContainer.isRunning
+    scrollButton.active = canScroll
+    scrollButton.hoverOverride = isScrolling
+    if (inventoryContainer.info.mainInvSize < 16 + inventoryOffset * 4) {
+      if (inventoryOffset != 0) scrollTo(0)
     }
+    super.render(graphics, mouseX, mouseY, dt)
   }
 
-  override def drawScreen(mouseX: Int, mouseY: Int, dt: Float) {
-    powerButton.toggled = robot.isRunning
-    scrollButton.enabled = canScroll
-    scrollButton.hoverOverride = isDragging
-    if (robot.inventorySize < 16 + inventoryOffset * 4) {
-      scrollTo(0)
-    }
-    super.drawScreen(mouseX, mouseY, dt)
+  override protected def init(): Unit = {
+    super.init()
+    powerButton = new ImageButton(leftPos + 5, topPos + 153 - deltaY, 18, 18, new Button.OnPress {
+      override def onPress(b: Button) = ClientPacketSender.sendRobotPower(inventoryContainer, !inventoryContainer.isRunning)
+    }, Textures.GUI.ButtonPower, canToggle = true)
+    scrollButton = new ImageButton(leftPos + scrollX + 1, topPos + scrollY + 1, 6, 13, new Button.OnPress {
+      override def onPress(b: Button) = ()
+    }, Textures.GUI.ButtonScroll)
+    addRenderableWidget(powerButton)
+    addRenderableWidget(scrollButton)
   }
 
-  override def initGui() {
-    super.initGui()
-    powerButton = new ImageButton(0, guiLeft + 5, guiTop + 153 - deltaY, 18, 18, Textures.guiButtonPower, canToggle = true)
-    scrollButton = new ImageButton(1, guiLeft + scrollX + 1, guiTop + scrollY + 1, 6, 13, Textures.guiButtonScroll)
-    add(buttonList, powerButton)
-    add(buttonList, scrollButton)
-  }
-
-  override def drawBuffer() {
+  override def drawBuffer(stack: PoseStack): Unit = {
     if (buffer != null) {
-      GL11.glTranslatef(bufferX, bufferY, 0)
-      RenderState.disableLighting()
-      GL11.glPushMatrix()
-      GL11.glTranslatef(-3, -3, 0)
-      GL11.glColor4f(1, 1, 1, 1)
-      BufferRenderer.drawBackground()
-      GL11.glPopMatrix()
-      RenderState.makeItBlend()
+      stack.translate(bufferX, bufferY, 0)
+      stack.pushPose()
+      stack.translate(-3, -3, 0)
+      RenderSystem.setShaderColor(1, 1, 1, 1)
+      BufferRenderer.drawBackground(stack, bufferRenderWidth.toInt, bufferRenderHeight.toInt, forRobot = true)
+      stack.popPose()
       val scaleX = bufferRenderWidth / buffer.renderWidth
       val scaleY = bufferRenderHeight / buffer.renderHeight
-      val scale = math.min(scaleX, scaleY)
+      val scale = math.min(scaleX, scaleY).toFloat
       if (scaleX > scale) {
-        GL11.glTranslated(buffer.renderWidth * (scaleX - scale) / 2, 0, 0)
+        stack.translate(buffer.renderWidth * (scaleX - scale) / 2, 0, 0)
       }
       else if (scaleY > scale) {
-        GL11.glTranslated(0, buffer.renderHeight * (scaleY - scale) / 2, 0)
+        stack.translate(0, buffer.renderHeight * (scaleY - scale) / 2, 0)
       }
-      GL11.glScaled(scale, scale, scale)
-      GL11.glScaled(this.scale, this.scale, 1)
-      BufferRenderer.drawText(buffer)
+      stack.scale(scale * this.scale.toFloat, scale * this.scale.toFloat, scale)
+      BufferRenderer.drawText(stack, buffer)
     }
   }
 
-  override protected def drawSecondaryForegroundLayer(mouseX: Int, mouseY: Int) {
-    drawBufferLayer()
-    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS) // Me lazy... prevents NEI render glitch.
-    if (func_146978_c(power.x, power.y, power.width, power.height, mouseX, mouseY)) {
-      val tooltip = new java.util.ArrayList[String]
+  override protected def renderLabels(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
+    drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
+
+    for (slot <- 0 until menu.slots.size()) {
+      drawSlotHighlight(graphics, menu.getSlot(slot))
+    }
+  }
+
+  override protected def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
+    drawBufferLayer(graphics.pose())
+    if (isHovering(power.x, power.y, power.width, power.height, mouseX - leftPos, mouseY - topPos)) {
+      val tooltip = new java.util.ArrayList[Component]
       val format = Localization.Computer.Power + ": %d%% (%d/%d)"
-      tooltip.add(format.format(
-        ((robot.globalBuffer / robot.globalBufferSize) * 100).toInt,
-        robot.globalBuffer.toInt,
-        robot.globalBufferSize.toInt))
-      copiedDrawHoveringText(tooltip, mouseX - guiLeft, mouseY - guiTop, fontRendererObj)
+      tooltip.add(Component.literal(format.format(
+        100 * inventoryContainer.globalBuffer / inventoryContainer.globalBufferSize,
+        inventoryContainer.globalBuffer, inventoryContainer.globalBufferSize)))
+      graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY)
     }
-    if (powerButton.func_146115_a) {
-      val tooltip = new java.util.ArrayList[String]
-      tooltip.addAll(asJavaCollection(if (robot.isRunning) Localization.Computer.TurnOff.lines.toIterable else Localization.Computer.TurnOn.lines.toIterable))
-      copiedDrawHoveringText(tooltip, mouseX - guiLeft, mouseY - guiTop, fontRendererObj)
+    if (powerButton.isMouseOver(mouseX, mouseY)) {
+      val tooltip = new java.util.ArrayList[Component]
+      tooltip.addAll(
+        if (inventoryContainer.isRunning)
+          Localization.Computer.TurnOff.linesIterator.map(Component.literal).toList.asJava
+        else
+          Localization.Computer.TurnOn.linesIterator.map(Component.literal).toList.asJava
+      )
+      graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY)
     }
-    GL11.glPopAttrib()
   }
 
-  override protected def drawGuiContainerBackgroundLayer(dt: Float, mouseX: Int, mouseY: Int) {
-    GL11.glColor3f(1, 1, 1) // Required under Linux.
-    if (buffer != null) mc.renderEngine.bindTexture(Textures.guiRobot)
-    else mc.renderEngine.bindTexture(Textures.guiRobotNoScreen)
-    drawTexturedModalRect(guiLeft, guiTop, 0, 0, xSize, ySize)
-    power.level = robot.globalBuffer / robot.globalBufferSize
-    drawWidgets()
-    if (robot.inventorySize > 0) {
-      drawSelection()
+  override protected def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+    graphics.blit(if (buffer != null) Textures.GUI.Robot else Textures.GUI.RobotNoScreen, leftPos, topPos, 0, 0, imageWidth, imageHeight)
+    power.level = inventoryContainer.globalBuffer.toDouble / inventoryContainer.globalBufferSize
+    drawWidgets(graphics)
+    if (inventoryContainer.info.mainInvSize > 0) {
+      drawSelection(graphics.pose)
     }
 
-    drawInventorySlots()
-  }
-
-  protected override def drawGradientRect(par1: Int, par2: Int, par3: Int, par4: Int, par5: Int, par6: Int) {
-    super.drawGradientRect(par1, par2, par3, par4, par5, par6)
-    RenderState.makeItBlend()
+    drawInventorySlots(graphics)
   }
 
   // No custom slots, we just extend DynamicGuiContainer for the highlighting.
-  override protected def drawSlotBackground(x: Int, y: Int) {}
+  override protected def drawSlotBackground(graphics: GuiGraphics, x: Int, y: Int): Unit = {}
 
-  override protected def keyTyped(char: Char, code: Int) {
-    if (code == Keyboard.KEY_ESCAPE) {
-      super.keyTyped(char, code)
-    }
-  }
-
-  override protected def mouseClicked(mouseX: Int, mouseY: Int, button: Int) {
-    super.mouseClicked(mouseX, mouseY, button)
-    if (canScroll && button == 0 && isCoordinateOverScrollBar(mouseX - guiLeft, mouseY - guiTop)) {
-      isDragging = true
+  override def mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = {
+    val mx = mouseX.asInstanceOf[Int]
+    val my = mouseY.asInstanceOf[Int]
+    if (canScroll && button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isCoordinateOverScrollBar(mx - leftPos, my - topPos)) {
+      isScrolling = true
       scrollMouse(mouseY)
+      true
     }
+    else super.mouseClicked(mouseX, mouseY, button)
   }
 
-  override protected def mouseMovedOrUp(mouseX: Int, mouseY: Int, button: Int) {
-    super.mouseMovedOrUp(mouseX, mouseY, button)
-    if (button == 0) {
-      isDragging = false
+  override def mouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean = {
+    if (canScroll && button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isScrolling) {
+      isScrolling = false
+      return true
     }
+    super.mouseReleased(mouseX, mouseY, button)
   }
 
-  override protected def mouseClickMove(mouseX: Int, mouseY: Int, lastButtonClicked: Int, timeSinceMouseClick: Long) {
-    super.mouseClickMove(mouseX, mouseY, lastButtonClicked, timeSinceMouseClick)
-    if (isDragging) {
+  override def mouseDragged(mouseX: Double, mouseY: Double, button: Int, deltaX: Double, deltaY: Double): Boolean = {
+    if (isScrolling) {
       scrollMouse(mouseY)
+      true
     }
+    else super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)
   }
 
-  private def scrollMouse(mouseY: Int) {
-    scrollTo(math.round((mouseY - guiTop - scrollY + 1 - 6.5) * maxOffset / (scrollHeight - 13.0)).toInt)
+  private def scrollMouse(mouseY: Double): Unit = {
+    scrollTo(math.round((mouseY - topPos - scrollY + 1 - 6.5) * maxOffset / (scrollHeight - 13.0)).toInt)
   }
 
-  override def handleMouseInput() {
-    super.handleMouseInput()
-    if (Mouse.hasWheel && Mouse.getEventDWheel != 0) {
-      val mouseX = Mouse.getEventX * width / mc.displayWidth - guiLeft
-      val mouseY = height - Mouse.getEventY * height / mc.displayHeight - 1 - guiTop
-      if (isCoordinateOverInventory(mouseX, mouseY) || isCoordinateOverScrollBar(mouseX, mouseY)) {
-        if (math.signum(Mouse.getEventDWheel) < 0) scrollDown()
-        else scrollUp()
-      }
+  override def mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean = {
+    val mx = mouseX.asInstanceOf[Int] - leftPos
+    val my = mouseY.asInstanceOf[Int] - topPos
+    if (isCoordinateOverInventory(mx, my) || isCoordinateOverScrollBar(mx, my)) {
+      if (scrollY < 0) scrollDown()
+      else scrollUp()
+      true
     }
+    else super.mouseScrolled(mouseX, mouseY, scrollX, scrollY)
   }
 
   private def isCoordinateOverInventory(x: Int, y: Int) =
@@ -223,58 +224,42 @@ class Robot(playerInventory: InventoryPlayer, val robot: tileentity.Robot) exten
 
   private def scrollDown() = scrollTo(inventoryOffset + 1)
 
-  private def scrollTo(row: Int) {
+  private def scrollTo(row: Int): Unit = {
     inventoryOffset = math.max(0, math.min(maxOffset, row))
-    for (index <- 4 until 68) {
-      val slot = inventorySlots.getSlot(index)
-      val displayIndex = index - inventoryOffset * 4 - 4
-      if (displayIndex >= 0 && displayIndex < 16) {
-        slot.xDisplayPosition = 1 + inventoryX + (displayIndex % 4) * slotSize
-        slot.yDisplayPosition = 1 + inventoryY + (displayIndex / 4) * slotSize
-      }
-      else {
-        // Hide the rest!
-        slot.xDisplayPosition = -10000
-        slot.yDisplayPosition = -10000
-      }
-    }
-    val yMin = guiTop + scrollY + 1
+    menu.generateSlotsFor(inventoryOffset)
+    val yMin = topPos + scrollY + 1
     if (maxOffset > 0) {
-      scrollButton.yPosition = yMin + (scrollHeight - 15) * inventoryOffset / maxOffset
+      scrollButton.y = yMin + (scrollHeight - 13) * inventoryOffset / maxOffset
     }
     else {
-      scrollButton.yPosition = yMin
+      scrollButton.y = yMin
     }
   }
 
-  override protected def changeSize(w: Double, h: Double, recompile: Boolean) = {
+  override protected def changeSize(w: Double, h: Double): Double = {
     val bw = w * TextBufferRenderCache.renderer.charRenderWidth
     val bh = h * TextBufferRenderCache.renderer.charRenderHeight
     val scaleX = math.min(bufferRenderWidth / bw, 1)
     val scaleY = math.min(bufferRenderHeight / bh, 1)
-    if (recompile) {
-      BufferRenderer.compileBackground(bufferRenderWidth.toInt, bufferRenderHeight.toInt, forRobot = true)
-    }
     math.min(scaleX, scaleY)
   }
 
-  private def drawSelection() {
-    val slot = robot.selectedSlot - inventoryOffset * 4
+  private def drawSelection(stack: PoseStack): Unit = {
+    val slot = inventoryContainer.selectedSlot - inventoryOffset * 4
     if (slot >= 0 && slot < 16) {
-      RenderState.makeItBlend()
-      Minecraft.getMinecraft.renderEngine.bindTexture(Textures.guiRobotSelection)
-      val now = System.currentTimeMillis() / 1000.0
-      val offsetV = ((now - now.toInt) * selectionsStates).toInt * selectionStepV
-      val x = guiLeft + inventoryX - 1 + (slot % 4) * (selectionSize - 2)
-      val y = guiTop + inventoryY - 1 + (slot / 4) * (selectionSize - 2)
+      Textures.bind(Textures.GUI.RobotSelection)
+      val now = System.currentTimeMillis() % 1000 / 1000.0f
+      val offsetV = (now * selectionsStates).toInt * selectionStepV
+      val x = leftPos + inventoryX - 1 + (slot % 4) * (selectionSize - 2)
+      val y = topPos + inventoryY - 1 + (slot / 4) * (selectionSize - 2)
 
-      val t = Tessellator.instance
-      t.startDrawingQuads()
-      t.addVertexWithUV(x, y, zLevel, 0, offsetV)
-      t.addVertexWithUV(x, y + selectionSize, zLevel, 0, offsetV + selectionStepV)
-      t.addVertexWithUV(x + selectionSize, y + selectionSize, zLevel, 1, offsetV + selectionStepV)
-      t.addVertexWithUV(x + selectionSize, y, zLevel, 1, offsetV)
-      t.draw()
+      val t = Tesselator.getInstance
+      val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
+      r.addVertex(stack.last.pose(), x, y, 0).setUv(0, offsetV)
+      r.addVertex(stack.last.pose(), x, y + selectionSize, 0).setUv(0, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), x + selectionSize, y + selectionSize, 0).setUv(1, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), x + selectionSize, y, 0).setUv(1, offsetV)
+      BufferUploader.drawWithShader(r.buildOrThrow())
     }
   }
 }

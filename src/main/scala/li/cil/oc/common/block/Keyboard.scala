@@ -1,128 +1,135 @@
 package li.cil.oc.common.block
 
+import com.mojang.blaze3d.systems.RenderSystem
+import li.cil.oc.{Constants, api}
+import li.cil.oc.common.block.property.PropertyRotatable
+import li.cil.oc.common.blockentity
+import li.cil.oc.util.ExtendedEnumFacing._
+import li.cil.oc.util.{BlockPosHelper, BlockPosition, InventoryUtils, RotationHelper}
+import net.minecraft.core.{BlockPos, Direction, Vec3i}
+import net.minecraft.server.level.{ServerLevel => ServerWorld}
+import net.minecraft.util.RandomSource
+import net.minecraft.world.{InteractionHand => Hand}
+import net.minecraft.world.entity.player.{Player => PlayerEntity}
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.context.{BlockPlaceContext => BlockItemUseContext}
+import net.minecraft.world.level.{BlockGetter => IBlockReader, Level => World, LevelReader => IWorldReader}
+import net.minecraft.world.level.block.{Block, Blocks}
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.block.state.{BlockState, StateDefinition => StateContainer}
+import net.minecraft.world.phys.shapes.{VoxelShape, CollisionContext => ISelectionContext, Shapes => VoxelShapes}
+import net.minecraft.world.ticks.ScheduledTick
+import net.neoforged.api.distmarker.{Dist, OnlyIn}
+
 import java.util.Random
 
-import li.cil.oc.Constants
-import li.cil.oc.api
-import li.cil.oc.common.tileentity
-import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.ExtendedWorld._
-import li.cil.oc.util.InventoryUtils
-import net.minecraft.block.Block
-import net.minecraft.block.material.Material
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.world.IBlockAccess
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
-import org.lwjgl.opengl.GL11
-
-class Keyboard extends SimpleBlock(Material.rock) with traits.SpecialBlock {
-  setLightOpacity(0)
-
+class Keyboard(props: Properties) extends SimpleBlock(props) {
   // For Immibis Microblock support.
   val ImmibisMicroblocks_TransformableBlockMarker = null
 
-  override protected def customTextures = Array(
-    Some("Keyboard"),
-    Some("Keyboard"),
-    Some("Keyboard"),
-    Some("Keyboard"),
-    Some("Keyboard"),
-    Some("Keyboard")
-  )
+  protected override def createBlockStateDefinition(builder: StateContainer.Builder[Block, BlockState]) =
+    builder.add(PropertyRotatable.Pitch, PropertyRotatable.Yaw)
 
-  override def isSideSolid(world: IBlockAccess, x: Int, y: Int, z: Int, side: ForgeDirection) = false
+  // ----------------------------------------------------------------------- //
 
-  override def shouldSideBeRendered(world: IBlockAccess, x: Int, y: Int, z: Int, side: ForgeDirection) = true
-
-  override def setBlockBoundsForItemRender(metadata: Int) = setBlockBounds(ForgeDirection.NORTH, ForgeDirection.WEST)
-
-  override def preItemRender(metadata: Int) {
-    GL11.glTranslatef(-0.75f, 0, 0)
-    GL11.glScalef(1.5f, 1.5f, 1.5f)
+  override def getShape(state: BlockState, world: IBlockReader, pos: BlockPos, ctx: ISelectionContext): VoxelShape = {
+    val (pitch, yaw) = (state.getValue(PropertyRotatable.Pitch), state.getValue(PropertyRotatable.Yaw))
+    val (forward, up) = pitch match {
+      case side@(Direction.DOWN | Direction.UP) => (side, yaw)
+      case _ => (yaw, Direction.UP)
+    }
+    val side = forward.getRotation(up)
+    val sizes = Array(7f / 16f, 4f / 16f, 7f / 16f)
+    val x0 = -up.getStepX * sizes(1) - side.getStepX * sizes(2) - forward.getStepX * sizes(0)
+    val x1 = up.getStepX * sizes(1) + side.getStepX * sizes(2) - forward.getStepX * 0.5f
+    val y0 = -up.getStepY * sizes(1) - side.getStepY * sizes(2) - forward.getStepY * sizes(0)
+    val y1 = up.getStepY * sizes(1) + side.getStepY * sizes(2) - forward.getStepY * 0.5f
+    val z0 = -up.getStepZ * sizes(1) - side.getStepZ * sizes(2) - forward.getStepZ * sizes(0)
+    val z1 = up.getStepZ * sizes(1) + side.getStepZ * sizes(2) - forward.getStepZ * 0.5f
+    VoxelShapes.box(
+      math.min(0.5 + x0, 0.5 + x1),
+      math.min(0.5 + y0, 0.5 + y1),
+      math.min(0.5 + z0, 0.5 + z1),
+      math.max(0.5 + x0, 0.5 + x1),
+      math.max(0.5 + y0, 0.5 + y1),
+      math.max(0.5 + z0, 0.5 + z1)
+    )
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def hasTileEntity(metadata: Int) = true
-
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Keyboard()
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.Keyboard(pos, state)
 
   // ----------------------------------------------------------------------- //
 
-  override def updateTick(world: World, x: Int, y: Int, z: Int, rng: Random) =
-    world.getTileEntity(x, y, z) match {
-      case keyboard: tileentity.Keyboard => api.Network.joinOrCreateNetwork(keyboard)
+  override def onPlace(state: BlockState, world: World, pos: BlockPos, prevState: BlockState, moved: Boolean): Unit = {
+    if (!world.isClientSide) {
+      world.getBlockTicks.schedule(new ScheduledTick[Block](this, pos, 10, world.nextSubTickCount))
+    }
+  }
+
+  override def tick(state: BlockState, world: ServerWorld, pos: BlockPos, rand: RandomSource) = {
+    world.getBlockEntity(pos) match {
+      case keyboard: blockentity.Keyboard => api.Network.joinOrCreateNetwork(keyboard)
       case _ =>
     }
+    world.getBlockTicks.schedule(new ScheduledTick[Block](this, pos, 10, world.nextSubTickCount))
+  }
 
-  override def canPlaceBlockOnSide(world: World, x: Int, y: Int, z: Int, side: ForgeDirection) = {
-    world.isSideSolid(x + side.offsetX, y + side.offsetY, z + side.offsetZ, side.getOpposite) &&
-      (world.getTileEntity(x + side.offsetX, y + side.offsetY, z + side.offsetZ) match {
-        case screen: tileentity.Screen => screen.facing != side.getOpposite
+  override def getStateForPlacement(ctx: BlockItemUseContext): BlockState = {
+    val (pitch, yaw) = ctx.getClickedFace match {
+      case side@(Direction.DOWN | Direction.UP) => (side, ctx.getHorizontalDirection)
+      case side => (Direction.NORTH, side)
+    }
+    super.getStateForPlacement(ctx).setValue(PropertyRotatable.Pitch, pitch).setValue(PropertyRotatable.Yaw, yaw)
+  }
+
+  override def canSurvive(state: BlockState, world: IWorldReader, pos: BlockPos) = {
+    // Check without the TE because this is called to check if the block may be placed.
+    val side = state.getValue(PropertyRotatable.Pitch) match {
+      case pitch@(Direction.UP | Direction.DOWN) => pitch
+      case _ => state.getValue(PropertyRotatable.Yaw)
+    }
+    val sidePos = BlockPosHelper.relative(pos, side.getOpposite)
+    world.getBlockState(sidePos).isFaceSturdy(world, sidePos, side) &&
+      (world.getBlockEntity(BlockPosHelper.relative(pos, side.getOpposite)) match {
+        case screen: blockentity.Screen => screen.facing != side
         case _ => true
       })
   }
 
-  override protected def doSetBlockBoundsBasedOnState(world: IBlockAccess, x: Int, y: Int, z: Int) =
-    world.getTileEntity(x, y, z) match {
-      case keyboard: tileentity.Keyboard => setBlockBounds(keyboard.pitch, keyboard.yaw)
-      case _ =>
+  @Deprecated
+  override def neighborChanged(state: BlockState, world: World, pos: BlockPos, block: Block, fromPos: BlockPos, b: Boolean): Unit =
+    if (!canSurvive(world.getBlockState(pos), world, pos)) {
+      world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState)
+      InventoryUtils.spawnStackInWorld(BlockPosition(pos, world), api.Items.get(Constants.BlockName.Keyboard).createItemStack(1))
     }
 
-  private def setBlockBounds(pitch: ForgeDirection, yaw: ForgeDirection) {
-    val (forward, up) = pitch match {
-      case side@(ForgeDirection.DOWN | ForgeDirection.UP) => (side, yaw)
-      case _ => (yaw, ForgeDirection.UP)
-    }
-    val side = forward.getRotation(up)
-    val sizes = Array(7f / 16f, 4f / 16f, 7f / 16f)
-    val x0 = -up.offsetX * sizes(1) - side.offsetX * sizes(2) - forward.offsetX * sizes(0)
-    val x1 = up.offsetX * sizes(1) + side.offsetX * sizes(2) - forward.offsetX * 0.5f
-    val y0 = -up.offsetY * sizes(1) - side.offsetY * sizes(2) - forward.offsetY * sizes(0)
-    val y1 = up.offsetY * sizes(1) + side.offsetY * sizes(2) - forward.offsetY * 0.5f
-    val z0 = -up.offsetZ * sizes(1) - side.offsetZ * sizes(2) - forward.offsetZ * sizes(0)
-    val z1 = up.offsetZ * sizes(1) + side.offsetZ * sizes(2) - forward.offsetZ * 0.5f
-    setBlockBounds(
-      math.min(x0, x1) + 0.5f, math.min(y0, y1) + 0.5f, math.min(z0, z1) + 0.5f,
-      math.max(x0, x1) + 0.5f, math.max(y0, y1) + 0.5f, math.max(z0, z1) + 0.5f)
-  }
-
-  override def onNeighborBlockChange(world: World, x: Int, y: Int, z: Int, block: Block) =
-    world.getTileEntity(x, y, z) match {
-      case keyboard: tileentity.Keyboard =>
-        if (!canPlaceBlockOnSide(world, x, y, z, keyboard.facing.getOpposite)) {
-          world.setBlockToAir(x, y, z)
-          InventoryUtils.spawnStackInWorld(BlockPosition(x, y, z, world), api.Items.get(Constants.BlockName.Keyboard).createItemStack(1))
-        }
-      case _ =>
-    }
-
-  override def onBlockActivated(world: World, x: Int, y: Int, z: Int, player: EntityPlayer, side: ForgeDirection, hitX: Float, hitY: Float, hitZ: Float) =
-    adjacencyInfo(world, BlockPosition(x, y, z)) match {
-      case Some((keyboard, screen, position, facing)) => screen.rightClick(world, position.x, position.y, position.z, player, facing, 0, 0, 0, force = true)
+  override def localOnBlockActivated(world: World, pos: BlockPos, player: PlayerEntity, hand: Hand, heldItem: ItemStack, side: Direction, hitX: Float, hitY: Float, hitZ: Float) =
+    adjacencyInfo(world, pos) match {
+      case Some((_, screen, blockPos, facing)) => screen.rightClick(world, blockPos, player, hand, heldItem, facing, 0, 0, 0, force = true)
       case _ => false
     }
 
-  def adjacencyInfo(world: World, position: BlockPosition) =
-    world.getTileEntity(position) match {
-      case keyboard: tileentity.Keyboard =>
-        val blockPos = position.offset(keyboard.facing.getOpposite)
-        world.getBlock(blockPos) match {
+  def adjacencyInfo(world: World, pos: BlockPos): Option[(blockentity.Keyboard, Screen, BlockPos, Direction)] =
+    world.getBlockEntity(pos) match {
+      case keyboard: blockentity.Keyboard =>
+        val blockPos = BlockPosHelper.relative(pos, keyboard.facing.getOpposite)
+        world.getBlockState(blockPos).getBlock match {
           case screen: Screen => Some((keyboard, screen, blockPos, keyboard.facing.getOpposite))
           case _ =>
             // Special case #1: check for screen in front of the keyboard.
             val forward = keyboard.facing match {
-              case ForgeDirection.UP | ForgeDirection.DOWN => keyboard.yaw
-              case _ => ForgeDirection.UP
+              case Direction.UP | Direction.DOWN => keyboard.yaw
+              case _ => Direction.UP
             }
-            val blockPos = position.offset(forward)
-            world.getBlock(blockPos) match {
+            val blockPos = BlockPosHelper.relative(pos, forward)
+            world.getBlockState(blockPos).getBlock match {
               case screen: Screen => Some((keyboard, screen, blockPos, forward))
-              case _ if keyboard.facing != ForgeDirection.UP && keyboard.facing != ForgeDirection.DOWN =>
+              case _ if keyboard.facing != Direction.UP && keyboard.facing != Direction.DOWN =>
                 // Special case #2: check for screen below keyboards on walls.
-                val blockPos = position.offset(forward.getOpposite)
-                world.getBlock(blockPos) match {
+                val blockPos = BlockPosHelper.relative(pos, forward.getOpposite)
+                world.getBlockState(blockPos).getBlock match {
                   case screen: Screen => Some((keyboard, screen, blockPos, forward.getOpposite))
                   case _ => None
                 }
@@ -132,5 +139,5 @@ class Keyboard extends SimpleBlock(Material.rock) with traits.SpecialBlock {
       case _ => None
     }
 
-  override def getValidRotations(world: World, x: Int, y: Int, z: Int) = null
+  override def getValidRotations(world: World, pos: BlockPos) = null
 }

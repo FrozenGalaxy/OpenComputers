@@ -3,11 +3,16 @@ package li.cil.oc.api.prefab;
 import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTBase;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentHolder;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.common.MutableDataComponentHolder;
+import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
+import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.TreeMap;
 
@@ -16,8 +21,8 @@ public class ItemStackArrayValue extends AbstractValue {
 	private ItemStack[] array = null;
 	private int iteratorIndex;
 
-	private static final byte TAGLIST_ID = (new NBTTagList()).getId();
-	private static final byte COMPOUND_ID = (new NBTTagCompound()).getId();
+	private static final byte TAGLIST_ID = (new ListTag()).getId();
+	private static final byte COMPOUND_ID = (new CompoundTag()).getId();
 	private static final String ARRAY_KEY = "Array";
 	private static final String INDEX_KEY = "Index";
 
@@ -44,7 +49,7 @@ public class ItemStackArrayValue extends AbstractValue {
 		if (this.iteratorIndex >= this.array.length)
 			return null;
 		int index = this.iteratorIndex++;
-		if (this.array[index] == null)//TODO 1.11 change to ItemStack.EMPTY?
+		if (this.array[index] == null || this.array[index].isEmpty())
 			return new Object[]{ emptyMap };
 		return new Object[]{ this.array[index] != null ? this.array[index] : emptyMap };
 	}
@@ -70,44 +75,42 @@ public class ItemStackArrayValue extends AbstractValue {
 	}
 
 	@Override
-	public void load(NBTTagCompound nbt) {
-		if (nbt.hasKey(ARRAY_KEY, TAGLIST_ID)){
-			NBTTagList tagList = nbt.getTagList(ARRAY_KEY,COMPOUND_ID);
-			this.array = new ItemStack[tagList.tagCount()];
-			for (int i = 0; i < tagList.tagCount(); ++i){
-				NBTTagCompound el = tagList.getCompoundTagAt(i);
-				if (el.hasNoTags())
-					this.array[i] = null;//TODO 1.11 change to ItemStack.EMPTY?
+	public void loadData(DataComponentHolder holder, @NonNull CompoundTag nbt, @Nonnull HolderLookup.Provider provider) {
+		if (nbt.contains(ARRAY_KEY, TAGLIST_ID)){
+			ListTag tagList = nbt.getList(ARRAY_KEY,COMPOUND_ID);
+			this.array = new ItemStack[tagList.size()];
+			for (int i = 0; i < tagList.size(); ++i){
+				CompoundTag el = tagList.getCompound(i);
+				if (el.isEmpty())
+					this.array[i] = ItemStack.EMPTY;
 				else
-					this.array[i] = ItemStack.loadItemStackFromNBT(el);
+					this.array[i] = ItemStack.parseOptional(provider, el);
 			}
 		} else {
 			this.array = null;
 		}
-		this.iteratorIndex = nbt.getInteger(INDEX_KEY);
+		this.iteratorIndex = nbt.getInt(INDEX_KEY);
 	}
 
 	@Override
-	public void save(NBTTagCompound nbt) {
+	public void saveData(MutableDataComponentHolder holder, @NotNull CompoundTag nbt, @Nonnull HolderLookup.Provider provider) {
 
-		NBTTagCompound nullnbt = new NBTTagCompound();
+		CompoundTag nullnbt = new CompoundTag();
 
 		if (this.array != null) {
-			NBTTagList nbttaglist = new NBTTagList();
+			ListTag nbttaglist = new ListTag();
 			for (ItemStack stack : this.array) {
 				if (stack != null) {
-					NBTTagCompound nbttagcompound = new NBTTagCompound();
-					stack.writeToNBT(nbttagcompound);
-					nbttaglist.appendTag(nbttagcompound);
+					nbttaglist.add(stack.save(provider));
 				} else {
-					nbttaglist.appendTag(nullnbt);
+					nbttaglist.add(nullnbt);
 				}
 			}
 
-			nbt.setTag(ARRAY_KEY, nbttaglist);
+			nbt.put(ARRAY_KEY, nbttaglist);
 		}
 
-		nbt.setInteger(INDEX_KEY, iteratorIndex);
+		nbt.putInt(INDEX_KEY, iteratorIndex);
 	}
 
 	@Callback(doc="function():nil -- Reset the iterator index so that the next call will return the first element.")
@@ -125,7 +128,7 @@ public class ItemStackArrayValue extends AbstractValue {
 	public Object[] getAll(Context context, Arguments arguments) throws Exception {
 		TreeMap<Integer,Object> map = new TreeMap<Integer,Object>();
 		for (int i=0; i<this.array.length; i++){
-			map.put(i, this.array[i] != null ? this.array[i] : emptyMap);
+			map.put(i + 1, this.array[i] != null ? this.array[i] : emptyMap);
 		}
 		return new Object[] { map };
 	}

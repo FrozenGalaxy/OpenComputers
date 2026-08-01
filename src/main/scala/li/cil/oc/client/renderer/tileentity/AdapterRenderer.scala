@@ -1,88 +1,83 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.client.Textures
-import li.cil.oc.common.tileentity
+import li.cil.oc.client.renderer.RenderTypes
+import li.cil.oc.common.blockentity
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import net.minecraftforge.common.util.ForgeDirection
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.blockentity.{BlockEntityRenderer, BlockEntityRendererProvider}
+import net.minecraft.core.Direction
 
-object AdapterRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+object AdapterRenderer extends BlockEntityRendererProvider[blockentity.Adapter] {
+  override def create(ctx: BlockEntityRendererProvider.Context): AdapterRenderer =
+    new AdapterRenderer()
+}
 
-    val adapter = tileEntity.asInstanceOf[tileentity.Adapter]
+class AdapterRenderer extends BlockEntityRenderer[blockentity.Adapter] {
+
+  override def render(adapter: blockentity.Adapter, dt: Float, stack: PoseStack, buffer: MultiBufferSource, light: Int, overlay: Int): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering")
+
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+
     if (adapter.openSides.contains(true)) {
-      GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+      stack.pushPose()
 
-      RenderState.disableLighting()
-      RenderState.makeItBlend()
+      stack.translate(0.5, 0.5, 0.5)
+      RenderState.mirrorScale(stack, 1.0025f, -1.0025f, 1.0025f)
+      stack.translate(-0.5f, -0.5f, -0.5f)
 
-      GL11.glPushMatrix()
+      val vBuffer = buffer.getBuffer(RenderTypes.BLOCK_OVERLAY)
+      val sideActivity = Textures.getSprite(Textures.Block.AdapterOn)
+      val matrix = stack.last.pose
 
-      GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
-      GL11.glScaled(1.0025, -1.0025, 1.0025)
-      GL11.glTranslatef(-0.5f, -0.5f, -0.5f)
-
-      bindTexture(TextureMap.locationBlocksTexture)
-      val t = Tessellator.instance
-      t.startDrawingQuads()
-
-      val sideActivity = Textures.Adapter.iconOn
-
-      if (adapter.isSideOpen(ForgeDirection.DOWN)) {
-        t.addVertexWithUV(0, 1, 0, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 1, 0, sideActivity.getMinU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 1, 1, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 1, 1, sideActivity.getMaxU, sideActivity.getMaxV)
+      if (adapter.isSideOpen(Direction.DOWN)) {
+        vBuffer.addVertex(matrix, 0, 1, 0).setUv(sideActivity.getU1, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 1, 1, 0).setUv(sideActivity.getU0, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 1, 1, 1).setUv(sideActivity.getU0, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 0, 1, 1).setUv(sideActivity.getU1, sideActivity.getV1)
       }
 
-      if (adapter.isSideOpen(ForgeDirection.UP)) {
-        t.addVertexWithUV(0, 0, 0, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 0, 1, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 1, sideActivity.getMinU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 0, sideActivity.getMinU, sideActivity.getMaxV)
+      if (adapter.isSideOpen(Direction.UP)) {
+        vBuffer.addVertex(matrix, 0, 0, 0).setUv(sideActivity.getU1, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 0, 0, 1).setUv(sideActivity.getU1, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 1, 0, 1).setUv(sideActivity.getU0, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 1, 0, 0).setUv(sideActivity.getU0, sideActivity.getV1)
       }
 
-      if (adapter.isSideOpen(ForgeDirection.NORTH)) {
-        t.addVertexWithUV(1, 1, 0, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 1, 0, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 0, 0, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 0, sideActivity.getMinU, sideActivity.getMinV)
+      if (adapter.isSideOpen(Direction.NORTH)) {
+        vBuffer.addVertex(matrix, 1, 1, 0).setUv(sideActivity.getU0, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 0, 1, 0).setUv(sideActivity.getU1, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 0, 0, 0).setUv(sideActivity.getU1, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 1, 0, 0).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      if (adapter.isSideOpen(ForgeDirection.SOUTH)) {
-        t.addVertexWithUV(0, 1, 1, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 1, 1, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 0, 1, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(0, 0, 1, sideActivity.getMinU, sideActivity.getMinV)
+      if (adapter.isSideOpen(Direction.SOUTH)) {
+        vBuffer.addVertex(matrix, 0, 1, 1).setUv(sideActivity.getU0, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 1, 1, 1).setUv(sideActivity.getU1, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 1, 0, 1).setUv(sideActivity.getU1, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 0, 0, 1).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      if (adapter.isSideOpen(ForgeDirection.WEST)) {
-        t.addVertexWithUV(0, 1, 0, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 1, 1, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 0, 1, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(0, 0, 0, sideActivity.getMinU, sideActivity.getMinV)
+      if (adapter.isSideOpen(Direction.WEST)) {
+        vBuffer.addVertex(matrix, 0, 1, 0).setUv(sideActivity.getU0, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 0, 1, 1).setUv(sideActivity.getU1, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 0, 0, 1).setUv(sideActivity.getU1, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 0, 0, 0).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      if (adapter.isSideOpen(ForgeDirection.EAST)) {
-        t.addVertexWithUV(1, 1, 1, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 1, 0, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 0, 0, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 1, sideActivity.getMinU, sideActivity.getMinV)
+      if (adapter.isSideOpen(Direction.EAST)) {
+        vBuffer.addVertex(matrix, 1, 1, 1).setUv(sideActivity.getU0, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 1, 1, 0).setUv(sideActivity.getU1, sideActivity.getV1)
+        vBuffer.addVertex(matrix, 1, 0, 0).setUv(sideActivity.getU1, sideActivity.getV0)
+        vBuffer.addVertex(matrix, 1, 0, 1).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      t.draw()
-
-      RenderState.enableLighting()
-
-      GL11.glPopMatrix()
-      GL11.glPopAttrib()
+      stack.popPose()
     }
 
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
 }

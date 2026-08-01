@@ -2,19 +2,18 @@ import com.typesafe.config.ConfigFactory
 import li.cil.oc.Settings
 import li.cil.oc.server.component.InternetCard
 import org.junit.runner.RunWith
-import org.scalatest.{FlatSpec, FunSpec, WordSpec}
-import org.scalatest.Matchers.{be, convertToAnyShouldWrapper}
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.mock.MockitoSugar
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatestplus.junit.JUnitRunner
 
 import java.net.InetAddress
-import scala.compat.Platform.EOL
 import scala.io.{Codec, Source}
 
 @RunWith(classOf[JUnitRunner])
-class InternetFilteringRuleTest extends FunSpec with MockitoSugar {
+class InternetFilteringRuleTest extends AnyFunSpec with Matchers {
   val config = autoClose(classOf[Settings].getResourceAsStream("/application.conf")) { in =>
-    val configStr = Source.fromInputStream(in)(Codec.UTF8).getLines().mkString("", EOL, EOL)
+    val eol = System.lineSeparator()
+    val configStr = Source.fromInputStream(in)(Codec.UTF8).getLines().mkString("", eol, eol)
     ConfigFactory.parseString(configStr)
   }
   val settings = new Settings(config.getConfig("opencomputers"))
@@ -33,7 +32,7 @@ class InternetFilteringRuleTest extends FunSpec with MockitoSugar {
       isUriBlacklisted("http://127.0.0.1") should be(true)
       isUriBlacklisted("http://127.0.1") should be(true)
       isUriBlacklisted("http://127.1") should be(true)
-      isUriBlacklisted("http://0") should be (true)
+      isUriBlacklisted("http://0") should be(true)
     }
     it("should reject the local host in IPv6") {
       isUriBlacklisted("http://[::1]") should be(true)
@@ -69,12 +68,12 @@ class InternetFilteringRuleTest extends FunSpec with MockitoSugar {
     !InternetCard.isRequestAllowed(settings, resolved, uriObj.getHost)
   }
 
-  def autoClose[A <: AutoCloseable, B](closeable: A)(fun: (A) ⇒ B): B = {
+  def autoClose[A <: AutoCloseable, B](closeable: A)(fun: (A) => B): B = {
     var t: Throwable = null
     try {
       fun(closeable)
     } catch {
-      case funT: Throwable ⇒
+      case funT: Throwable =>
         t = funT
         throw t
     } finally {
@@ -82,7 +81,7 @@ class InternetFilteringRuleTest extends FunSpec with MockitoSugar {
         try {
           closeable.close()
         } catch {
-          case closeT: Throwable ⇒
+          case closeT: Throwable =>
             t.addSuppressed(closeT)
             throw t
         }

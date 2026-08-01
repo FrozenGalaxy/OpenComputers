@@ -2,7 +2,7 @@ package li.cil.oc.api.internal;
 
 import li.cil.oc.api.Persistable;
 import li.cil.oc.api.network.Environment;
-import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * This interface is implemented by the keyboard component, to allow more
@@ -23,7 +23,7 @@ public interface Keyboard extends Environment, Persistable {
      * position, the specified callback will be queried for usability checks
      * instead.
      * <br>
-     * Pass <tt>null</tt> here to unset a previously set override.
+     * Pass {@code null} here to unset a previously set override.
      *
      * @param callback the usability checker to use.
      */
@@ -32,7 +32,7 @@ public interface Keyboard extends Environment, Persistable {
     /**
      * Contract interface that has to implemented for usability check overrides.
      *
-     * @see #setUsableOverride(Keyboard.UsabilityChecker)
+     * @see #setUsableOverride(UsabilityChecker)
      */
     interface UsabilityChecker {
         /**
@@ -42,6 +42,6 @@ public interface Keyboard extends Environment, Persistable {
          * @param player   the player to check for.
          * @return whether the keyboard is usable by the player.
          */
-        boolean isUsableByPlayer(Keyboard keyboard, EntityPlayer player);
+        boolean isUsableByPlayer(Keyboard keyboard, Player player);
     }
 }

@@ -3,33 +3,34 @@ package li.cil.oc.common.nanomachines.provider
 import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.prefab.AbstractBehavior
-import net.minecraft.entity.item.EntityItem
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.util.Vec3
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.phys.Vec3
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 
 object MagnetProvider extends ScalaProvider("9324d5ec-71f1-41c2-b51c-406e527668fc") {
-  override def createScalaBehaviors(player: EntityPlayer) = Iterable(new MagnetBehavior(player))
+  override def createScalaBehaviors(player: Player) = Iterable(new MagnetBehavior(player))
 
-  override def readBehaviorFromNBT(player: EntityPlayer, nbt: NBTTagCompound) = new MagnetBehavior(player)
+  override def readBehaviorFromNBT(player: Player, nbt: CompoundTag) = new MagnetBehavior(player)
 
-  class MagnetBehavior(player: EntityPlayer) extends AbstractBehavior(player) {
+  class MagnetBehavior(player: Player) extends AbstractBehavior(player) {
     override def getNameHint = "magnet"
 
     override def update(): Unit = {
-      val world = player.getEntityWorld
-      if (!world.isRemote) {
+      val world = player.level
+      if (!world.isClientSide) {
         val actualRange = Settings.get.nanomachineMagnetRange * api.Nanomachines.getController(player).getInputCount(this)
-        val items = world.getEntitiesWithinAABB(classOf[EntityItem], player.boundingBox.expand(actualRange, actualRange, actualRange))
+        val items = world.getEntitiesOfClass(classOf[ItemEntity], player.getBoundingBox.inflate(actualRange, actualRange, actualRange))
         items.collect {
-          case item: EntityItem if item.delayBeforeCanPickup < 1 && item.getEntityItem != null && player.inventory.mainInventory.exists(stack => stack == null || stack.stackSize < stack.getMaxStackSize && stack.isItemEqual(item.getEntityItem)) =>
-            val dx = player.posX - item.posX
-            val dy = player.posY - item.posY
-            val dz = player.posZ - item.posZ
-            val delta = Vec3.createVectorHelper(dx, dy, dz).normalize()
-            item.addVelocity(delta.xCoord * 0.1, delta.yCoord * 0.1, delta.zCoord * 0.1)
+          case item: ItemEntity if !item.hasPickUpDelay && !item.getItem.isEmpty && player.inventory.items.exists(stack => stack.isEmpty || stack.getCount < stack.getMaxStackSize && ItemStack.isSameItem(stack, item.getItem)) =>
+            val dx = player.getX - item.getX
+            val dy = player.getY - item.getY
+            val dz = player.getZ - item.getZ
+            val delta = new Vec3(dx, dy, dz).normalize()
+            item.push(delta.x * 0.1, delta.y * 0.1, delta.z * 0.1)
         }
       }
     }

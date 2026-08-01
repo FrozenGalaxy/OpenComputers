@@ -1,11 +1,10 @@
 package li.cil.oc.api.prefab;
 
-import net.minecraft.block.Block;
-import net.minecraft.item.ItemBlock;
-import net.minecraft.item.ItemStack;
-import net.minecraft.world.World;
-import net.minecraftforge.common.util.ForgeDirection;
-import net.minecraftforge.oredict.OreDictionary;
+import li.cil.oc.api.driver.DriverBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
 
 /**
  * If you wish to create a block component for a third-party block, i.e. a block
@@ -19,34 +18,24 @@ import net.minecraftforge.oredict.OreDictionary;
  * You still have to provide the implementation for creating its environment, if
  * any.
  * <br>
- * To limit sidedness, I recommend overriding {@link #worksWith(World, int, int, int, ForgeDirection)}
+ * To limit sidedness, I recommend overriding {@link #worksWith(Level, BlockPos, Direction)}
  * and calling <code>super.worksWith</code> in addition to the side check.
  *
  * @see li.cil.oc.api.network.ManagedEnvironment
  */
 @SuppressWarnings("UnusedDeclaration")
-public abstract class DriverSidedBlock implements li.cil.oc.api.driver.SidedBlock {
-    protected final ItemStack[] blocks;
+public abstract class DriverSidedBlock implements DriverBlock {
+    protected final BlockState[] blocks;
 
-    protected DriverSidedBlock(final ItemStack... blocks) {
+    protected DriverSidedBlock(final BlockState... blocks) {
         this.blocks = blocks.clone();
     }
 
     @Override
-    public boolean worksWith(final World world, final int x, final int y, final int z, final ForgeDirection side) {
-        return worksWith(world.getBlock(x, y, z), world.getBlockMetadata(x, y, z));
-    }
-
-    protected boolean worksWith(final Block referenceBlock, final int referenceMetadata) {
-        for (ItemStack stack : blocks) {
-            if (stack != null && stack.getItem() instanceof ItemBlock) {
-                final ItemBlock item = (ItemBlock) stack.getItem();
-                final Block supportedBlock = item.field_150939_a;
-                final int supportedMetadata = item.getMetadata(stack.getItemDamage());
-                if (referenceBlock == supportedBlock && (referenceMetadata == supportedMetadata || stack.getItemDamage() == OreDictionary.WILDCARD_VALUE)) {
-                    return true;
-                }
-            }
+    public boolean worksWith(final Level world, final BlockPos pos, final Direction side) {
+        final BlockState state = world.getBlockState(pos);
+        for (BlockState block : blocks) {
+            if (block == state) return true;
         }
         return false;
     }

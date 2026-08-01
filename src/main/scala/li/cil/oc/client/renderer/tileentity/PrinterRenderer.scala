@@ -1,44 +1,56 @@
 package li.cil.oc.client.renderer.tileentity
 
-import li.cil.oc.common.tileentity.Printer
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.math.Axis
+import li.cil.oc.client.Textures
+import li.cil.oc.common.blockentity.Printer
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.OpenGlHelper
-import net.minecraft.client.renderer.entity.RenderItem
-import net.minecraft.client.renderer.entity.RenderManager
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.entity.item.EntityItem
-import net.minecraft.tileentity.TileEntity
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.block.model.ItemTransforms
+import net.minecraft.client.renderer.blockentity.{BlockEntityRenderer, BlockEntityRendererProvider}
+import net.minecraft.world.item.ItemDisplayContext
 
-object PrinterRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+object PrinterRenderer extends BlockEntityRendererProvider[Printer] {
+  override def create(ctx: BlockEntityRendererProvider.Context): PrinterRenderer =
+    new PrinterRenderer()
+}
 
-    val printer = tileEntity.asInstanceOf[Printer]
-    if (printer.data.stateOff.size > 0) {
+class PrinterRenderer extends BlockEntityRenderer[Printer] {
+  override def render(
+                       printer: Printer,
+                       dt: Float,
+                       matrix: PoseStack,
+                       buffer: MultiBufferSource,
+                       light: Int,
+                       overlay: Int
+                     ): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering (aka: wasntme)")
+
+    if (printer.data.stateOff.nonEmpty) {
       val stack = printer.data.createItemStack()
 
-      GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
-      GL11.glPushMatrix()
+      matrix.pushPose()
+      matrix.translate(0.5, 0.5 + 0.3, 0.5)
 
-      GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
+      matrix.mulPose(Axis.YP.rotationDegrees((System.currentTimeMillis() % 20000) / 20000f * 360))
+      matrix.scale(0.75f, 0.75f, 0.75f)
 
-      GL11.glRotated((System.currentTimeMillis() % 20000) / 20000.0 * 360, 0, 1, 0)
+      Textures.Block.bind()
+      Minecraft.getInstance.getItemRenderer.renderStatic(
+        stack,
+        ItemDisplayContext.FIXED,
+        light,
+        overlay,
+        matrix,
+        buffer,
+        printer.getLevel,
+        0
+      )
 
-      val brightness = printer.world.getLightBrightnessForSkyBlocks(printer.x, printer.y, printer.z, 0)
-      OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, brightness % 65536, brightness / 65536)
-
-      // This is very 'meh', but item frames do it like this, too!
-      val entity = new EntityItem(printer.world, 0, 0, 0, stack)
-      entity.hoverStart = 0
-      RenderItem.renderInFrame = true
-      RenderManager.instance.renderEntityWithPosYaw(entity, 0, -0.1, 0, 0, 0)
-      RenderItem.renderInFrame = false
-
-      GL11.glPopMatrix()
-      GL11.glPopAttrib()
+      matrix.popPose()
     }
 
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
 }

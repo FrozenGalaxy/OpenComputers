@@ -2,9 +2,9 @@ package li.cil.oc.common.template
 
 import li.cil.oc.Constants
 import li.cil.oc.api
-import li.cil.oc.common.inventory.ServerInventory
+import li.cil.oc.common.container.ServerInventory
 import li.cil.oc.util.ItemUtils
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
 
 import scala.language.postfixOps
 
@@ -12,16 +12,19 @@ object ServerTemplate {
   def selectDisassembler(stack: ItemStack) =
     api.Items.get(stack) == api.Items.get(Constants.ItemName.ServerTier1) ||
       api.Items.get(stack) == api.Items.get(Constants.ItemName.ServerTier2) ||
-      api.Items.get(stack) == api.Items.get(Constants.ItemName.ServerTier3)
+      api.Items.get(stack) == api.Items.get(Constants.ItemName.ServerTier3) ||
+      api.Items.get(stack) == api.Items.get(Constants.ItemName.ServerTier4)
 
   def disassemble(stack: ItemStack, ingredients: Array[ItemStack]) = {
     val info = new ServerInventory {
       override def container = stack
+
+      override def rackSlot = -1
     }
-    Array(ingredients, (0 until info.getSizeInventory).map(info.getStackInSlot).filter(null !=).toArray)
+    Array(ingredients, (0 until info.getContainerSize).map(info.getItem).filter(null !=).toArray)
   }
 
-  def register() {
+  def register(): Unit = {
     // Disassembler
     api.IMC.registerDisassemblerTemplate("Server",
       "li.cil.oc.common.template.ServerTemplate.selectDisassembler",

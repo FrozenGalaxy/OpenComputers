@@ -1,11 +1,16 @@
 package li.cil.oc.common.item
 
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.neoforged.neoforge.common.extensions.IItemExtension
+
 import scala.language.existentials
 
-class CPU(val parent: Delegator, val tier: Int) extends traits.Delegate with traits.ItemTier with traits.CPULike {
-  override val unlocalizedName = super.unlocalizedName + tier
+class CPU(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with traits.CPULike with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
 
   override def cpuTier = tier
 
-  override protected def tooltipName = Option(super.unlocalizedName)
+  override protected def tooltipName = Option(unlocalizedName)
 }

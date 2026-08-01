@@ -5,10 +5,18 @@ import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.{EnvironmentHost, Packet}
+import li.cil.oc.common.datacomponents.{OCComponents, WakeMessage}
 import li.cil.oc.server.component._
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
 trait WakeMessageAware extends traits.NetworkAware {
+  private final val WakeMessageTag = "wakeMessage"
+
+  private final val WakeMessageFuzzyTag = "wakeMessageFuzzy"
+
   protected var wakeMessage: Option[String] = None
 
   protected var wakeMessageFuzzy: Boolean = false
@@ -32,7 +40,7 @@ trait WakeMessageAware extends traits.NetworkAware {
 
   protected def isPacketAccepted(packet: Packet, distance: Double): Boolean = true
 
-  protected def receivePacket(packet: Packet, distance: Double, host: EnvironmentHost) {
+  protected def receivePacket(packet: Packet, distance: Double, host: EnvironmentHost): Unit = {
     if (packet.source != node.address && Option(packet.destination).forall(_ == node.address)) {
       if (isPacketAccepted(packet, distance)) {
         node.sendToReachable("computer.signal", Seq("modem_message", packet.source, Int.box(packet.port), Double.box(distance)) ++ packet.data: _*)
@@ -56,15 +64,18 @@ trait WakeMessageAware extends traits.NetworkAware {
     }
   }
 
-  def loadWakeMessage(nbt: NBTTagCompound): Unit = {
-    if (nbt.hasKey("wakeMessage")) {
-      wakeMessage = Option(nbt.getString("wakeMessage"))
+  def loadWakeMessage(holder: DataComponentHolder): Unit = {
+    holder.getComponent(OCComponents.WAKE_MESSAGE) match {
+      case Some(wake) =>
+        wakeMessage = Some(wake.message)
+        wakeMessageFuzzy = wake.fuzzy
+      case None =>
+        wakeMessage = None
+        wakeMessageFuzzy = false
     }
-    wakeMessageFuzzy = nbt.getBoolean("wakeMessageFuzzy")
   }
 
-  def saveWakeMessage(nbt: NBTTagCompound): Unit = {
-    wakeMessage.foreach(nbt.setString("wakeMessage", _))
-    nbt.setBoolean("wakeMessageFuzzy", wakeMessageFuzzy)
+  def saveWakeMessage(holder: MutableDataComponentHolder): Unit = {
+    holder.setComponent(OCComponents.WAKE_MESSAGE, wakeMessage.map(WakeMessage(_, wakeMessageFuzzy)))
   }
 }

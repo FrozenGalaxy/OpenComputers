@@ -1,25 +1,30 @@
 package li.cil.oc.common.item
 
-import java.util
+import li.cil.oc.OpenComputers
+import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.container.DiskDriveMountableInventory
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.Level
+import net.minecraft.world.entity.player.Player
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResult
+import net.minecraft.world.InteractionResultHolder
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-import li.cil.oc.client.KeyBindings
-import li.cil.oc.{OpenComputers, Settings}
-import li.cil.oc.common.GuiType
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
+class DiskDriveMountable(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
+  override def use(stack: ItemStack, level: Level, player: Player) = {
+    if (!level.isClientSide) player match {
+      case srvPlr: ServerPlayer => MenuTypes.openDiskDriveGui(srvPlr, new DiskDriveMountableInventory {
+        override def container: ItemStack = stack
 
-import scala.collection.mutable
-
-class DiskDriveMountable(val parent: Delegator) extends traits.Delegate {
-  override def maxStackSize = 1
-
-  override def onItemRightClick(stack: ItemStack, world: World, player: EntityPlayer) = {
-    // Open the GUI immediately on the client, too, to avoid the player
-    // changing the current slot before it actually opens, which can lead to
-    // desynchronization of the player inventory.
-    player.openGui(OpenComputers, GuiType.DiskDriveMountable.id, world, 0, 0, 0)
-    player.swingItem()
-    stack
+        override def stillValid(player: Player) = player == srvPlr
+      })
+      case _ =>
+    }
+    player.swing(InteractionHand.MAIN_HAND)
+    new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
   }
 }

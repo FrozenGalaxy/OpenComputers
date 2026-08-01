@@ -1,100 +1,98 @@
 package li.cil.oc
 
-import cpw.mods.fml.common.Mod
-import cpw.mods.fml.common.Mod.EventHandler
-import cpw.mods.fml.common.SidedProxy
-import cpw.mods.fml.common.event.FMLInterModComms.IMCEvent
-import cpw.mods.fml.common.event._
-import cpw.mods.fml.common.network.FMLEventChannel
-import li.cil.oc.common.IMC
-import li.cil.oc.common.Proxy
-import li.cil.oc.common.asm.template.StaticSimpleEnvironment
-import li.cil.oc.server.command.CommandHandler
+import li.cil.oc.common.{IMC, Proxy}
+import li.cil.oc.common.block.ChameliumBlock
+import li.cil.oc.common.blockentity.BlockEntityTypes
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.common.entity.EntityTypes
+import li.cil.oc.common.init.{Blocks, Items}
+import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.recipe.Recipes
+import li.cil.oc.integration.Mods
+import li.cil.oc.server.loot.LootFunctions
+import li.cil.oc.server.command.SpawnComputerCommand
 import li.cil.oc.util.ThreadPoolFactory
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
+import net.neoforged.api.distmarker.Dist
+import net.neoforged.bus.api.{IEventBus, SubscribeEvent}
+import net.neoforged.fml.{InterModComms, ModContainer}
+import net.neoforged.fml.common.Mod
+import net.neoforged.fml.event.lifecycle.{FMLCommonSetupEvent, InterModProcessEvent}
+import net.neoforged.fml.loading.FMLPaths
+import net.neoforged.neoforge.common.NeoForge
+import net.neoforged.neoforgespi.Environment
+import org.apache.logging.log4j.{LogManager, Logger}
 
-@Mod(modid = OpenComputers.ID, name = OpenComputers.Name,
-  version = OpenComputers.Version,
-  modLanguage = "scala", useMetadata = true /*@MCVERSIONDEP@*/)
+import java.nio.file.Paths
+import scala.collection.convert.ImplicitConversionsToScala._
+
 object OpenComputers {
-  final val ID = "OpenComputers"
+  final val ID = "opencomputers"
 
   final val Name = "OpenComputers"
 
-  final val McVersion = "1.7.10-forge"
+  final val McVersion = "1.21.1-neoforge"
 
-  final val Version = "@VERSION@"
+  @volatile var Version = "unknown"
 
-  def log = logger.getOrElse(LogManager.getLogger(Name))
+  final val log: Logger = LogManager.getLogger(Name)
 
-  var logger: Option[Logger] = None
+  var proxy: Proxy = _
 
-  @SidedProxy(clientSide = "li.cil.oc.client.Proxy", serverSide = "li.cil.oc.server.Proxy")
-  var proxy: Proxy = null
+  private var instance: Option[OpenComputers] = None
 
-  var channel: FMLEventChannel = _
-
-  @EventHandler
-  def preInit(e: FMLPreInitializationEvent) {
-    logger = Option(e.getModLog)
-    proxy.preInit(e)
-    OpenComputers.log.info("Done with pre init phase.")
+  def get = instance match {
+    case Some(oc) => oc
+    case _ => throw new IllegalStateException("not initialized")
   }
+}
 
-  @EventHandler
-  def init(e: FMLInitializationEvent) = {
-    proxy.init(e)
-    OpenComputers.log.info("Done with init phase.")
-  }
+@Mod(OpenComputers.ID)
+class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
+  OpenComputers.Version = modContainer.getModInfo.getVersion.toString
 
-  @EventHandler
-  def postInit(e: FMLPostInitializationEvent) = {
-    proxy.postInit(e)
-    OpenComputers.log.info("Done with post init phase.")
-  }
-
-  @EventHandler
-  def missingMappings(e: FMLMissingMappingsEvent) = proxy.missingMappings(e)
-
-  @EventHandler
-  def serverStart(e: FMLServerStartingEvent): Unit = {
-    CommandHandler.register(e)
-    ThreadPoolFactory.safePools.foreach(_.newThreadPool())
-
-    if (Settings.get.internetAccessConfigured()) {
-      if (Settings.get.internetFilteringRulesInvalid()) {
-        OpenComputers.log.warn("####################################################")
-        OpenComputers.log.warn("#                                                  #")
-        OpenComputers.log.warn("#  Could not parse Internet Card filtering rules!  #")
-        OpenComputers.log.warn("#  Review the server log and adjust the filtering  #")
-        OpenComputers.log.warn("#  list to ensure it is appropriately configured.  #")
-        OpenComputers.log.warn("#   (config/OpenComputers.cfg => filteringRules)   #")
-        OpenComputers.log.warn("# Internet access has been automatically disabled. #")
-        OpenComputers.log.warn("#                                                  #")
-        OpenComputers.log.warn("####################################################")
-      } else if (!Settings.get.internetFilteringRulesObserved && e.getServer.isDedicatedServer) {
-        OpenComputers.log.warn("####################################################")
-        OpenComputers.log.warn("#                                                  #")
-        OpenComputers.log.warn("#    It appears that you're running a dedicated    #")
-        OpenComputers.log.warn("#  server with OpenComputers installed! Make sure  #")
-        OpenComputers.log.warn("#  to review the Internet Card address filtering   #")
-        OpenComputers.log.warn("#  list to ensure it is appropriately configured.  #")
-        OpenComputers.log.warn("#   (config/OpenComputers.cfg => filteringRules)   #")
-        OpenComputers.log.warn("#                                                  #")
-        OpenComputers.log.warn("####################################################")
-      } else {
-        OpenComputers.log.info(f"Successfully applied ${Settings.get.internetFilteringRules.length} Internet Card filtering rules.")
-      }
+  OpenComputers.proxy = {
+    val cls = Environment.get.getDist match {
+      case Dist.CLIENT => Class.forName("li.cil.oc.client.Proxy")
+      case _ => Class.forName("li.cil.oc.common.ServerProxy")
     }
+    cls.getConstructor(classOf[IEventBus]).newInstance(modBus).asInstanceOf[Proxy]
   }
 
-  @EventHandler
-  def serverStop(e: FMLServerStoppedEvent): Unit = {
-    ThreadPoolFactory.safePools.foreach(_.waitForCompletion())
-    StaticSimpleEnvironment.onServerStopped()
+  Settings.load(FMLPaths.CONFIGDIR.get().resolve(Paths.get("opencomputers", "settings.conf")).toFile())
+
+  modBus.register(this)
+  OCComponents.REGISTRAR.register(modBus)
+  Items.init(modBus)
+  Blocks.init(modBus)
+  CreativeTab.CREATIVE_TABS.register(modBus)
+  BlockEntityTypes.init(modBus)
+  Recipes.init(modBus)
+  LootFunctions.init(modBus)
+  EntityTypes.ENTITY_TYPES.register(modBus)
+  MenuTypes.MENU.register(modBus)
+  modBus.register(li.cil.oc.data.DataGenerators)
+  modBus.register(CreativeTab)
+  OpenComputers.instance = Some(this)
+  modBus.register(OpenComputers.proxy)
+  OpenComputers.proxy.preInit()
+  NeoForge.EVENT_BUS.register(ThreadPoolFactory)
+  NeoForge.EVENT_BUS.addListener(SpawnComputerCommand.onRegisterCommands)
+
+  // these used to use @EventBusSubscriber but Scala makes this impossible on NeoForge
+  modBus.register(ChameliumBlock)
+
+  Mods.preInit() // Must happen after loading Settings but before registry events are fired.
+
+  @SubscribeEvent
+  def imc(e: InterModProcessEvent): Unit = {
+    // Technically requires synchronization because IMC.sendTo doesn't check the loading stage.
+    e.enqueueWork((() => {
+      InterModComms.getMessages(OpenComputers.ID).sequential.iterator.foreach(IMC.handleMessage)
+    }): Runnable)
   }
 
-  @EventHandler
-  def imc(e: IMCEvent) = IMC.handleEvent(e)
+  @SubscribeEvent
+  def onCommonSetup(e: FMLCommonSetupEvent): Unit = {
+    OpenComputers.proxy.init(e)
+  }
 }

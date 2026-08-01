@@ -1,72 +1,81 @@
 package li.cil.oc.common.block
 
-import li.cil.oc.common.GuiType
-import li.cil.oc.common.tileentity
+import java.util
+import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.block.property.PropertyRotatable
+import li.cil.oc.common.blockentity
 import li.cil.oc.integration.Mods
 import li.cil.oc.util.Tooltip
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.item.{TooltipFlag => ITooltipFlag}
+import net.minecraft.world.entity.player.{Player => PlayerEntity}
+import net.minecraft.server.level.{ServerPlayer => ServerPlayerEntity}
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.block.state.{StateDefinition => StateContainer}
+import net.minecraft.core.Direction
+import net.minecraft.world.{InteractionHand => Hand}
+import net.minecraft.core.BlockPos
+import net.minecraft.network.chat.{Component => ITextComponent}
+import net.minecraft.world.item.Item.TooltipContext
+import net.minecraft.world.level.{BlockGetter => IBlockReader}
+import net.minecraft.world.level.{Level => World}
 
-class DiskDrive extends SimpleBlock with traits.GUI {
-  override protected def customTextures = Array(
-    None,
-    None,
-    Some("DiskDriveSide"),
-    Some("DiskDriveFront"),
-    Some("DiskDriveSide"),
-    Some("DiskDriveSide")
-  )
+import scala.collection.convert.ImplicitConversionsToScala._
+
+class DiskDrive(props: Properties) extends SimpleBlock(props) with traits.GUI {
+  protected override def createBlockStateDefinition(builder: StateContainer.Builder[Block, BlockState]) =
+    builder.add(PropertyRotatable.Facing)
 
   // ----------------------------------------------------------------------- //
 
-  override protected def tooltipTail(metadata: Int, stack: ItemStack, player: EntityPlayer, tooltip: java.util.List[String], advanced: Boolean) {
-    super.tooltipTail(metadata, stack, player, tooltip, advanced)
-    if (Mods.ComputerCraft.isAvailable) {
-      tooltip.addAll(Tooltip.get(getClass.getSimpleName + ".CC"))
+  override protected def tooltipTail(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], flag: ITooltipFlag): Unit = {
+    super.tooltipTail(stack, context, tooltip, flag)
+    if (Mods.ComputerCraft.isModAvailable) {
+      for (curr <- Tooltip.get(getClass.getSimpleName + ".CC")) tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def guiType = GuiType.DiskDrive
+  override def openGui(player: ServerPlayerEntity, world: World, pos: BlockPos): Unit = world.getBlockEntity(pos) match {
+    case te: blockentity.DiskDrive => MenuTypes.openDiskDriveGui(player, te)
+    case _ =>
+  }
 
-  override def hasTileEntity(metadata: Int) = true
-
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.DiskDrive()
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.DiskDrive(pos, state)
 
   // ----------------------------------------------------------------------- //
 
-  override def hasComparatorInputOverride = true
+  override def hasAnalogOutputSignal(state: BlockState): Boolean = true
 
-  override def getComparatorInputOverride(world: World, x: Int, y: Int, z: Int, side: Int) =
-    world.getTileEntity(x, y, z) match {
-      case drive: tileentity.DiskDrive if drive.getStackInSlot(0) != null => 15
+  override def getAnalogOutputSignal(state: BlockState, world: World, pos: BlockPos): Int =
+    world.getBlockEntity(pos) match {
+      case drive: blockentity.DiskDrive if !drive.getItem(0).isEmpty => 15
       case _ => 0
     }
 
   // ----------------------------------------------------------------------- //
 
-  override def onBlockActivated(world: World, x: Int, y: Int, z: Int, player: EntityPlayer,
-                                side: ForgeDirection, hitX: Float, hitY: Float, hitZ: Float) = {
+  override def localOnBlockActivated(world: World, pos: BlockPos, player: PlayerEntity, hand: Hand, heldItem: ItemStack, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
     // Behavior: sneaking -> Insert[+Eject], not sneaking -> GUI.
-    if (player.isSneaking) world.getTileEntity(x, y, z) match {
-      case drive: tileentity.DiskDrive =>
-        val isDiskInDrive = drive.getStackInSlot(0) != null
-        val isHoldingDisk = drive.isItemValidForSlot(0, player.getHeldItem)
+    if (player.isCrouching) world.getBlockEntity(pos) match {
+      case drive: blockentity.DiskDrive =>
+        val isDiskInDrive = drive.getItem(0) != null
+        val isHoldingDisk = drive.canPlaceItem(0, heldItem)
         if (isDiskInDrive) {
-          if (!world.isRemote) {
+          if (!world.isClientSide) {
             drive.dropSlot(0, 1, Option(drive.facing))
           }
         }
         if (isHoldingDisk) {
           // Insert the disk.
-          drive.setInventorySlotContents(0, player.inventory.decrStackSize(player.inventory.currentItem, 1))
+          drive.setItem(0, heldItem.split(1))
         }
         isDiskInDrive || isHoldingDisk
       case _ => false
     }
-    else super.onBlockActivated(world, x, y, z, player, side, hitX, hitY, hitZ)
+    else super.localOnBlockActivated(world, pos, player, hand, heldItem, side, hitX, hitY, hitZ)
   }
 }

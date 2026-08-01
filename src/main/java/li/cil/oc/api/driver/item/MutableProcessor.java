@@ -1,7 +1,7 @@
 package li.cil.oc.api.driver.item;
 
 import li.cil.oc.api.machine.Architecture;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * May be implemented in processor drivers of processors that can be reconfigured.
@@ -9,7 +9,7 @@ import net.minecraft.item.ItemStack;
  * This is the case for OC's built-in CPUs, for example, which can be reconfigured
  * to any registered architecture. It a CPU has such a driver, it may also be
  * reconfigured by the machine it is running in (e.g. in the Lua case via
- * <tt>computer.setArchitecture</tt>).
+ * {@code computer.setArchitecture}).
  */
 public interface MutableProcessor extends Processor {
     /**

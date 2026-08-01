@@ -1,21 +1,24 @@
 package li.cil.oc.common.event
 
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
 import li.cil.oc.Settings
 import li.cil.oc.api.event.FileSystemAccessEvent
 import li.cil.oc.api.internal.Rack
-import li.cil.oc.common.tileentity.Case
-import li.cil.oc.common.tileentity.DiskDrive
-import li.cil.oc.common.tileentity.Raid
+import li.cil.oc.common.blockentity.Case
+import li.cil.oc.common.blockentity.DiskDrive
+import li.cil.oc.common.blockentity.Raid
 import li.cil.oc.server.component.DiskDriveMountable
 import li.cil.oc.server.component.Server
+import net.minecraft.resources.ResourceLocation
+import net.neoforged.bus.api.SubscribeEvent
+import net.minecraft.sounds.SoundEvent
+import net.minecraft.sounds.SoundSource
 
 object FileSystemAccessHandler {
   @SubscribeEvent
-  def onFileSystemAccess(e: FileSystemAccessEvent.Server) {
-    e.getTileEntity match {
+  def onFileSystemAccess(e: FileSystemAccessEvent.Server): Unit = {
+    e.getBlockEntity match {
       case t: Rack =>
-        for (slot <- 0 until t.getSizeInventory) {
+        for (slot <- 0 until t.getContainerSize) {
           t.getMountable(slot) match {
             case server: Server =>
               val containsNode = server.componentSlot(e.getNode.address) >= 0
@@ -37,10 +40,14 @@ object FileSystemAccessHandler {
   }
 
   @SubscribeEvent
-  def onFileSystemAccess(e: FileSystemAccessEvent.Client) {
+  def onFileSystemAccess(e: FileSystemAccessEvent.Client): Unit = {
     val volume = Settings.get.soundVolume
-    e.getWorld.playSound(e.getX, e.getY, e.getZ, e.getSound, volume, 1, false)
-    e.getTileEntity match {
+    val soundName = e.getSound
+    if (soundName != null && soundName.nonEmpty) {
+      val sound = SoundEvent.createVariableRangeEvent(ResourceLocation.tryParse(soundName))
+      e.getWorld.playLocalSound(e.getX, e.getY, e.getZ, sound, SoundSource.BLOCKS, volume, 1, false)
+    }
+    e.getBlockEntity match {
       case t: DiskDrive => t.lastAccess = System.currentTimeMillis()
       case t: Case => t.lastFileSystemAccess = System.currentTimeMillis()
       case t: Raid => t.lastAccess = System.currentTimeMillis()

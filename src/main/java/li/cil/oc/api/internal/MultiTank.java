@@ -1,13 +1,13 @@
 package li.cil.oc.api.internal;
 
-import net.minecraftforge.fluids.IFluidTank;
+import net.neoforged.neoforge.fluids.IFluidTank;
 
 /**
  * Implemented by objects with multiple internal tanks.
  * <br>
  * This is specifically for containers where the side does not matter when
  * accessing the internal tanks, only the index of the tank; unlike with the
- * {@link net.minecraftforge.fluids.IFluidHandler} interface.
+ * {@link IFluidTank} interface.
  */
 public interface MultiTank {
     /**

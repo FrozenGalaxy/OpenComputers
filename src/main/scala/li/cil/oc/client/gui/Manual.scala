@@ -1,24 +1,21 @@
 package li.cil.oc.client.gui
 
-import java.util
-
-import li.cil.oc.Localization
-import li.cil.oc.api
+import com.mojang.blaze3d.platform.InputConstants
+import li.cil.oc.{Localization, api}
 import li.cil.oc.client.Textures
 import li.cil.oc.client.renderer.markdown.Document
-import li.cil.oc.client.renderer.markdown.segment.InteractiveSegment
-import li.cil.oc.client.renderer.markdown.segment.Segment
+import li.cil.oc.client.renderer.markdown.segment.{InteractiveSegment, Segment}
 import li.cil.oc.client.{Manual => ManualAPI}
-import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiButton
-import net.minecraft.client.gui.GuiScreen
-import org.lwjgl.input.Mouse
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.KeyMapping
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.screens
+import net.minecraft.network.chat.Component
+import org.lwjgl.glfw.GLFW
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.jdk.CollectionConverters._
 
-class Manual extends GuiScreen with traits.Window {
+class Manual extends screens.Screen(Component.empty()) with traits.Window {
   final val documentMaxWidth = 230
   final val documentMaxHeight = 176
   final val scrollPosX = 244
@@ -34,9 +31,11 @@ class Manual extends GuiScreen with traits.Window {
   override val windowWidth = 256
   override val windowHeight = 192
 
-  override def backgroundImage = Textures.guiManual
+  override def backgroundImage = Textures.GUI.Manual
 
-  var isDragging = false
+  override protected def renderBlurredBackground(dt: Float): Unit = ()
+
+  var isScrolling = false
   var document: Segment = null
   var documentHeight = 0
   var currentSegment = None: Option[InteractiveSegment]
@@ -58,9 +57,9 @@ class Manual extends GuiScreen with traits.Window {
 
   def refreshPage(): Unit = {
     val content = Option(api.Manual.contentFor(ManualAPI.history.top.path)).
-      getOrElse(asJavaIterable(Iterable("Document not found: " + ManualAPI.history.top.path)))
-    document = Document.parse(content)
-    documentHeight = Document.height(document, documentMaxWidth, fontRendererObj)
+      getOrElse(Iterable("Document not found: " + ManualAPI.history.top.path).asJava)
+    document = Document.parse(content.asScala)
+    documentHeight = Document.height(document, documentMaxWidth, font)
     scrollTo(offset)
   }
 
@@ -77,131 +76,158 @@ class Manual extends GuiScreen with traits.Window {
       refreshPage()
     }
     else {
-      Minecraft.getMinecraft.thePlayer.closeScreen()
+      onClose()
     }
   }
 
-  override def actionPerformed(button: GuiButton): Unit = {
-    if (button.id >= 0 && button.id < ManualAPI.tabs.length) {
-      api.Manual.navigate(ManualAPI.tabs(button.id).path)
-    }
-  }
-
-  override def initGui(): Unit = {
-    super.initGui()
+  override protected def init(): Unit = {
+    super.init()
+    minecraft.mouseHandler.releaseMouse()
+    KeyMapping.releaseAll()
 
     for ((tab, i) <- ManualAPI.tabs.zipWithIndex if i < maxTabsPerSide) {
-      val x = guiLeft + tabPosX
-      val y = guiTop + tabPosY + i * (tabHeight - 1)
-      add(buttonList, new ImageButton(i, x, y, tabWidth, tabHeight, Textures.guiManualTab))
+      val x = leftPos + tabPosX
+      val y = topPos + tabPosY + i * (tabHeight - 1)
+      addRenderableWidget(new ImageButton(x, y, tabWidth, tabHeight, (_: Button) =>
+        api.Manual.navigate(tab.path), Textures.GUI.ManualTab))
     }
 
-    scrollButton = new ImageButton(-1, guiLeft + scrollPosX, guiTop + scrollPosY, 6, 13, Textures.guiButtonScroll)
-    add(buttonList, scrollButton)
+    scrollButton = new ImageButton(leftPos + scrollPosX, topPos + scrollPosY, 6, 13, (_: Button) => (),
+      Textures.GUI.ButtonScroll)
+    addRenderableWidget(scrollButton)
 
     refreshPage()
   }
 
-  override def drawScreen(mouseX: Int, mouseY: Int, dt: Float): Unit = {
-    super.drawScreen(mouseX, mouseY, dt)
+  override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
+    super.render(graphics, mouseX, mouseY, dt)
 
-    scrollButton.enabled = canScroll
-    scrollButton.hoverOverride = isDragging
+    scrollButton.active = canScroll
+    scrollButton.hoverOverride = isScrolling
 
+    val stack = graphics.pose()
     for ((tab, i) <- ManualAPI.tabs.zipWithIndex if i < maxTabsPerSide) {
-      val button = buttonList.get(i).asInstanceOf[ImageButton]
-      GL11.glPushMatrix()
-      GL11.glTranslated(button.xPosition + 5, button.yPosition + 5, zLevel)
-      tab.renderer.render()
-      GL11.glPopMatrix()
+      val button = renderables.get(i).asInstanceOf[ImageButton]
+      stack.pushPose()
+      stack.translate(button.x + 5, button.y + 5, 0)
+      tab.renderer.render(graphics)
+      stack.popPose()
     }
 
-    currentSegment = Document.render(document, guiLeft + 8, guiTop + 8, documentMaxWidth, documentMaxHeight, offset, fontRendererObj, mouseX, mouseY)
+    currentSegment = Document.render(graphics, document, leftPos + 8, topPos + 8, documentMaxWidth, documentMaxHeight, offset, font, mouseX, mouseY)
 
-    if (!isDragging) currentSegment match {
+    def localizeAndWrap(text: String): java.util.List[Component] =
+      Localization.localizeImmediately(text).linesIterator.map(Component.literal).toList
+        .asInstanceOf[List[Component]].asJava
+
+    if (!isScrolling) currentSegment match {
       case Some(segment) =>
         segment.tooltip match {
-          case Some(text) if text.nonEmpty => drawHoveringText(seqAsJavaList(Localization.localizeImmediately(text).lines.toSeq), mouseX, mouseY, fontRendererObj)
+          case Some(text) if text.nonEmpty =>
+            graphics.renderComponentTooltip(font, localizeAndWrap(text), mouseX, mouseY)
           case _ =>
         }
       case _ =>
     }
 
-    if (!isDragging) for ((tab, i) <- ManualAPI.tabs.zipWithIndex if i < maxTabsPerSide) {
-      val button = buttonList.get(i).asInstanceOf[ImageButton]
-      if (mouseX > button.xPosition && mouseX < button.xPosition + tabWidth && mouseY > button.yPosition && mouseY < button.yPosition + tabHeight) tab.tooltip.foreach(text => {
-        drawHoveringText(seqAsJavaList(Localization.localizeImmediately(text).lines.toSeq), mouseX, mouseY, fontRendererObj)
-      })
+    if (!isScrolling) for ((tab, i) <- ManualAPI.tabs.zipWithIndex if i < maxTabsPerSide) {
+      val button = renderables.get(i).asInstanceOf[ImageButton]
+      if (mouseX > button.x && mouseX < button.x + tabWidth && mouseY > button.y && mouseY < button.y + tabHeight)
+        tab.tooltip.foreach(text => graphics.renderComponentTooltip(font, localizeAndWrap(text), mouseX, mouseY))
     }
 
-    if (canScroll && (isCoordinateOverScrollBar(mouseX - guiLeft, mouseY - guiTop) || isDragging)) {
-      drawHoveringText(seqAsJavaList(Seq(s"${100 * offset / maxOffset}%")), guiLeft + scrollPosX + scrollWidth, scrollButton.yPosition + scrollButton.height + 1, fontRendererObj)
+    if (canScroll && (isCoordinateOverScrollBar(mouseX - leftPos, mouseY - topPos) || isScrolling)) {
+      val lines: java.util.List[Component] = java.util.List.of(Component.literal(s"${100 * offset / maxOffset}%"))
+      graphics.renderComponentTooltip(font, lines, leftPos + scrollPosX + scrollWidth, scrollButton.y + scrollButton.getHeight + 1)
     }
   }
 
-  override def keyTyped(char: Char, code: Int): Unit = {
-    if (code == mc.gameSettings.keyBindJump.getKeyCode) {
+  override def keyPressed(keyCode: Int, scanCode: Int, mods: Int): Boolean = {
+    val input = InputConstants.getKey(keyCode, scanCode)
+    if (minecraft.options.keyJump.isActiveAndMatches(input)) {
       popPage()
+      return true
     }
-    else if (code == mc.gameSettings.keyBindInventory.getKeyCode) {
-      mc.thePlayer.closeScreen()
+    if (minecraft.options.keyInventory.isActiveAndMatches(input)) {
+      onClose()
+      return true
     }
-    else super.keyTyped(char, code)
+    super.keyPressed(keyCode, scanCode, mods)
   }
 
-  override def handleMouseInput(): Unit = {
-    super.handleMouseInput()
-    if (Mouse.hasWheel && Mouse.getEventDWheel != 0) {
-      if (math.signum(Mouse.getEventDWheel) < 0) scrollDown()
-      else scrollUp()
+  override def mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean = {
+    if (scrollY < 0) {
+      scrollDown()
+      true
     }
+    else if (scrollY > 0) {
+      scrollUp()
+      true
+    }
+    else super.mouseScrolled(mouseX, mouseY, scrollX, scrollY)
   }
 
-  override def mouseClicked(mouseX: Int, mouseY: Int, button: Int): Unit = {
+  override def mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = {
+    val (mcx, mcy) = (mouseX.toInt - leftPos, mouseY.toInt - topPos)
+    if (canScroll && button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isCoordinateOverScrollBar(mcx, mcy)) {
+      isScrolling = true
+      scrollMouse(mouseY)
+      return true
+    }
+    if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isCoordinateOverContent(mcx, mcy)) {
+      if (currentSegment.exists(_.onMouseClick(mouseX.toInt, mouseY.toInt))) {
+        return true
+      }
+    }
+    if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+      popPage()
+      return true
+    }
     super.mouseClicked(mouseX, mouseY, button)
+  }
 
-    if (canScroll && button == 0 && isCoordinateOverScrollBar(mouseX - guiLeft, mouseY - guiTop)) {
-      isDragging = true
+  override def mouseMoved(mouseX: Double, mouseY: Double): Unit = {
+    if (isScrolling) scrollMouse(mouseY)
+    super.mouseMoved(mouseX, mouseY)
+  }
+
+  override def mouseDragged(mouseX: Double, mouseY: Double, button: Int, deltaX: Double, deltaY: Double): Boolean = {
+    if (isScrolling) {
       scrollMouse(mouseY)
+      return true
     }
-    else if (button == 0) currentSegment.foreach(_.onMouseClick(mouseX, mouseY))
-    else if (button == 1) popPage()
+    super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)
   }
 
-  override protected def mouseClickMove(mouseX: Int, mouseY: Int, lastButtonClicked: Int, timeSinceMouseClick: Long) {
-    super.mouseClickMove(mouseX, mouseY, lastButtonClicked, timeSinceMouseClick)
-    if (isDragging) {
-      scrollMouse(mouseY)
+  override def mouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean = {
+    if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && isScrolling) {
+      isScrolling = false
+      return true
     }
+    super.mouseReleased(mouseX, mouseY, button)
   }
 
-  override protected def mouseMovedOrUp(mouseX: Int, mouseY: Int, button: Int) {
-    super.mouseMovedOrUp(mouseX, mouseY, button)
-    if (button == 0) {
-      isDragging = false
-    }
-  }
+  private def scrollMouse(mouseY: Double): Unit =
+    scrollTo(math.round((mouseY - topPos - scrollPosY - 6.5) * maxOffset / (scrollHeight - 13.0)).toInt)
 
-  private def scrollMouse(mouseY: Int) {
-    scrollTo(math.round((mouseY - guiTop - scrollPosY - 6.5) * maxOffset / (scrollHeight - 13.0)).toInt)
-  }
+  private def scrollUp() = scrollTo(offset - Document.lineHeight(font) * 3)
 
-  private def scrollUp() = scrollTo(offset - Document.lineHeight(fontRendererObj) * 3)
-
-  private def scrollDown() = scrollTo(offset + Document.lineHeight(fontRendererObj) * 3)
+  private def scrollDown() = scrollTo(offset + Document.lineHeight(font) * 3)
 
   private def scrollTo(row: Int): Unit = {
     ManualAPI.history.top.offset = math.max(0, math.min(maxOffset, row))
-    val yMin = guiTop + scrollPosY
-    if (maxOffset > 0) {
-      scrollButton.yPosition = yMin + (scrollHeight - 13) * offset / maxOffset
-    }
-    else {
-      scrollButton.yPosition = yMin
-    }
+    val yMin = topPos + scrollPosY
+    if (maxOffset > 0)
+      scrollButton.y = yMin + (scrollHeight - 13) * offset / maxOffset
+    else
+      scrollButton.y = yMin
   }
 
+  private def isCoordinateOverContent(x: Int, y: Int) =
+    x >= 8 && x < 8 + documentMaxWidth &&
+      y >= 8 && y < 8 + documentMaxHeight
+
   private def isCoordinateOverScrollBar(x: Int, y: Int) =
-    x > scrollPosX && x < scrollPosX + scrollWidth &&
+    x >= scrollPosX && x < scrollPosX + scrollWidth &&
       y >= scrollPosY && y < scrollPosY + scrollHeight
 }

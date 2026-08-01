@@ -1,23 +1,23 @@
 package li.cil.oc.server.component
 
-import java.util
-
 import li.cil.oc.Constants
-import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
-import li.cil.oc.api.driver.DeviceInfo.DeviceClass
 import li.cil.oc.api.Network
 import li.cil.oc.api.driver.DeviceInfo
-import li.cil.oc.api.network.EnvironmentHost
-import li.cil.oc.api.network.Visibility
-import li.cil.oc.api.prefab
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraftforge.fluids.FluidStack
-import net.minecraftforge.fluids.FluidTank
-import net.minecraftforge.fluids.IFluidTank
+import li.cil.oc.api.driver.DeviceInfo.{DeviceAttribute, DeviceClass}
+import li.cil.oc.api.network.{EnvironmentHost, Visibility}
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.component.DataComponentHolder
+import net.neoforged.neoforge.common.MutableDataComponentHolder
+import net.neoforged.neoforge.fluids.{FluidStack, IFluidTank}
+import net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction
+import net.neoforged.neoforge.fluids.capability.templates.FluidTank
 
-import scala.collection.convert.WrapAsJava._
+import java.util
+import scala.collection.convert.ImplicitConversionsToJava._
 
-class UpgradeTank(val owner: EnvironmentHost, val capacity: Int) extends prefab.ManagedEnvironment with IFluidTank with DeviceInfo {
+class UpgradeTank(val owner: EnvironmentHost, val capacity: Int) extends AbstractManagedEnvironment with IFluidTank with DeviceInfo {
   override val node = Network.newNode(this, Visibility.None).create()
 
   private final lazy val deviceInfo = Map(
@@ -34,14 +34,14 @@ class UpgradeTank(val owner: EnvironmentHost, val capacity: Int) extends prefab.
 
   val tank = new FluidTank(capacity)
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    tank.readFromNBT(nbt)
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+    tank.setFluid(holder.getComponent(OCComponents.TANK) getOrElse FluidStack.EMPTY)
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    tank.writeToNBT(nbt)
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    holder.setComponent(OCComponents.TANK, tank.getFluid)
   }
 
   // ----------------------------------------------------------------------- //
@@ -52,20 +52,28 @@ class UpgradeTank(val owner: EnvironmentHost, val capacity: Int) extends prefab.
 
   override def getCapacity = tank.getCapacity
 
-  override def getInfo = tank.getInfo
+  override def isFluidValid(stack: FluidStack) = tank.isFluidValid(stack)
 
-  override def fill(stack: FluidStack, doFill: Boolean) = {
-    val amount = tank.fill(stack, doFill)
-    if (doFill && amount > 0) {
+  override def fill(stack: FluidStack, action: FluidAction) = {
+    val amount = tank.fill(stack, action)
+    if (action.execute && amount > 0) {
       node.sendToVisible("computer.signal", "tank_changed", Int.box(tankIndex), Int.box(amount))
     }
     amount
   }
 
-  override def drain(maxDrain: Int, doDrain: Boolean) = {
-    val amount = tank.drain(maxDrain, doDrain)
-    if (doDrain && amount != null && amount.amount > 0) {
-      node.sendToVisible("computer.signal", "tank_changed", Int.box(tankIndex), Int.box(-amount.amount))
+  override def drain(stack: FluidStack, action: FluidAction) = {
+    val amount = tank.drain(stack, action)
+    if (action.execute && amount != null && amount.getAmount > 0) {
+      node.sendToVisible("computer.signal", "tank_changed", Int.box(tankIndex), Int.box(-amount.getAmount))
+    }
+    amount
+  }
+
+  override def drain(maxDrain: Int, action: FluidAction) = {
+    val amount = tank.drain(maxDrain, action)
+    if (action.execute && amount != null && amount.getAmount > 0) {
+      node.sendToVisible("computer.signal", "tank_changed", Int.box(tankIndex), Int.box(-amount.getAmount))
     }
     amount
   }

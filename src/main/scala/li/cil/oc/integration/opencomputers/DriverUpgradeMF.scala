@@ -3,13 +3,17 @@ package li.cil.oc.integration.opencomputers
 import li.cil.oc.api.driver.EnvironmentProvider
 import li.cil.oc.api.driver.item.HostAware
 import li.cil.oc.api.network.{EnvironmentHost, ManagedEnvironment}
+import li.cil.oc.common.datacomponents.{MFCoords, OCComponents}
 import li.cil.oc.common.{Slot, Tier}
 import li.cil.oc.server.component
 import li.cil.oc.util.BlockPosition
-import li.cil.oc.{Constants, Settings, api}
-import net.minecraft.item.ItemStack
-import net.minecraftforge.common.DimensionManager
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import li.cil.oc.{Constants, api}
+import net.minecraft.core.registries.Registries
+import net.minecraft.resources.ResourceKey
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.item.ItemStack
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
 /**
   * @author Vexatos
@@ -26,15 +30,11 @@ object DriverUpgradeMF extends Item with HostAware {
   override def tier(stack: ItemStack) = Tier.Three
 
   override def createEnvironment(stack: ItemStack, host: EnvironmentHost): ManagedEnvironment = {
-    if (host.world != null && !host.world.isRemote) {
-      if (stack.hasTagCompound) {
-        stack.getTagCompound.getIntArray(Settings.namespace + "coord") match {
-          case Array(x, y, z, dim, side) =>
-            Option(DimensionManager.getWorld(dim)) match {
-              case Some(world) => return new component.UpgradeMF(host, BlockPosition(x, y, z, world), ForgeDirection.getOrientation(side))
-              case _ => // Invalid dimension ID
-            }
-          case _ => // Invalid tag
+    if (host.getEnvironmentLevel != null && !host.getEnvironmentLevel.isClientSide) {
+      for(MFCoords(dimension, blockPos, side) <- stack.getComponent(OCComponents.MF_COORD)) {
+        ServerLifecycleHooks.getCurrentServer.getLevel(ResourceKey.create(Registries.DIMENSION, dimension)) match {
+          case world: ServerLevel => return new component.UpgradeMF(host, BlockPosition(blockPos, world), side)
+          case _ => // Invalid dimension ID
         }
       }
     }

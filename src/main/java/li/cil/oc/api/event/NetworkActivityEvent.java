@@ -1,10 +1,11 @@
 package li.cil.oc.api.event;
 
-import cpw.mods.fml.common.eventhandler.Event;
 import li.cil.oc.api.network.Node;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.world.World;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.ICancellableEvent;
 
 /**
  * Events for handling network activity and representing it on the client.
@@ -18,8 +19,8 @@ import net.minecraft.world.World;
  * Canceling this event is provided to allow registering higher priority
  * event handlers that override default behavior.
  */
-public class NetworkActivityEvent extends Event {
-    protected World world;
+public class NetworkActivityEvent extends Event implements ICancellableEvent {
+    protected Level world;
 
     protected double x;
 
@@ -27,9 +28,9 @@ public class NetworkActivityEvent extends Event {
 
     protected double z;
 
-    protected TileEntity tileEntity;
+    protected BlockEntity tileEntity;
 
-    protected NBTTagCompound data;
+    protected CompoundTag data;
 
     /**
      * Constructor for tile entity hosted network cards.
@@ -37,11 +38,11 @@ public class NetworkActivityEvent extends Event {
      * @param tileEntity the tile entity hosting the network card.
      * @param data       the additional data.
      */
-    protected NetworkActivityEvent(TileEntity tileEntity, NBTTagCompound data) {
-        this.world = tileEntity.getWorldObj();
-        this.x = tileEntity.xCoord + 0.5;
-        this.y = tileEntity.yCoord + 0.5;
-        this.z = tileEntity.zCoord + 0.5;
+    protected NetworkActivityEvent(BlockEntity tileEntity, CompoundTag data) {
+        this.world = tileEntity.getLevel();
+        this.x = tileEntity.getBlockPos().getX() + 0.5;
+        this.y = tileEntity.getBlockPos().getY() + 0.5;
+        this.z = tileEntity.getBlockPos().getZ() + 0.5;
         this.tileEntity = tileEntity;
         this.data = data;
     }
@@ -55,7 +56,7 @@ public class NetworkActivityEvent extends Event {
      * @param z     the z coordinate of the network card's container.
      * @param data  the additional data.
      */
-    protected NetworkActivityEvent(World world, double x, double y, double z, NBTTagCompound data) {
+    protected NetworkActivityEvent(Level world, double x, double y, double z, CompoundTag data) {
         this.world = world;
         this.x = x;
         this.y = y;
@@ -67,7 +68,7 @@ public class NetworkActivityEvent extends Event {
     /**
      * The world the network card lives in.
      */
-    public World getWorld() {
+    public Level getWorld() {
         return world;
     }
 
@@ -95,10 +96,10 @@ public class NetworkActivityEvent extends Event {
     /**
      * The tile entity hosting the network card.
      * <br>
-     * <em>Important</em>: this can be <tt>null</tt>, which is usually the
+     * <em>Important</em>: this can be {@code null}, which is usually the
      * case when the container is an entity or item.
      */
-    public TileEntity getTileEntity() {
+    public BlockEntity getBlockEntity() {
         return tileEntity;
     }
 
@@ -106,20 +107,20 @@ public class NetworkActivityEvent extends Event {
      * Addition custom data, this is used to transmit the number of the server
      * in a server rack the network card lives in, for example.
      */
-    public NBTTagCompound getData() {
+    public CompoundTag getData() {
         return data;
     }
 
     public static final class Server extends NetworkActivityEvent {
         private Node node;
 
-        public Server(TileEntity tileEntity, Node node) {
-            super(tileEntity, new NBTTagCompound());
+        public Server(BlockEntity tileEntity, Node node) {
+            super(tileEntity, new CompoundTag());
             this.node = node;
         }
 
-        public Server(World world, double x, double y, double z, Node node) {
-            super(world, x, y, z, new NBTTagCompound());
+        public Server(Level world, double x, double y, double z, Node node) {
+            super(world, x, y, z, new CompoundTag());
             this.node = node;
         }
 
@@ -138,7 +139,7 @@ public class NetworkActivityEvent extends Event {
          * @param tileEntity the tile entity hosting the network card.
          * @param data       the additional data.
          */
-        public Client(TileEntity tileEntity, NBTTagCompound data) {
+        public Client(BlockEntity tileEntity, CompoundTag data) {
             super(tileEntity, data);
         }
 
@@ -151,7 +152,7 @@ public class NetworkActivityEvent extends Event {
          * @param z     the z coordinate of the network card's container.
          * @param data  the additional data.
          */
-        public Client(World world, double x, double y, double z, NBTTagCompound data) {
+        public Client(Level world, double x, double y, double z, CompoundTag data) {
             super(world, x, y, z, data);
         }
     }

@@ -1,101 +1,67 @@
 package li.cil.oc.common.block
 
-import cpw.mods.fml.relauncher.{Side, SideOnly}
+import li.cil.oc.{Constants, Settings, api}
+import li.cil.oc.common.{block, blockentity}
+import li.cil.oc.common.item.data.{MicrocontrollerData, PrintData, RobotData}
+import li.cil.oc.util.Rarity
+import net.minecraft.core.Direction
+import net.minecraft.core.component.DataComponents
+import net.minecraft.network.chat.Component
+import net.minecraft.world.item
+import net.minecraft.world.item.Item.{Properties, TooltipContext}
+import net.minecraft.world.item.{BlockItem, ItemStack, TooltipFlag}
+import net.minecraft.world.item.context.BlockPlaceContext
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.phys.BlockHitResult
 
-import java.util
-import li.cil.oc.Constants
-import li.cil.oc.Settings
-import li.cil.oc.api
-import li.cil.oc.client.KeyBindings
-import li.cil.oc.common.item.data.PrintData
-import li.cil.oc.common.item.data.RobotData
-import li.cil.oc.common.tileentity
-import li.cil.oc.util.Color
-import li.cil.oc.util.ItemColorizer
-import li.cil.oc.util.ItemCosts
-import net.minecraft.block.Block
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.EnumRarity
-import net.minecraft.item.ItemBlock
-import net.minecraft.item.ItemStack
-import net.minecraft.util.StatCollector
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
-
-class Item(value: Block) extends ItemBlock(value) {
-  setHasSubtypes(true)
-
-  def block = field_150939_a
-
-  override def addInformation(stack: ItemStack, player: EntityPlayer, tooltip: util.List[_], advanced: Boolean) {
-    super.addInformation(stack, player, tooltip, advanced)
-    (block, tooltip) match {
-      case (simple: SimpleBlock, lines: util.List[String]@unchecked) =>
-        simple.addInformation(getMetadata(stack.getItemDamage), stack, player, lines, advanced)
-
-        if (KeyBindings.showMaterialCosts) {
-          ItemCosts.addTooltip(stack, lines)
-        }
-        else {
-          lines.add(StatCollector.translateToLocalFormatted(
-            Settings.namespace + "tooltip.MaterialCosts",
-            KeyBindings.getKeyBindingName(KeyBindings.materialCosts)))
-        }
+class Item(value: Block, props: Properties) extends BlockItem(value, props) {
+  override def appendHoverText(stack: ItemStack, ctx: TooltipContext, tooltip: java.util.List[Component], flag: TooltipFlag): Unit = {
+    getBlock match {
+      case _: block.Microcontroller =>
+        stack.set(DataComponents.RARITY, Rarity.byTier(new MicrocontrollerData(stack).tier))
+      case _: block.RobotProxy =>
+        stack.set(DataComponents.RARITY, Rarity.byTier(new RobotData(stack).tier))
       case _ =>
     }
+    super.appendHoverText(stack, ctx, tooltip, flag)
   }
 
-  override def getRarity(stack: ItemStack) = block match {
-    case simple: SimpleBlock => simple.rarity(stack)
-    case _ => EnumRarity.common
-  }
-
-  override def getMetadata(itemDamage: Int) = itemDamage
-
-  override def getItemStackDisplayName(stack: ItemStack): String = {
+  override def getName(stack: ItemStack): Component = {
     if (api.Items.get(stack) == api.Items.get(Constants.BlockName.Print)) {
       val data = new PrintData(stack)
-      data.label.getOrElse(super.getItemStackDisplayName(stack))
+      data.label.map(Component.literal).getOrElse(super.getName(stack))
     }
-    else super.getItemStackDisplayName(stack)
+    else super.getName(stack)
   }
 
-  override def getUnlocalizedName = block match {
-    case simple: SimpleBlock => simple.getUnlocalizedName
+  @Deprecated
+  override def getDescriptionId: String = getBlock match {
+    case simple: SimpleBlock => simple.getDescriptionId
     case _ => Settings.namespace + "tile"
   }
 
-  @SideOnly(Side.CLIENT)
-  override def getColorFromItemStack(stack: ItemStack, v: Int) = {
-    if (api.Items.get(stack) == api.Items.get(Constants.BlockName.Cable)) {
-      if (ItemColorizer.hasColor(stack)) {
-        ItemColorizer.getColor(stack)
-      }
-      else Color.LightGray
-    }
-    else super.getColorFromItemStack(stack, v)
-  }
-
-  override def isBookEnchantable(a: ItemStack, b: ItemStack) = false
-
-  override def placeBlockAt(stack: ItemStack, player: EntityPlayer, world: World, x: Int, y: Int, z: Int, side: Int, hitX: Float, hitY: Float, hitZ: Float, metadata: Int) = {
+  override def placeBlock(ctx: BlockPlaceContext, newState: BlockState): Boolean = {
     // When placing robots in creative mode, we have to copy the stack
     // manually before it's placed to ensure different component addresses
     // in the different robots, to avoid interference of screens e.g.
-    val needsCopying = player.capabilities.isCreativeMode && api.Items.get(stack) == api.Items.get(Constants.BlockName.Robot)
-    val stackToUse = if (needsCopying) new RobotData(stack).copyItemStack() else stack
-    if (super.placeBlockAt(stackToUse, player, world, x, y, z, side, hitX, hitY, hitZ, metadata)) {
+    val needsCopying = ctx.getPlayer.isCreative && api.Items.get(ctx.getItemInHand) == api.Items.get(Constants.BlockName.Robot)
+    val ctxToUse = if (needsCopying) {
+      val stackToUse = new RobotData(ctx.getItemInHand).copyItemStack(ctx.getLevel.registryAccess())
+      val hitResult = new BlockHitResult(ctx.getClickLocation, ctx.getClickedFace, ctx.getClickedPos, ctx.isInside)
+      new BlockPlaceContext(ctx.getLevel, ctx.getPlayer, ctx.getHand, stackToUse, hitResult)
+    }
+    else ctx
+    if (super.placeBlock(ctxToUse, newState)) {
       // If it's a rotatable block try to make it face the player.
-      world.getTileEntity(x, y, z) match {
-        case keyboard: tileentity.Keyboard =>
-          keyboard.setFromEntityPitchAndYaw(player)
-          keyboard.setFromFacing(ForgeDirection.getOrientation(side))
-        case rotatable: tileentity.traits.Rotatable =>
-          rotatable.setFromEntityPitchAndYaw(player)
+      ctx.getLevel.getBlockEntity(ctxToUse.getClickedPos) match {
+        case keyboard: blockentity.Keyboard => // Ignore.
+        case rotatable: blockentity.traits.Rotatable =>
+          rotatable.setFromEntityPitchAndYaw(ctxToUse.getPlayer)
           if (!rotatable.validFacings.contains(rotatable.pitch)) {
-            rotatable.pitch = rotatable.validFacings.headOption.getOrElse(ForgeDirection.NORTH)
+            rotatable.pitch = rotatable.validFacings.headOption.getOrElse(Direction.NORTH)
           }
-          if (!rotatable.isInstanceOf[tileentity.RobotProxy]) {
+          if (!rotatable.isInstanceOf[blockentity.RobotProxy]) {
             rotatable.invertRotation()
           }
         case _ => // Ignore.

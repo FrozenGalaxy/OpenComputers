@@ -1,18 +1,15 @@
 package li.cil.oc.common.item
 
 import li.cil.oc.Constants
-import li.cil.oc.api
-import net.minecraft.item.ItemStack
+import li.cil.oc.common.init.Items
+import net.minecraft.world.item.{Item, ItemStack}
+import net.minecraft.world.item.Item.Properties
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class InkCartridge(val parent: Delegator) extends traits.Delegate {
-  override def maxStackSize = 1
 
-  override def getContainerItem(stack: ItemStack): ItemStack = {
-    if (api.Items.get(stack) == api.Items.get(Constants.ItemName.InkCartridge))
-      api.Items.get(Constants.ItemName.InkCartridgeEmpty).createItemStack(1)
-    else
-      super.getContainerItem(stack)
-  }
+class InkCartridge(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
+  override def hasCraftingRemainingItem(stack: ItemStack): Boolean = true
 
-  override def hasContainerItem(stack: ItemStack): Boolean = true
+  override def getCraftingRemainingItem(stack: ItemStack): ItemStack =
+    Items.get(Constants.ItemName.InkCartridgeEmpty).createItemStack(1)
 }

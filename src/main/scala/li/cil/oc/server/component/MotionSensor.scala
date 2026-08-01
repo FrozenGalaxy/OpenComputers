@@ -1,7 +1,6 @@
 package li.cil.oc.server.component
 
 import java.util
-
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
@@ -15,17 +14,22 @@ import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
 import li.cil.oc.util.SideTracker
-import net.minecraft.entity.EntityLivingBase
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.potion.Potion
-import net.minecraft.util.AxisAlignedBB
-import net.minecraft.util.Vec3
+import net.minecraft.core.HolderLookup
+import net.minecraft.nbt.CompoundTag
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.level.ClipContext
+import net.minecraft.world.phys.HitResult
+import net.minecraft.world.phys.shapes.CollisionContext
+import net.minecraft.world.effect.MobEffects
 
-class MotionSensor(val host: EnvironmentHost) extends prefab.ManagedEnvironment with DeviceInfo {
+class MotionSensor(val host: EnvironmentHost) extends prefab.AbstractManagedEnvironment with DeviceInfo {
   override val node = api.Network.newNode(this, Visibility.Network).
     withComponent("motion_sensor").
     withConnector().
@@ -35,7 +39,7 @@ class MotionSensor(val host: EnvironmentHost) extends prefab.ManagedEnvironment 
 
   private var sensitivity = 0.4
 
-  private val trackedEntities = mutable.Map.empty[EntityLivingBase, (Double, Double, Double)]
+  private val trackedEntities = mutable.Map.empty[LivingEntity, (Double, Double, Double)]
 
   private final lazy val deviceInfo = Map(
     DeviceAttribute.Class -> DeviceClass.Generic,
@@ -49,7 +53,7 @@ class MotionSensor(val host: EnvironmentHost) extends prefab.ManagedEnvironment 
 
   // ----------------------------------------------------------------------- //
 
-  private def world = host.world
+  private def world = host.getEnvironmentLevel
 
   private def x = host.xPosition
 
@@ -57,19 +61,19 @@ class MotionSensor(val host: EnvironmentHost) extends prefab.ManagedEnvironment 
 
   private def z = host.zPosition
 
-  private def isServer: Boolean = if (world != null) !world.isRemote else SideTracker.isServer
+  private def isServer: Boolean = if (world != null) !world.isClientSide else SideTracker.isServer
 
   override def canUpdate: Boolean = isServer
 
-  override def update() {
+  override def update(): Unit = {
     super.update()
-    if (world.getTotalWorldTime % 10 == 0) {
+    if (world.getGameTime % 10 == 0) {
       // Get a list of all living entities we could possibly detect, using a rough
       // bounding box check, then refining it using the actual distance and an
       // actual visibility check.
-      val entities = world.getEntitiesWithinAABB(classOf[EntityLivingBase], sensorBounds)
-        .map(_.asInstanceOf[EntityLivingBase])
-        .filter(entity => entity.isEntityAlive && isInRange(entity) && isVisible(entity))
+      val entities = world.getEntitiesOfClass(classOf[LivingEntity], sensorBounds)
+        .map(_.asInstanceOf[LivingEntity])
+        .filter(entity => entity.isAlive && isInRange(entity) && isVisible(entity))
         .toSet
       // Get rid of all tracked entities that are no longer visible.
       trackedEntities.retain((key, _) => entities.contains(key))
@@ -78,7 +82,7 @@ class MotionSensor(val host: EnvironmentHost) extends prefab.ManagedEnvironment 
         trackedEntities.get(entity) match {
           case Some((prevX, prevY, prevZ)) =>
             // Known entity, check if it moved enough to trigger.
-            if (entity.getDistanceSq(prevX, prevY, prevZ) > sensitivity * sensitivity * 2) {
+            if (entity.distanceToSqr(prevX, prevY, prevZ) > sensitivity * sensitivity * 2) {
               sendSignal(entity)
             }
           case _ =>
@@ -86,41 +90,41 @@ class MotionSensor(val host: EnvironmentHost) extends prefab.ManagedEnvironment 
             sendSignal(entity)
         }
         // Update tracked position.
-        trackedEntities += entity ->(entity.posX, entity.posY, entity.posZ)
+        trackedEntities += entity ->(entity.getX, entity.getY, entity.getZ)
       }
     }
   }
 
-  private def sensorBounds = AxisAlignedBB.getBoundingBox(
+  private def sensorBounds = new AABB(
     x + 0.5 - radius, y + 0.5 - radius, z + 0.5 - radius,
     x + 0.5 + radius, y + 0.5 + radius, z + 0.5 + radius)
 
-  private def isInRange(entity: EntityLivingBase) = entity.getDistanceSq(x + 0.5, y + 0.5, z + 0.5) <= radius * radius
+  private def isInRange(entity: LivingEntity) = entity.distanceToSqr(x + 0.5, y + 0.5, z + 0.5) <= radius * radius
 
   private def isClearPath(target: Vec3): Boolean = {
-    val origin = Vec3.createVectorHelper(x, y, z)
-    val path = origin.subtract(target).normalize()
-    val eye = origin.addVector(path.xCoord, path.yCoord, path.zCoord)
-    val blocker = world.rayTraceBlocks(eye, target)
-    blocker == null
+    val origin = new Vec3(x, y, z)
+    val path = target.subtract(origin).normalize()
+    val eye = origin.add(path)
+    val trace = world.clip(new ClipContext(eye, target, ClipContext.Block.COLLIDER, ClipContext.Fluid.ANY, null.asInstanceOf[CollisionContext]))
+    trace.getType == HitResult.Type.MISS
   }
 
-  private def isVisible(entity: EntityLivingBase): Boolean =
-    entity.getActivePotionEffect(Potion.invisibility) == null &&
+  private def isVisible(entity: LivingEntity) =
+    entity.getEffect(MobEffects.INVISIBILITY) == null &&
       // Note: it only working in lit conditions works and is neat, but this
       // is pseudo-infrared driven (it only works for *living* entities, after
       // all), so I think it makes more sense for it to work in the dark, too.
       /* entity.getBrightness(0) > 0.2 && */ {
-      val target = Vec3.createVectorHelper(entity.posX, entity.posY, entity.posZ)
-      isClearPath(target) || isClearPath(target.addVector(0, entity.getEyeHeight, 0))
+      val target = entity.position
+      isClearPath(target) || isClearPath(target.add(0.0D, entity.getEyeHeight, 0.0D))
     }
 
-  private def sendSignal(entity: EntityLivingBase) {
+  private def sendSignal(entity: LivingEntity): Unit = {
     if (Settings.get.inputUsername) {
-      node.sendToReachable("computer.signal", "motion", Double.box(entity.posX - (x + 0.5)), Double.box(entity.posY - (y + 0.5)), Double.box(entity.posZ - (z + 0.5)), entity.getCommandSenderName)
+      node.sendToReachable("computer.signal", "motion", Double.box(entity.getX - (x + 0.5)), Double.box(entity.getY - (y + 0.5)), Double.box(entity.getZ - (z + 0.5)), entity.getName.getString)
     }
     else {
-      node.sendToReachable("computer.signal", "motion", Double.box(entity.posX - (x + 0.5)), Double.box(entity.posY - (y + 0.5)), Double.box(entity.posZ - (z + 0.5)))
+      node.sendToReachable("computer.signal", "motion", Double.box(entity.getX - (x + 0.5)), Double.box(entity.getY - (y + 0.5)), Double.box(entity.getZ - (z + 0.5)))
     }
   }
 
@@ -140,14 +144,14 @@ class MotionSensor(val host: EnvironmentHost) extends prefab.ManagedEnvironment 
 
   private final val SensitivityTag = Settings.namespace + "sensitivity"
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
+  override def loadData(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.loadData(nbt, provider)
     sensitivity = nbt.getDouble(SensitivityTag)
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setDouble(SensitivityTag, sensitivity)
+  override def saveData(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.saveData(nbt, provider)
+    nbt.putDouble(SensitivityTag, sensitivity)
   }
 
   // ----------------------------------------------------------------------- //

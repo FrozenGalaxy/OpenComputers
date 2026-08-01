@@ -4,14 +4,16 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.ReadableByteChannel
-
 import li.cil.oc.api
 import li.cil.oc.api.fs.Mode
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.nbt.NBTTagList
-import net.minecraftforge.common.util.Constants.NBT
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
 
 import scala.collection.mutable
+import net.minecraft.nbt.Tag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
 trait InputStreamFileSystem extends api.fs.FileSystem {
   private val handles = mutable.Map.empty[Int, Handle]
@@ -53,12 +55,17 @@ trait InputStreamFileSystem extends api.fs.FileSystem {
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    val handlesNbt = nbt.getTagList("input", NBT.TAG_COMPOUND)
-    (0 until handlesNbt.tagCount).map(handlesNbt.getCompoundTagAt).foreach(handleNbt => {
-      val handle = handleNbt.getInteger("handle")
-      val path = handleNbt.getString("path")
-      val position = handleNbt.getLong("position")
+  private final val InputTag = "input"
+  private final val HandleTag = "handle"
+  private final val PathTag = "path"
+  private final val PositionTag = "position"
+
+  override def loadData(nbt: CompoundTag): Unit = {
+    val handlesNbt = nbt.getList(InputTag, Tag.TAG_COMPOUND)
+    (0 until handlesNbt.size).map(handlesNbt.getCompound).foreach(handleNbt => {
+      val handle = handleNbt.getInt(HandleTag)
+      val path = handleNbt.getString(PathTag)
+      val position = handleNbt.getLong(PositionTag)
       openInputChannel(path) match {
         case Some(channel) =>
           val fileHandle = new Handle(this, handle, path, channel)
@@ -69,17 +76,17 @@ trait InputStreamFileSystem extends api.fs.FileSystem {
     })
   }
 
-  override def save(nbt: NBTTagCompound) = this.synchronized {
-    val handlesNbt = new NBTTagList()
+  override def saveData(nbt: CompoundTag): Unit = this.synchronized {
+    val handlesNbt = new ListTag()
     for (file <- handles.values) {
       assert(file.channel.isOpen)
-      val handleNbt = new NBTTagCompound()
-      handleNbt.setInteger("handle", file.handle)
-      handleNbt.setString("path", file.path)
-      handleNbt.setLong("position", file.position)
-      handlesNbt.appendTag(handleNbt)
+      val handleNbt = new CompoundTag()
+      handleNbt.putInt(HandleTag, file.handle)
+      handleNbt.putString(PathTag, file.path)
+      handleNbt.putLong(PositionTag, file.position)
+      handlesNbt.add(handleNbt)
     }
-    nbt.setTag("input", handlesNbt)
+    nbt.put(InputTag, handlesNbt)
   }
 
   // ----------------------------------------------------------------------- //
@@ -89,7 +96,7 @@ trait InputStreamFileSystem extends api.fs.FileSystem {
   protected trait InputChannel extends ReadableByteChannel {
     def isOpen: Boolean
 
-    def close()
+    def close(): Unit
 
     def position: Long
 
@@ -102,7 +109,7 @@ trait InputStreamFileSystem extends api.fs.FileSystem {
         read(dst.array())
       }
       else {
-        val count = math.max(0, dst.limit - dst.position)
+        val count = math.max(0, dst.limit() - dst.position())
         val buffer = new Array[Byte](count)
         val n = read(buffer)
         if (n > 0) dst.put(buffer, 0, n)

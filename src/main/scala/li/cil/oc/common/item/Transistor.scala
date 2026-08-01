@@ -1,3 +1,8 @@
 package li.cil.oc.common.item
 
-class Transistor(val parent: Delegator) extends traits.Delegate
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.neoforged.neoforge.common.extensions.IItemExtension
+
+
+class Transistor(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension

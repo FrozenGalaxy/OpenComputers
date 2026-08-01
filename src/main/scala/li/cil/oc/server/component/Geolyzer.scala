@@ -1,7 +1,6 @@
 package li.cil.oc.server.component
 
 import java.util
-
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
@@ -18,26 +17,31 @@ import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.Message
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
-import li.cil.oc.common.tileentity.{Robot => EntityRobot, Microcontroller}
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
+import li.cil.oc.common.blockentity.{Microcontroller, Robot => EntityRobot}
 import li.cil.oc.common.entity.{Drone => EntityDrone}
 import li.cil.oc.common.item.TabletWrapper
 import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.DatabaseAccess
 import li.cil.oc.util.ExtendedArguments._
-import li.cil.oc.util.ExtendedWorld._
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.Item
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.world.biome.BiomeGenDesert
-import net.minecraftforge.common.MinecraftForge
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.util.ExtendedLevel._
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.core.Direction
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.JavaConverters.mapAsJavaMap
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.language.existentials
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.biome.Biome.Precipitation
+import net.minecraft.world.level.Level
+import net.minecraft.world.level.block.Block
+import net.neoforged.neoforge.common.NeoForge
 
-class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with traits.WorldControl with DeviceInfo {
+class Geolyzer(val host: EnvironmentHost) extends AbstractManagedEnvironment with traits.LevelControl with DeviceInfo {
   override val node = api.Network.newNode(this, Visibility.Network).
     withComponent("geolyzer").
     withConnector().
@@ -55,7 +59,7 @@ class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with
 
   // ----------------------------------------------------------------------- //
 
-  override protected def checkSideForAction(args: Arguments, n: Int): ForgeDirection = {
+  override protected def checkSideForAction(args: Arguments, n: Int): Direction = {
     val side = args.checkSideAny(n)
     val is_uc = host.isInstanceOf[Microcontroller]
     host match {
@@ -69,15 +73,15 @@ class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with
 
   override def position: BlockPosition = host match {
     case robot: EntityRobot => robot.proxy.position
-    case drone: EntityDrone => BlockPosition(drone.posX, drone.posY, drone.posZ, drone.world)
+    case drone: EntityDrone => BlockPosition(drone.blockPosition, drone.getEnvironmentLevel)
     case uc: Microcontroller => uc.position
-    case tablet: TabletWrapper => BlockPosition(tablet.xPosition, tablet.yPosition, tablet.zPosition, tablet.world)
+    case tablet: TabletWrapper => BlockPosition(tablet.xPosition, tablet.yPosition, tablet.zPosition, tablet.getEnvironmentLevel)
     case _ => BlockPosition(host)
   }
 
   private def canSeeSky: Boolean = {
-    val blockPos = position.offset(ForgeDirection.UP)
-    !host.world.provider.hasNoSky && host.world.canBlockSeeTheSky(blockPos.x, blockPos.y, blockPos.z)
+    val blockPos = position.offset(Direction.UP)
+    host.getEnvironmentLevel.dimension != Level.NETHER && host.getEnvironmentLevel.canSeeSkyFromBelowWater(blockPos.toBlockPos)
   }
 
   @Callback(doc = """function():boolean -- Returns whether there is a clear line of sight to the sky directly above.""")
@@ -87,11 +91,11 @@ class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with
 
   @Callback(doc = """function():boolean -- Return whether the sun is currently visible directly above.""")
   def isSunVisible(computer: Context, args: Arguments): Array[AnyRef] = {
-    val blockPos = BlockPosition(host).offset(ForgeDirection.UP)
+    val blockPos = BlockPosition(host).offset(Direction.UP)
     result(
-      host.world.isDaytime &&
+      host.getEnvironmentLevel.isDay &&
       canSeeSky &&
-      (host.world.getWorldChunkManager.getBiomeGenAt(blockPos.x, blockPos.z).isInstanceOf[BiomeGenDesert] || (!host.world.isRaining && !host.world.isThundering)))
+        (host.getEnvironmentLevel.getBiome(blockPos.toBlockPos).value.getPrecipitationAt(blockPos.toBlockPos) == Precipitation.NONE || (!host.getEnvironmentLevel.isRaining && !host.getEnvironmentLevel.isThundering)))
   }
 
   @Callback(doc = """function(x:number, z:number[, y:number, w:number, d:number, h:number][, ignoreReplaceable:boolean|options:table]):table -- Analyzes the density of the column at the specified relative coordinates.""")
@@ -107,11 +111,11 @@ class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with
     }
 
     if (!node.tryChangeBuffer(-Settings.get.geolyzerScanCost))
-      return result(Unit, "not enough energy")
+      return result((), "not enough energy")
 
     val event = new GeolyzerEvent.Scan(host, options, minX, minY, minZ, maxX, maxY, maxZ)
-    MinecraftForge.EVENT_BUS.post(event)
-    if (event.isCanceled) result(Unit, "scan was canceled")
+    NeoForge.EVENT_BUS.post(event)
+    if (event.isCanceled) result((), "scan was canceled")
     else result(event.data)
   }
 
@@ -146,15 +150,15 @@ class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with
     val options = args.optTable(1, Map.empty[AnyRef, AnyRef])
 
     if (!node.tryChangeBuffer(-Settings.get.geolyzerScanCost))
-      return result(Unit, "not enough energy")
+      return result((), "not enough energy")
 
     val globalPos = BlockPosition(host).offset(globalSide)
-    val event = new Analyze(host, options, globalPos.x, globalPos.y, globalPos.z)
-    MinecraftForge.EVENT_BUS.post(event)
-    if (event.isCanceled) result(Unit, "scan was canceled")
+    val event = new Analyze(host, options, globalPos.toBlockPos)
+    NeoForge.EVENT_BUS.post(event)
+    if (event.isCanceled) result((), "scan was canceled")
     else result(event.data)
   }
-  else result(Unit, "not enabled in config")
+  else result((), "not enabled in config")
 
   @Callback(doc = """function(side:number, dbAddress:string, dbSlot:number):boolean -- Store an item stack representation of the block on the specified side in a database component.""")
   def store(computer: Context, args: Arguments): Array[AnyRef] = {
@@ -165,19 +169,23 @@ class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with
     }
 
     if (!node.tryChangeBuffer(-Settings.get.geolyzerScanCost))
-      return result(Unit, "not enough energy")
+      return result((), "not enough energy")
 
     val blockPos = BlockPosition(host).offset(globalSide)
-    val block = host.world.getBlock(blockPos)
-    val item = Item.getItemFromBlock(block)
-    if (item == null) result(Unit, "block has no registered item representation")
+    val blockState = host.getEnvironmentLevel.getBlockState(blockPos.toBlockPos)
+    val item = blockState.getBlock().asItem()
+    if (item == null) result((), "block has no registered item representation")
     else {
-      val metadata = host.world.getBlockMetadata(blockPos)
-      val damage = block.damageDropped(metadata)
-      val stack = new ItemStack(item, 1, damage)
+      val stacks = Block.getDrops(blockState, host.getEnvironmentLevel.asInstanceOf[ServerLevel], blockPos.toBlockPos, host.getEnvironmentLevel.getBlockEntity(blockPos.toBlockPos))
+      val stack = if (!stacks.isEmpty) {
+        val drop = stacks.find(s => s.getItem == item).getOrElse(stacks.get(0))
+        drop.setCount(1)
+        drop
+      }
+      else new ItemStack(item, 1)
       DatabaseAccess.withDatabase(node, args.checkString(1), database => {
         val toSlot = args.checkSlot(database.data, 2)
-        val nonEmpty = database.getStackInSlot(toSlot) != null
+        val nonEmpty = database.getStackInSlot(toSlot) != ItemStack.EMPTY // not the same as isEmpty! zero size stacks!
         database.setStackInSlot(toSlot, stack)
         result(nonEmpty)
       })
@@ -188,14 +196,14 @@ class Geolyzer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with
     super.onMessage(message)
     if (message.name == "tablet.use") message.source.host match {
       case machine: api.machine.Machine => (machine.host, message.data) match {
-        case (tablet: internal.Tablet, Array(nbt: NBTTagCompound, stack: ItemStack, player: EntityPlayer, blockPos: BlockPosition, side: ForgeDirection, hitX: java.lang.Float, hitY: java.lang.Float, hitZ: java.lang.Float)) =>
+        case (tablet: internal.Tablet, Array(nbt: CompoundTag, stack: ItemStack, player: Player, blockPos: BlockPosition, side: Direction, hitX: java.lang.Float, hitY: java.lang.Float, hitZ: java.lang.Float)) =>
           if (node.tryChangeBuffer(-Settings.get.geolyzerScanCost)) {
-            val event = new Analyze(host, Map.empty[AnyRef, AnyRef], blockPos.x, blockPos.y, blockPos.z)
-            MinecraftForge.EVENT_BUS.post(event)
+            val event = new Analyze(host, Map.empty[AnyRef, AnyRef], blockPos.toBlockPos)
+            NeoForge.EVENT_BUS.post(event)
             if (!event.isCanceled) {
               for ((key, value) <- event.data) value match {
-                case number: java.lang.Number => nbt.setDouble(key, number.doubleValue())
-                case string: String if !string.isEmpty => nbt.setString(key, string)
+                case number: java.lang.Number => nbt.putDouble(key, number.doubleValue())
+                case string: String if !string.isEmpty => nbt.putString(key, string)
                 case _ => // Unsupported, ignore.
               }
             }

@@ -1,110 +1,44 @@
 package li.cil.oc.common.item
 
 import li.cil.oc.api
-import li.cil.oc.common.asm.Injectable
-import li.cil.oc.integration.Mods
-import net.minecraft.block.Block
-import net.minecraft.entity.Entity
-import net.minecraft.entity.EntityLivingBase
-import net.minecraft.entity.item.EntityMinecart
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.init.Blocks
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.common.block.SimpleBlock
+import net.minecraft.core.{BlockPos, Direction}
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.{Item, ItemStack}
+import net.minecraft.world.level.block.Rotation
+import net.minecraft.world.level.{BlockGetter, Level, LevelReader}
+import net.minecraft.world.{InteractionHand, InteractionResult}
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.level.block.Blocks
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-@Injectable.InterfaceList(Array(
-  new Injectable.Interface(value = "appeng.api.implementations.items.IAEWrench", modid = Mods.IDs.AppliedEnergistics2),
-  new Injectable.Interface(value = "buildcraft.api.tools.IToolWrench", modid = Mods.IDs.BuildCraftTools),
-  new Injectable.Interface(value = "com.bluepowermod.api.misc.IScrewdriver", modid = Mods.IDs.BluePower),
-  new Injectable.Interface(value = "cofh.api.item.IToolHammer", modid = Mods.IDs.CoFHItem),
-  new Injectable.Interface(value = "crazypants.enderio.tool.ITool", modid = Mods.IDs.EnderIO),
-  new Injectable.Interface(value = "mekanism.api.IMekWrench", modid = Mods.IDs.Mekanism),
-  new Injectable.Interface(value = "powercrystals.minefactoryreloaded.api.IMFRHammer", modid = Mods.IDs.MineFactoryReloaded),
-  new Injectable.Interface(value = "mrtjp.projectred.api.IScrewdriver", modid = Mods.IDs.ProjectRedCore),
-  new Injectable.Interface(value = "mods.railcraft.api.core.items.IToolCrowbar", modid = Mods.IDs.Railcraft),
-  new Injectable.Interface(value = "ic2.api.item.IBoxable", modid = Mods.IDs.IndustrialCraft2)
-))
-class Wrench extends traits.SimpleItem with api.internal.Wrench {
-  setHarvestLevel("wrench", 1)
-  setMaxStackSize(1)
+class Wrench(props: Properties) extends Item(props) with traits.SimpleItem with api.internal.Wrench with IItemExtension {
+  override def doesSneakBypassUse(stack: ItemStack, world: LevelReader, pos: BlockPos, player: Player): Boolean = true
 
-  override def doesSneakBypassUse(world: World, x: Int, y: Int, z: Int, player: EntityPlayer): Boolean = true
-
-  override def onItemUseFirst(stack: ItemStack, player: EntityPlayer, world: World, x: Int, y: Int, z: Int, side: Int, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
-    world.blockExists(x, y, z) && world.canMineBlock(player, x, y, z) && (world.getBlock(x, y, z) match {
-      case block: Block if block.rotateBlock(world, x, y, z, ForgeDirection.getOrientation(side)) =>
-        block.onNeighborBlockChange(world, x, y, z, Blocks.air)
-        player.swingItem()
-        !world.isRemote
-      case _ =>
-        super.onItemUseFirst(stack, player, world, x, y, z, side, hitX, hitY, hitZ)
-    })
+  override def onItemUseFirst(stack: ItemStack, player: Player, world: Level, pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float, hand: InteractionHand): InteractionResult = {
+    if (world.isLoaded(pos) && world.mayInteract(player, pos)) {
+      val state = world.getBlockState(pos)
+      state.getBlock match {
+        case block: SimpleBlock if block.rotateBlock(world, pos, side) =>
+          state.onNeighborChange(world, pos, pos)
+          player.swing(hand)
+          if (!world.isClientSide) InteractionResult.sidedSuccess(world.isClientSide) else InteractionResult.PASS
+        case _ =>
+          val updated = state.rotate(world, pos, Rotation.CLOCKWISE_90)
+          if (updated != state) {
+            world.setBlock(pos, updated, 3)
+            player.swing(hand)
+            if (!world.isClientSide) InteractionResult.sidedSuccess(world.isClientSide) else InteractionResult.PASS
+          }
+          else super.onItemUseFirst(stack, player, world, pos, side, hitX, hitY, hitZ, hand)
+      }
+    }
+    else super.onItemUseFirst(stack, player, world, pos, side, hitX, hitY, hitZ, hand)
   }
 
-  def useWrenchOnBlock(player: EntityPlayer, world: World, x: Int, y: Int, z: Int, simulate: Boolean): Boolean = {
-    if (!simulate) player.swingItem()
+  def useWrenchOnBlock(player: Player, world: Level, pos: BlockPos, simulate: Boolean): Boolean = {
+    if (!simulate) player.swing(InteractionHand.MAIN_HAND)
     true
   }
-
-  // Applied Energistics 2
-
-  def canWrench(stack: ItemStack, player: EntityPlayer, x: Int, y: Int, z: Int): Boolean = true
-
-  // BluePower
-  def damage(stack: ItemStack, damage: Int, player: EntityPlayer, simulated: Boolean): Boolean = damage == 0
-
-  // BuildCraft
-
-  def canWrench(player: EntityPlayer, x: Int, y: Int, z: Int): Boolean = true
-
-  def wrenchUsed(player: EntityPlayer, x: Int, y: Int, z: Int): Unit = player.swingItem()
-
-  def canWrench(player: EntityPlayer, entity: Entity): Boolean = true
-
-  def wrenchUsed(player: EntityPlayer, entity: Entity): Unit = player.swingItem()
-
-  // CoFH
-
-  def isUsable(stack: ItemStack, player: EntityLivingBase, x: Int, y: Int, z: Int): Boolean = true
-
-  def toolUsed(stack: ItemStack, player: EntityLivingBase, x: Int, y: Int, z: Int): Unit = player.swingItem()
-
-  // EnderIO
-
-  def canUse(stack: ItemStack, player: EntityPlayer, x: Int, y: Int, z: Int): Boolean = true
-
-  def used(stack: ItemStack, player: EntityPlayer, x: Int, y: Int, z: Int): Unit = {}
-
-  // Mekanism
-
-  def canUseWrench(player: EntityPlayer, x: Int, y: Int, z: Int): Boolean = true
-
-  // Project Red
-
-  def canUse(entityPlayer: EntityPlayer, itemStack: ItemStack): Boolean = true
-
-  // pre v4.7
-  def damageScrewdriver(world: World, player: EntityPlayer): Unit = {}
-
-  // v4.7+
-  def damageScrewdriver(player: EntityPlayer, stack: ItemStack): Unit = {}
-
-  // Railcraft
-
-  def canWhack(player: EntityPlayer, stack: ItemStack, x: Int, y: Int, z: Int): Boolean = true
-
-  def onWhack(player: EntityPlayer, stack: ItemStack, x: Int, y: Int, z: Int): Unit = {}
-
-  def canLink(player: EntityPlayer, stack: ItemStack, cart: EntityMinecart): Boolean = false
-
-  def onLink(player: EntityPlayer, stack: ItemStack, cart: EntityMinecart): Unit = {}
-
-  def canBoost(player: EntityPlayer, stack: ItemStack, cart: EntityMinecart): Boolean = false
-
-  def onBoost(player: EntityPlayer, stack: ItemStack, cart: EntityMinecart): Unit = {}
-
-  // IndustrialCraft 2
-
-  def canBeStoredInToolbox(stack: ItemStack): Boolean = true
 }

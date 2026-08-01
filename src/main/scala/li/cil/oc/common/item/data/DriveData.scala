@@ -1,50 +1,54 @@
 package li.cil.oc.common.item.data
 
+import com.mojang.serialization.Codec
+import com.mojang.serialization.codecs.RecordCodecBuilder
 import li.cil.oc.Settings
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.common.datacomponents.{OCComponents, ScalaCodec}
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
 import li.cil.oc.server.fs
-import net.minecraft.entity.player.EntityPlayer
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.world.entity.player.Player
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-class DriveData extends ItemData(null) {
-  def this(stack: ItemStack) {
+case class DriveData(var isUnmanaged: Boolean = false, var lockInfo: String = "") extends ItemData(null) {
+  def this(stack: DataComponentHolder) = {
     this()
-    load(stack)
+    loadData(stack)
   }
-
-  var isUnmanaged = false
-  var lockInfo: String = ""
 
   def isLocked: Boolean = {
     lockInfo != null && !lockInfo.isEmpty
   }
 
-  private val UnmanagedKey = Settings.namespace + "unmanaged"
-  private val LockKey = Settings.namespace + "lock"
-
-  override def load(nbt: NBTTagCompound) {
-    isUnmanaged = nbt.getBoolean(UnmanagedKey)
-    lockInfo = if (nbt.hasKey(LockKey)) {
-      nbt.getString(LockKey)
-    } else ""
+  override def loadData(holder: DataComponentHolder): Unit = {
+    isUnmanaged = holder.getComponent(OCComponents.UNMANAGED) getOrElse false
+    lockInfo = holder.getComponent(OCComponents.LOCK) getOrElse ""
   }
 
-  override def save(nbt: NBTTagCompound) {
-    nbt.setBoolean(UnmanagedKey, isUnmanaged)
-    nbt.setString(LockKey, lockInfo)
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    holder.setComponent(OCComponents.UNMANAGED, isUnmanaged)
+    holder.setComponent(OCComponents.LOCK, lockInfo)
   }
 }
 
 object DriveData {
-  def lock(stack: ItemStack, player: EntityPlayer): Unit = {
-    val key = player.getDisplayName
+  val CODEC = RecordCodecBuilder.create[DriveData](inst => inst.group(
+    ScalaCodec.BOOL.fieldOf("unmanaged").forGetter(_.isUnmanaged),
+    Codec.STRING.fieldOf("lock").forGetter(_.lockInfo)
+  ).apply(inst, DriveData.apply _))
+
+  def lock(stack: ItemStack, player: Player): Unit = {
+    val key = player.getName.getString
     val data = new DriveData(stack)
     if (!data.isLocked) {
       data.lockInfo = key match {
         case name: String if name != null && name.nonEmpty => name
         case _ => "notch" // meaning: "unknown"
       }
-      data.save(stack)
+      data.saveData(stack)
     }
   }
 
@@ -55,6 +59,6 @@ object DriveData {
       data.lockInfo = ""
     }
     data.isUnmanaged = unmanaged
-    data.save(stack)
+    data.saveData(stack)
   }
 }

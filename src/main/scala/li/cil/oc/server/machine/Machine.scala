@@ -2,7 +2,6 @@ package li.cil.oc.server.machine
 
 import java.util
 import java.util.concurrent.TimeUnit
-
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
 import li.cil.oc.api.Driver
@@ -21,35 +20,57 @@ import li.cil.oc.api.machine.LimitReachedException
 import li.cil.oc.api.machine.MachineHost
 import li.cil.oc.api.machine.Value
 import li.cil.oc.api.network.Component
+import li.cil.oc.api.network.ComponentConnector
 import li.cil.oc.api.network.Message
 import li.cil.oc.api.network.Node
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
+import li.cil.oc.client.ClientUtil
 import li.cil.oc.common.EventHandler
 import li.cil.oc.common.SaveHandler
 import li.cil.oc.common.Slot
-import li.cil.oc.common.tileentity
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.datacomponents.MachineData.{Signal => DataSignal}
+import li.cil.oc.common.datacomponents.{MachineData, OCComponents}
 import li.cil.oc.server.PacketSender
 import li.cil.oc.server.driver.Registry
 import li.cil.oc.server.fs.FileSystem
 import li.cil.oc.util.ExtendedNBT._
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import li.cil.oc.util.ResultWrapper
 import li.cil.oc.util.ResultWrapper.result
 import li.cil.oc.util.ThreadPoolFactory
-import net.minecraft.client.Minecraft
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
 import net.minecraft.nbt._
-import net.minecraft.server.MinecraftServer
-import net.minecraft.server.integrated.IntegratedServer
-import net.minecraftforge.common.util.Constants.NBT
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-import scala.Array.canBuildFrom
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.JavaConverters.mapAsJavaMap
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.Tag
+import net.minecraft.nbt.StringTag
+import net.minecraft.nbt.ByteTag
+import net.minecraft.nbt.LongTag
+import net.minecraft.nbt.DoubleTag
+import net.minecraft.nbt.ByteArrayTag
+import net.minecraft.nbt.ListTag
+import net.minecraft.client.server.IntegratedServer
+import net.minecraft.core.{BlockPos, HolderLookup}
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.world.level.ChunkPos
+import net.neoforged.api.distmarker.Dist
+import net.neoforged.fml.loading.FMLEnvironment
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with machine.Machine with Runnable with DeviceInfo {
-  override val node = Network.newNode(this, Visibility.Network).
+import java.nio.ByteBuffer
+
+class Machine(val host: MachineHost) extends AbstractManagedEnvironment with machine.Machine with Runnable with DeviceInfo {
+  override val node: ComponentConnector = Network.newNode(this, Visibility.Network).
     withComponent("computer", Visibility.Neighbors).
     withConnector(Settings.get.bufferComputer).
     create()
@@ -150,23 +171,23 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     hasMemory = Option(architecture).fold(false)(_.recomputeMemory(components))
   }
 
-  override def components = scala.collection.convert.WrapAsJava.mapAsJavaMap(_components)
+  override def components: util.Map[String, String] = mapAsJavaMap(_components)
 
-  def componentCount = (_components.foldLeft(0.0)((acc, entry) => entry match {
+  def componentCount: Int = (_components.foldLeft(0.0)((acc, entry) => entry match {
     case (_, name) => acc + (if (name != "filesystem") 1.0 else 0.25)
   }) + addedComponents.foldLeft(0.0)((acc, component) => acc + (if (component.name != "filesystem") 1 else 0.25)) - 1).toInt // -1 = this computer
 
-  override def tmpAddress = tmp.fold(null: String)(_.node.address)
+  override def tmpAddress: String = tmp.fold(null: String)(_.node.address)
 
-  def lastError = message.orNull
+  def lastError: String = message.orNull
 
-  override def setCostPerTick(value: Double) = cost = value * Settings.get.tickFrequency
+  override def setCostPerTick(value: Double): Unit = cost = value * Settings.get.tickFrequency
 
-  override def getCostPerTick = cost / Settings.get.tickFrequency
+  override def getCostPerTick: Double = cost / Settings.get.tickFrequency
 
-  override def users = _users.synchronized(_users.toArray)
+  override def users: Array[String] = _users.synchronized(_users.toArray)
 
-  override def upTime() = {
+  override def upTime(): Double = {
     // Convert from old saves (set to -timeStarted on load).
     if (uptime < 0) {
       uptime = worldTime + uptime
@@ -177,7 +198,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     uptime / 20.0
   }
 
-  override def cpuTime = (cpuTotal + (System.nanoTime() - cpuStart)) * 10e-10
+  override def cpuTime: Double = (cpuTotal + (System.nanoTime() - cpuStart)) * 10e-10
 
   // ----------------------------------------------------------------------- //
 
@@ -188,17 +209,18 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
 
   // ----------------------------------------------------------------------- //
 
-  override def canInteract(player: String) = !Settings.get.canComputersBeOwned ||
+  override def canInteract(player: String): Boolean = !Settings.get.canComputersBeOwned ||
     _users.synchronized(_users.isEmpty || _users.contains(player)) ||
-    MinecraftServer.getServer.isSinglePlayer || {
-    val config = MinecraftServer.getServer.getConfigurationManager
-    val entity = config.func_152612_a(player)
-    entity != null && config.func_152596_g(entity.getGameProfile)
+    ServerLifecycleHooks.getCurrentServer == null ||
+    ServerLifecycleHooks.getCurrentServer.isSingleplayer || {
+    val config = ServerLifecycleHooks.getCurrentServer.getPlayerList
+    val entity = config.getPlayerByName(player)
+    entity != null && config.isOp(entity.getGameProfile)
   }
 
-  override def isRunning = state.synchronized(state.top != Machine.State.Stopped && state.top != Machine.State.Stopping)
+  override def isRunning: Boolean = state.synchronized(state.top != Machine.State.Stopped && state.top != Machine.State.Stopping)
 
-  override def isPaused = state.synchronized(state.top == Machine.State.Paused && remainingPause > 0)
+  override def isPaused: Boolean = state.synchronized(state.top == Machine.State.Paused && remainingPause > 0)
 
   override def start(): Boolean = state.synchronized(state.top match {
     case Machine.State.Stopped if node.network != null =>
@@ -269,7 +291,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     false
   }
 
-  override def stop() = state.synchronized(state.headOption match {
+  override def stop(): Boolean = state.synchronized(state.headOption match {
     case Some(Machine.State.Stopped | Machine.State.Stopping) =>
       false
     case _ =>
@@ -289,14 +311,14 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
   }
 
   override def beep(frequency: Short, duration: Short): Unit = {
-    PacketSender.sendSound(host.world, host.xPosition, host.yPosition, host.zPosition, frequency, duration)
+    PacketSender.sendSound(host.getEnvironmentLevel, host.xPosition, host.yPosition, host.zPosition, frequency, duration)
   }
 
-  override def beep(pattern: String) {
-    PacketSender.sendSound(host.world, host.xPosition, host.yPosition, host.zPosition, pattern)
+  override def beep(pattern: String): Unit = {
+    PacketSender.sendSound(host.getEnvironmentLevel, host.xPosition, host.yPosition, host.zPosition, pattern)
   }
 
-  override def crash(message: String) = {
+  override def crash(message: String): Boolean = {
     this.message = Option(message)
     state.synchronized {
       val result = stop()
@@ -320,7 +342,8 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
       case arg: java.lang.Number => Double.box(arg.doubleValue)
       case arg: java.lang.String => arg
       case arg: Array[Byte] => arg
-      case arg: NBTTagCompound => arg
+      case arg: CompoundTag => arg
+      case arg: java.util.HashMap[AnyRef, AnyRef] => arg.asScala
       case arg =>
         OpenComputers.log.warn("Trying to push signal with an unsupported argument of type " + arg.getClass.getName)
         null
@@ -337,7 +360,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
         }
         else {
           signals.enqueue(new Machine.Signal(name, args.map {
-            case null | Unit | None => null
+            case null | ResultWrapper.unit | None => null
             case arg: Map[_, _] if arg.isEmpty || arg.head._1.isInstanceOf[String] && arg.head._2.isInstanceOf[String] => arg
             case arg: mutable.Map[_, _] if arg.isEmpty || arg.head._1.isInstanceOf[String] && arg.head._2.isInstanceOf[String] => arg.toMap
             case arg: java.util.Map[_, _] => {
@@ -365,12 +388,17 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
 
   override def popSignal(): Machine.Signal = signals.synchronized(if (signals.isEmpty) null else signals.dequeue().convert())
 
-  override def methods(value: scala.AnyRef) = Callbacks(value).map(entry => {
+  override def methods(value: scala.AnyRef): util.Map[String, Callback] = Callbacks(value).map(entry => {
     val (name, callback) = entry
     name -> callback.annotation
   })
 
   override def invoke(address: String, method: String, args: Array[AnyRef]): Array[AnyRef] = {
+    if (method == "setForeground" || method == "setBackground") {
+      if (args.nonEmpty && args(0).isInstanceOf[Array[Byte]]) {
+        OpenComputers.log.warn(s"[Debug] Bad argument passed to $method! Array[Byte] detected.")
+      }
+    }
     if (node != null && node.network != null) {
       Option(node.network.node(address)) match {
         case Some(component: li.cil.oc.server.network.Component) if component.canBeSeenFrom(node) || component == node =>
@@ -402,7 +430,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     }
   }
 
-  override def addUser(name: String) {
+  override def addUser(name: String): Unit = {
     if (_users.size >= Settings.get.maxUsers)
       throw new Exception("too many users")
 
@@ -410,7 +438,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
       throw new Exception("user exists")
     if (name.length > Settings.get.maxUsernameLength)
       throw new Exception("username too long")
-    if (!MinecraftServer.getServer.getConfigurationManager.getAllUsernames.contains(name))
+    if (!ServerLifecycleHooks.getCurrentServer.getPlayerNames.contains(name))
       throw new Exception("player must be online")
 
     _users.synchronized {
@@ -419,7 +447,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     }
   }
 
-  override def removeUser(name: String) = _users.synchronized {
+  override def removeUser(name: String): Boolean = _users.synchronized {
     val success = _users.remove(name)
     if (success) {
       usersChanged = true
@@ -487,11 +515,11 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
 
   // ----------------------------------------------------------------------- //
 
-  def isExecuting = state.synchronized(state.contains(Machine.State.Running))
+  def isExecuting: Boolean = state.synchronized(state.contains(Machine.State.Running))
 
   override val canUpdate = true
 
-  override def update() = if (state.synchronized(state.top != Machine.State.Stopped)) {
+  override def update(): Unit = if (state.synchronized(state.top != Machine.State.Stopped)) {
     // Add components that were added since the last update to the actual list
     // of components if we can see them. We use this delayed approach to avoid
     // issues with components that have a visibility lower than their
@@ -505,11 +533,12 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     // Component overflow check, crash if too many components are connected, to
     // avoid confusion on the user's side due to components not showing up.
     if (componentCount > maxComponents) {
+      beep("-..")
       crash("gui.Error.ComponentOverflow")
     }
 
     // Update world time for time() and uptime().
-    worldTime = host.world.getWorldTime
+    worldTime = host.getEnvironmentLevel.getDayTime
     uptime += 1
 
     if (remainIdle > 0) {
@@ -520,7 +549,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     callBudget = maxCallBudget
 
     // Make sure we have enough power.
-    if (host.world.getTotalWorldTime % Settings.get.tickFrequency == 0) {
+    if (host.getEnvironmentLevel.getGameTime % Settings.get.tickFrequency == 0) {
       state.synchronized(state.top match {
         case Machine.State.Paused |
              Machine.State.Restarting |
@@ -538,13 +567,13 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     }
 
     // Avoid spamming user list across the network.
-    if (host.world.getTotalWorldTime % 20 == 0 && usersChanged) {
+    if (host.getEnvironmentLevel.getGameTime % 20 == 0 && usersChanged) {
       val list = _users.synchronized {
         usersChanged = false
         users
       }
       host match {
-        case computer: tileentity.traits.Computer => PacketSender.sendComputerUserList(computer, list)
+        case computer: blockentity.traits.Computer => PacketSender.sendComputerUserList(computer, list)
         case _ =>
       }
     }
@@ -627,12 +656,12 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
 
   // ----------------------------------------------------------------------- //
 
-  override def onMessage(message: Message) {
+  override def onMessage(message: Message): Unit = {
     message.data match {
       case Array(name: String, args@_*) if message.name == "computer.signal" =>
         signal(name, Seq(message.source.address) ++ args: _*)
-      case Array(player: EntityPlayer, name: String, args@_*) if message.name == "computer.checked_signal" =>
-        if (canInteract(player.getCommandSenderName))
+      case Array(player: Player, name: String, args@_*) if message.name == "computer.checked_signal" =>
+        if (canInteract(player.getName.getString))
           signal(name, Seq(message.source.address) ++ args: _*)
       case _ =>
         if (message.name == "computer.start" && !isPaused) start()
@@ -640,7 +669,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     }
   }
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     if (node == this.node) {
       _components += this.node.address -> this.node.name
       tmp.foreach(fs => node.connect(fs.node))
@@ -656,7 +685,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     host.onMachineConnect(node)
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     if (node == this.node) {
       close()
       tmp.foreach(_.node.remove())
@@ -673,13 +702,13 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
 
   // ----------------------------------------------------------------------- //
 
-  def addComponent(component: Component) {
+  def addComponent(component: Component): Unit = {
     if (!_components.contains(component.address)) {
       addedComponents += component
     }
   }
 
-  def removeComponent(component: Component) {
+  def removeComponent(component: Component): Unit = {
     if (_components.contains(component.address)) {
       _components.synchronized(_components -= component.address)
       signal("component_removed", component.address, component.name)
@@ -687,7 +716,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     addedComponents -= component
   }
 
-  private def processAddedComponents() {
+  private def processAddedComponents(): Unit = {
     if (addedComponents.nonEmpty) {
       for (component <- addedComponents) {
         if (component.canBeSeenFrom(node)) {
@@ -703,7 +732,7 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     }
   }
 
-  private def verifyComponents() {
+  private def verifyComponents(): Unit = {
     val invalid = mutable.Set.empty[String]
     for ((address, name) <- _components) {
       node.network.node(address) match {
@@ -725,149 +754,158 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) = Machine.this.synchronized(state.synchronized {
+  private def tmpPath = node.address + "_tmp"
+
+  override def loadData(holder: DataComponentHolder): Unit = Machine.this.synchronized(state.synchronized {
     assert(state.top == Machine.State.Stopped || state.top == Machine.State.Paused)
     close()
     state.clear()
 
-    super.load(nbt)
-
-    state.pushAll(nbt.getIntArray("state").reverseMap(Machine.State(_)))
-    nbt.getTagList("users", NBT.TAG_STRING).foreach((tag: NBTTagString) => _users += tag.func_150285_a_())
-    if (nbt.hasKey("message")) {
-      message = Some(nbt.getString("message"))
+    val machineData = holder.getComponent(OCComponents.MACHINE)
+    machineData.flatMap(_.nodeAddress) match {
+      case Some(address) => node.asInstanceOf[li.cil.oc.server.network.Node].loadAddress(address)
+      // Data written before machine nodes had their own nested address used
+      // the shared holder address. Retain that as a migration fallback.
+      case _ => super.loadData(holder)
     }
 
-    _components ++= nbt.getTagList("components", NBT.TAG_COMPOUND).map((tag: NBTTagCompound) =>
-      tag.getString("address") -> tag.getString("name"))
+    for(data <- machineData) {
+      // Stack iteration/save order is top-to-bottom, while pushAll places each
+      // following value on top. Reverse the serialized order, as the 1.12
+      // implementation did, so the active machine state remains on top.
+      state.pushAll(data.state.reverse)
+      _users ++= data.users
 
-    tmp.foreach(fs => {
-      if (nbt.hasKey("tmp")) fs.load(nbt.getCompoundTag("tmp"))
-      else fs.load(SaveHandler.loadNBT(nbt, node.address + "_tmp"))
-    })
-
-    if (state.nonEmpty && isRunning && init()) try {
-      architecture.load(nbt)
-
-      signals ++= nbt.getTagList("signals", NBT.TAG_COMPOUND).map((signalNbt: NBTTagCompound) => {
-        val argsNbt = signalNbt.getCompoundTag("args")
-        val argsLength = argsNbt.getInteger("length")
-        new Machine.Signal(signalNbt.getString("name"),
-          (0 until argsLength).map("arg" + _).map(argsNbt.getTag).map {
-            case tag: NBTTagByte if tag.func_150290_f == -1 => null
-            case tag: NBTTagByte => Boolean.box(tag.func_150290_f == 1)
-            case tag: NBTTagLong => Long.box(tag.func_150291_c)
-            case tag: NBTTagDouble => Double.box(tag.func_150286_g)
-            case tag: NBTTagString => tag.func_150285_a_
-            case tag: NBTTagByteArray => tag.func_150292_c
-            case tag: NBTTagList =>
-              val data = mutable.Map.empty[String, String]
-              for (i <- 0 until tag.tagCount by 2) {
-                data += tag.getStringTagAt(i) -> tag.getStringTagAt(i + 1)
-              }
-              data
-            case tag: NBTTagCompound => tag
-            case _ => null
-          }.toArray[AnyRef])
-      })
-
-      uptime = nbt.getLong("uptime")
-      cpuTotal = nbt.getLong("cpuTime")
-      remainingPause = nbt.getInteger("remainingPause")
-
-      // Delay execution for a second to allow the world around us to settle.
-      if (state.top != Machine.State.Restarting) {
-        pause(Settings.get.startupDelay)
+      for(msg <- data.message) {
+        message = Some(msg)
       }
-    }
-    catch {
-      case t: Throwable =>
-        OpenComputers.log.error(
-          s"""Unexpected error loading a state of computer at ${host.machinePosition()}. """ +
-            s"""State: ${state.headOption.fold("no state")(_.toString)}. Unless you're upgrading/downgrading across a major version, please report this! Thank you.""", t)
+
+      _components ++= data.components.map(c => c.address -> c.name)
+
+      for (fs <- tmp) {
+        val lvl = host.getEnvironmentLevel
+        val cpos = new ChunkPos(new BlockPos(host.xPosition.toInt, host.yPosition.toInt, host.zPosition.toInt))
+        fs.loadData(SaveHandler.loadNBT(lvl.dimension.location, cpos, tmpPath), lvl.registryAccess())
+      }
+
+      if (state.nonEmpty && isRunning && init()) {
+        try {
+          architecture.loadData(holder, data.architectureData)
+        } catch {
+          case t: Throwable =>
+            OpenComputers.log.error(
+              s"""Unexpected error loading a state of computer at ${host.machinePosition()}. """ +
+                s"""State: ${state.headOption.fold("no state")(_.toString)}. Unless you're upgrading/downgrading across a major version, please report this! Thank you.""", t)
+            close()
+            // Preserve usability when a native VM snapshot is corrupt or
+            // incompatible: restart through the BIOS with the persisted
+            // components and disks instead of leaving the machine dead.
+            start()
+        }
+
+        signals ++= data.signals.map(v => Machine.Signal(v.name, v.args.map {
+          case DataSignal.Null => null
+          case DataSignal.Boolean(v) => Boolean.box(v)
+          case DataSignal.Long(v) => Long.box(v)
+          case DataSignal.Double(v) => Double.box(v)
+          case DataSignal.StringValue(v) => v
+          case DataSignal.ByteArray(v) => if (v.hasArray) {
+            v.array
+          } else {
+            val array: Array[Byte] = Array.fill(v.remaining()) {
+              0
+            }
+            v.get(array)
+            array
+          }
+          case DataSignal.StringMap(v) => mutable.Map.from(v)
+          case DataSignal.Compound(v) => v
+        }.toArray))
+
+        uptime = data.uptime
+        cpuTotal = data.cpuTotal
+        remainingPause = data.remainingPause
+
+        // Delay execution for a second to allow the world around us to settle.
+        if (state.top != Machine.State.Restarting) {
+          pause(Settings.get.startupDelay)
+        }
+      } else {
+        // Clean up in case we got a weird state stack.
+        onHostChanged()
         close()
-    }
-    else {
-      // Clean up in case we got a weird state stack.
-      close()
+      }
     }
   })
 
-  override def save(nbt: NBTTagCompound): Unit = Machine.this.synchronized(state.synchronized {
+  override def saveData(holder: MutableDataComponentHolder): Unit = Machine.this.synchronized(state.synchronized {
     // The lock on 'this' should guarantee that this never happens regularly.
     // If something other than regular saving tries to save while we are executing code,
     // e.g. SpongeForge saving during robot.move due to block changes being captured,
     // just don't save this at all. What could possibly go wrong?
     if(isExecuting) return
 
-    if (SaveHandler.savingForClients) {
+    if(SaveHandler.savingForClients) {
       return
     }
 
     // Make sure we don't continue running until everything has saved.
     pause(0.05)
 
-    super.save(nbt)
-
     // Make sure the component list is up-to-date.
     processAddedComponents()
 
-    nbt.setIntArray("state", state.map(_.id).toArray)
-    nbt.setNewTagList("users", _users)
-    message.foreach(nbt.setString("message", _))
-
-    val componentsNbt = new NBTTagList()
-    for ((address, name) <- _components) {
-      val componentNbt = new NBTTagCompound()
-      componentNbt.setString("address", address)
-      componentNbt.setString("name", name)
-      componentsNbt.appendTag(componentNbt)
+    for(fs <- tmp) {
+      val lvl = host.getEnvironmentLevel
+      val cpos = new ChunkPos(new BlockPos(host.xPosition.toInt, host.yPosition.toInt, host.zPosition.toInt))
+      SaveHandler.scheduleSave(lvl.dimension.location, cpos, tmpPath, (nbt: CompoundTag) => fs.saveData(nbt, lvl.registryAccess()))
     }
-    nbt.setTag("components", componentsNbt)
 
-    tmp.foreach(fs => SaveHandler.scheduleSave(host, nbt, node.address + "_tmp", fs.save _))
+    holder.setComponent(OCComponents.MACHINE, MachineData(
+      state = state.toArray,
+      users = _users.toSet,
+      message = message,
+      components = _components.map { case (k, v) => MachineData.Component(k, v) }.toList,
+      nodeAddress = Option(node.address),
+      architectureData = {
+        val nbt = new CompoundTag()
 
-    if (state.top != Machine.State.Stopped) try {
-      architecture.save(nbt)
-
-      val signalsNbt = new NBTTagList()
-      for (s <- signals.iterator) {
-        val signalNbt = new NBTTagCompound()
-        signalNbt.setString("name", s.name)
-        signalNbt.setNewCompoundTag("args", args => {
-          args.setInteger("length", s.args.length)
-          s.args.zipWithIndex.foreach {
-            case (null, i) => args.setByte("arg" + i, -1)
-            case (arg: java.lang.Boolean, i) => args.setByte("arg" + i, if (arg) 1 else 0)
-            case (arg: java.lang.Long, i) => args.setLong("arg" + i, arg)
-            case (arg: java.lang.Double, i) => args.setDouble("arg" + i, arg)
-            case (arg: String, i) => args.setString("arg" + i, arg)
-            case (arg: Array[Byte], i) => args.setByteArray("arg" + i, arg)
-            case (arg: Map[_, _], i) =>
-              val list = new NBTTagList()
-              for ((key, value) <- arg) {
-                list.append(key.toString)
-                list.append(value.toString)
-              }
-              args.setTag("arg" + i, list)
-            case (arg: NBTTagCompound, i) => args.setTag("arg" + i, arg)
-            case (_, i) => args.setByte("arg" + i, -1)
+        if(architecture != null) {
+          try {
+            architecture.saveData(holder, nbt)
+          } catch {
+            case t: Throwable =>
+              OpenComputers.log.error(
+                s"""Unexpected error saving a state of computer at ${host.machinePosition()}. """ +
+                  s"""State: ${state.headOption.fold("no state")(_.toString)}. Unless you're upgrading/downgrading across a major version, please report this! Thank you.""", t)
           }
-        })
-        signalsNbt.appendTag(signalNbt)
-      }
-      nbt.setTag("signals", signalsNbt)
+        }
 
-      nbt.setLong("uptime", uptime)
-      nbt.setLong("cpuTime", cpuTotal)
-      nbt.setInteger("remainingPause", remainingPause)
-    }
-    catch {
-      case t: Throwable =>
-        OpenComputers.log.error(
-          s"""Unexpected error saving a state of computer at ${host.machinePosition()}. """ +
-            s"""State: ${state.headOption.fold("no state")(_.toString)}. Unless you're upgrading/downgrading across a major version, please report this! Thank you.""", t)
-    }
+        nbt
+      },
+      signals = if(state.top != Machine.State.Stopped) {
+        signals.map {
+          case Machine.Signal(name, args) =>
+            MachineData.Signal(
+              name,
+              args.map {
+                case null => DataSignal.Null
+                case arg: java.lang.Boolean => DataSignal.Boolean(arg)
+                case arg: java.lang.Long => DataSignal.Long(arg)
+                case arg: java.lang.Double => DataSignal.Double(arg)
+                case arg: String => DataSignal.StringValue(arg)
+                case arg: Array[Byte] => DataSignal.ByteArray(ByteBuffer.wrap(arg))
+                case arg: Map[_, _] => DataSignal.StringMap(Map.from(arg.iterator.map { case a -> b => a.toString -> b.toString }))
+                case arg: CompoundTag => DataSignal.Compound(arg)
+                case _ => DataSignal.Null
+              }.toList
+            )
+        }.toList
+      } else List.empty,
+      uptime = uptime,
+      cpuTotal = cpuTotal,
+      remainingPause = remainingPause
+    ))
   })
 
   // ----------------------------------------------------------------------- //
@@ -949,10 +987,13 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
     result
   }
 
-  private def isGamePaused = !MinecraftServer.getServer.isDedicatedServer && (MinecraftServer.getServer match {
-    case integrated: IntegratedServer => Minecraft.getMinecraft.isGamePaused
-    case _ => false
-  })
+  private def isGamePaused: Boolean = {
+    val server = ServerLifecycleHooks.getCurrentServer
+
+    server != null &&
+      !server.isDedicatedServer &&
+      (FMLEnvironment.dist.isClient && (() => { ClientUtil.isPaused })())
+  }
 
   // This is a really high level lock that we only use for saving and loading.
   override def run(): Unit = Machine.this.synchronized {
@@ -1046,9 +1087,9 @@ class Machine(val host: MachineHost) extends prefab.ManagedEnvironment with mach
 
 object Machine extends MachineAPI {
   // Keep registration order, to allow deterministic iteration of the architectures.
-  val checked = mutable.LinkedHashSet.empty[Class[_ <: Architecture]]
+  val checked: mutable.LinkedHashSet[Class[_ <: Architecture]] = mutable.LinkedHashSet.empty[Class[_ <: Architecture]]
 
-  override def add(architecture: Class[_ <: Architecture]) {
+  override def add(architecture: Class[_ <: Architecture]): Unit = {
     if (!checked.contains(architecture)) {
       try {
         architecture.getConstructor(classOf[machine.Machine])
@@ -1060,9 +1101,9 @@ object Machine extends MachineAPI {
     }
   }
 
-  override def architectures = checked.toSeq
+  override def architectures: util.List[Class[_ <: Architecture]] = checked.toSeq
 
-  def getArchitectureName(architecture: Class[_ <: Architecture]) =
+  def getArchitectureName(architecture: Class[_ <: Architecture]): String =
     architecture.getAnnotation(classOf[Architecture.Name]) match {
       case annotation: Architecture.Name => annotation.value
       case _ => architecture.getSimpleName
@@ -1071,7 +1112,7 @@ object Machine extends MachineAPI {
   override def create(host: MachineHost) = new Machine(host)
 
   /** Possible states of the computer, and in particular its executor. */
-  private[machine] object State extends Enumeration {
+  object State extends Enumeration {
     /** The computer is not running right now and there is no Lua state. */
     val Stopped = Value("Stopped")
 
@@ -1104,7 +1145,7 @@ object Machine extends MachineAPI {
   }
 
   /** Signals are messages sent to the Lua state from Java asynchronously. */
-  private[machine] class Signal(val name: String, val args: Array[AnyRef]) extends machine.Signal {
+  private[machine] case class Signal(val name: String, val args: Array[AnyRef]) extends machine.Signal {
     def convert() = new Signal(name, Registry.convert(args))
   }
 

@@ -1,98 +1,88 @@
 package li.cil.oc.client.gui
 
-import java.lang.Iterable
 import java.text.DecimalFormat
-import java.util
-
-import codechicken.nei.VisiblityData
-import codechicken.nei.api.INEIGuiHandler
-import codechicken.nei.api.TaggedInventoryArea
-import cpw.mods.fml.common.Optional
+import com.mojang.blaze3d.systems.RenderSystem
 import li.cil.oc.Localization
 import li.cil.oc.client.Textures
-import li.cil.oc.common.container
-import li.cil.oc.common.tileentity
-import li.cil.oc.integration.Mods
+import li.cil.oc.common.menu
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.inventory.GuiContainer
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.entity.player.InventoryPlayer
-import net.minecraft.item.ItemStack
+import net.minecraft.client.renderer.Rect2i
 import org.lwjgl.opengl.GL11
-import org.lwjgl.util.Rectangle
+import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, PoseStack, Tesselator, VertexFormat}
+import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.player.Inventory
+import net.minecraft.client.gui.GuiGraphics
 
-@Optional.Interface(iface = "codechicken.nei.api.INEIGuiHandler", modid = Mods.IDs.NotEnoughItems)
-class Relay(playerInventory: InventoryPlayer, val relay: tileentity.Relay) extends DynamicGuiContainer(new container.Relay(playerInventory, relay)) with INEIGuiHandler {
+class Relay(state: menu.Relay, playerInventory: Inventory, name: Component)
+  extends DynamicGuiContainer(state, playerInventory, name) {
+
   private val format = new DecimalFormat("#.##hz")
 
-  private val tabPosition = new Rectangle(xSize, 10, 23, 26)
+  val tabPosition = new Rect2i(imageWidth, 10, 23, 26)
 
-  override protected def drawSecondaryBackgroundLayer(): Unit = {
-    super.drawSecondaryBackgroundLayer()
+  override protected def drawSecondaryBackgroundLayer(graphics: GuiGraphics): Unit = {
+    super.drawSecondaryBackgroundLayer(graphics)
 
-    // Tab background.
-    GL11.glColor4f(1, 1, 1, 1)
-    Minecraft.getMinecraft.getTextureManager.bindTexture(Textures.guiUpgradeTab)
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+    RenderSystem.setShaderTexture(0, Textures.GUI.UpgradeTab)
+    val stack = graphics.pose()
     val x = windowX + tabPosition.getX
     val y = windowY + tabPosition.getY
     val w = tabPosition.getWidth
     val h = tabPosition.getHeight
-    val t = Tessellator.instance
-    t.startDrawingQuads()
-    t.addVertexWithUV(x, y + h, zLevel, 0, 1)
-    t.addVertexWithUV(x + w, y + h, zLevel, 1, 1)
-    t.addVertexWithUV(x + w, y, zLevel, 1, 0)
-    t.addVertexWithUV(x, y, zLevel, 0, 0)
-    t.draw()
+    val t = Tesselator.getInstance
+    val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
+    r.addVertex(stack.last.pose(), x, y + h, 0).setUv(0, 1)
+    r.addVertex(stack.last.pose(), x + w, y + h, 0).setUv(1, 1)
+    r.addVertex(stack.last.pose(), x + w, y, 0).setUv(1, 0)
+    r.addVertex(stack.last.pose(), x, y, 0).setUv(0, 0)
+    BufferUploader.drawWithShader(r.buildOrThrow())
   }
 
-  override def mouseClicked(mouseX: Int, mouseY: Int, button: Int): Unit = {
+  override def mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = {
     // So MC doesn't throw away the item in the upgrade slot when we're trying to pick it up...
-    val originalWidth = xSize
+    val originalWidth = imageWidth
     try {
-      xSize += tabPosition.getWidth
+      imageWidth += tabPosition.getWidth
       super.mouseClicked(mouseX, mouseY, button)
     }
     finally {
-      xSize = originalWidth
+      imageWidth = originalWidth
     }
   }
 
-  override def mouseMovedOrUp(mouseX: Int, mouseY: Int, button: Int): Unit = {
+  override def mouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean = {
     // So MC doesn't throw away the item in the upgrade slot when we're trying to pick it up...
-    val originalWidth = xSize
+    val originalWidth = imageWidth
     try {
-      xSize += tabPosition.getWidth
-      super.mouseMovedOrUp(mouseX, mouseY, button)
+      imageWidth += tabPosition.getWidth
+      super.mouseReleased(mouseX, mouseY, button)
     }
     finally {
-      xSize = originalWidth
+      imageWidth = originalWidth
     }
   }
 
-  override def drawSecondaryForegroundLayer(mouseX: Int, mouseY: Int) = {
-    super.drawSecondaryForegroundLayer(mouseX, mouseY)
-    fontRendererObj.drawString(
-      Localization.localizeImmediately(relay.getInventoryName),
-      8, 6, 0x404040)
+  override def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
+    super.drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
 
-    fontRendererObj.drawString(
+    graphics.drawString(font,
       Localization.Switch.TransferRate,
       14, 20, 0x404040)
-    fontRendererObj.drawString(
+    graphics.drawString(font,
       Localization.Switch.PacketsPerCycle,
       14, 39, 0x404040)
-    fontRendererObj.drawString(
+    graphics.drawString(font,
       Localization.Switch.QueueSize,
       14, 58, 0x404040)
 
-    fontRendererObj.drawString(
+    graphics.drawString(font,
       format.format(20f / inventoryContainer.relayDelay),
       108, 20, 0x404040)
-    fontRendererObj.drawString(
+    graphics.drawString(font,
       inventoryContainer.packetsPerCycleAvg + " / " + inventoryContainer.relayAmount,
       108, 39, thresholdBasedColor(inventoryContainer.packetsPerCycleAvg, math.ceil(inventoryContainer.relayAmount / 2f).toInt, inventoryContainer.relayAmount))
-    fontRendererObj.drawString(
+    graphics.drawString(font,
       inventoryContainer.queueSize + " / " + inventoryContainer.maxQueueSize,
       108, 58, thresholdBasedColor(inventoryContainer.queueSize, inventoryContainer.maxQueueSize / 2, inventoryContainer.maxQueueSize))
   }
@@ -101,22 +91,5 @@ class Relay(playerInventory: InventoryPlayer, val relay: tileentity.Relay) exten
     if (value < yellow) 0x009900
     else if (value < red) 0x999900
     else 0x990000
-  }
-
-  @Optional.Method(modid = Mods.IDs.NotEnoughItems)
-  override def modifyVisiblity(gui: GuiContainer, currentVisibility: VisiblityData): VisiblityData = null
-
-  @Optional.Method(modid = Mods.IDs.NotEnoughItems)
-  override def getItemSpawnSlots(gui: GuiContainer, stack: ItemStack): Iterable[Integer] = null
-
-  @Optional.Method(modid = Mods.IDs.NotEnoughItems)
-  override def getInventoryAreas(gui: GuiContainer): util.List[TaggedInventoryArea] = null
-
-  @Optional.Method(modid = Mods.IDs.NotEnoughItems)
-  override def handleDragNDrop(gui: GuiContainer, mouseX: Int, mouseY: Int, stack: ItemStack, button: Int): Boolean = false
-
-  @Optional.Method(modid = Mods.IDs.NotEnoughItems)
-  override def hideItemPanelSlot(gui: GuiContainer, x: Int, y: Int, w: Int, h: Int): Boolean = {
-    new Rectangle(x - windowX, y - windowY, w, h).intersects(tabPosition)
   }
 }

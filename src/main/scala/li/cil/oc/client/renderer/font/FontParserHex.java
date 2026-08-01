@@ -1,27 +1,29 @@
 package li.cil.oc.client.renderer.font;
 
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import li.cil.oc.OpenComputers;
 import li.cil.oc.Settings;
 import li.cil.oc.util.FontUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.IResource;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
 import org.lwjgl.BufferUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Optional;
 
 public class FontParserHex implements IGlyphProvider {
     private static final byte[] OPAQUE = {(byte) 255, (byte) 255, (byte) 255, (byte) 255};
     private static final byte[] TRANSPARENT = {0, 0, 0, 0};
 
-    private final TIntObjectMap<byte[]> glyphs = new TIntObjectHashMap<>();
+    private final Int2ObjectMap<byte[]> glyphs = new Int2ObjectOpenHashMap<>();
 
     private static int hex2int(char c) {
         if (c >= '0' && c <= '9') {
@@ -37,57 +39,50 @@ public class FontParserHex implements IGlyphProvider {
 
     @Override
     public void initialize() {
-        try {
-            glyphs.clear();
+        glyphs.clear();
 
-            OpenComputers.log().info("Loading Unicode glyphs...");
-            long time = System.currentTimeMillis();
-            int glyphCount = 0;
+        OpenComputers.log().info("Loading Unicode glyphs...");
+        long time = System.currentTimeMillis();
+        int glyphCount = 0;
 
-            ResourceLocation loc = new ResourceLocation(Settings.resourceDomain(), "font.hex");
-            for (IResource resource : (List<IResource>) Minecraft.getMinecraft().getResourceManager().getAllResources(loc)) {
-                final InputStream font = resource.getInputStream();
-                try {
-                    final BufferedReader input = new BufferedReader(new InputStreamReader(font));
-                    String line;
-                    while ((line = input.readLine()) != null) {
-                        final String info = line.substring(0, line.indexOf(':'));
-                        final int charCode = Integer.parseInt(info, 16);
-                        if (charCode < 0 || charCode >= FontUtils.codepoint_limit()) {
-                            OpenComputers.log().warn(String.format("Unicode font contained unexpected glyph: U+%04X, ignoring", charCode));
-                            continue; // Out of bounds.
-                        }
-                        final int expectedWidth = FontUtils.wcwidth(charCode);
-                        if (expectedWidth < 1) continue; // Skip control characters.
-                        // Two chars representing one byte represent one row of eight pixels.
-                        int glyphStrOfs = info.length() + 1;
-                        final byte[] glyph = new byte[(line.length() - glyphStrOfs) >> 1];
-                        final int glyphWidth = glyph.length / getGlyphHeight();
-                        if (expectedWidth == glyphWidth) {
-                            for (int i = 0; i < glyph.length; i++, glyphStrOfs += 2) {
-                                glyph[i] = (byte) ((hex2int(line.charAt(glyphStrOfs)) << 4) | (hex2int(line.charAt(glyphStrOfs + 1))));
-                            }
-                            if (!glyphs.containsKey(charCode)) {
-                                glyphCount++;
-                            }
-                            glyphs.put(charCode, glyph);
-                        } else if (Settings.get().logHexFontErrors()) {
-                            OpenComputers.log().warn(String.format("Size of glyph for code point U+%04X (%s) in font (%d) does not match expected width (%d), ignoring.", charCode, String.valueOf((char) charCode), glyphWidth, expectedWidth));
-                        }
+        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain(), "font.hex");
+        List<Resource> optRes = Minecraft.getInstance().getResourceManager().getResourceStack(loc);
+        if (optRes.isEmpty()) return;
+        for (Resource resource : optRes) {
+            try (InputStream font = resource.open()) {
+                final BufferedReader input = new BufferedReader(new InputStreamReader(font));
+                String line;
+                while ((line = input.readLine()) != null) {
+                    final String info = line.substring(0, line.indexOf(':'));
+                    final int charCode = Integer.parseInt(info, 16);
+                    if (charCode < 0 || charCode >= FontUtils.codepoint_limit()) {
+                        OpenComputers.log().warn(String.format("Unicode font contained unexpected glyph: U+%04X, ignoring", charCode));
+                        continue; // Out of bounds.
                     }
-                } finally {
-                    try {
-                        font.close();
-                    } catch (IOException ex) {
-                        OpenComputers.log().warn("Error parsing font.", ex);
+                    final int expectedWidth = FontUtils.wcwidth(charCode);
+                    if (expectedWidth < 1) continue; // Skip control characters.
+                    // Two chars representing one byte represent one row of eight pixels.
+                    int glyphStrOfs = info.length() + 1;
+                    final byte[] glyph = new byte[(line.length() - glyphStrOfs) >> 1];
+                    final int glyphWidth = glyph.length / getGlyphHeight();
+                    if (expectedWidth == glyphWidth) {
+                        for (int i = 0; i < glyph.length; i++, glyphStrOfs += 2) {
+                            glyph[i] = (byte) ((hex2int(line.charAt(glyphStrOfs)) << 4) | (hex2int(line.charAt(glyphStrOfs + 1))));
+                        }
+                        if (!glyphs.containsKey(charCode)) {
+                            glyphCount++;
+                        }
+                        glyphs.put(charCode, glyph);
+                    } else if (Settings.get().logHexFontErrors()) {
+                        OpenComputers.log().warn(String.format("Size of glyph for code point U+%04X (%s) in font (%d) does not match expected width (%d), ignoring.", charCode, (char) charCode, glyphWidth, expectedWidth));
                     }
                 }
+            } catch (IOException ex) {
+                OpenComputers.log().warn("Error parsing font.", ex);
             }
-
-            OpenComputers.log().info("Loaded " + glyphCount + " glyphs in " + (System.currentTimeMillis() - time) + " milliseconds.");
-        } catch (IOException ex) {
-            OpenComputers.log().warn("Failed loading glyphs.", ex);
         }
+
+        OpenComputers.log().info("Loaded " + glyphCount + " glyphs in " + (System.currentTimeMillis() - time) + " milliseconds.");
     }
 
     @Override
@@ -108,7 +103,7 @@ public class FontParserHex implements IGlyphProvider {
                 c <<= 1;
             }
         }
-        buffer.rewind();
+        ((Buffer) buffer).rewind();
         return buffer;
     }
 

@@ -9,11 +9,11 @@ import li.cil.oc.util.ExtendedArguments._
 import li.cil.oc.util.FluidUtils
 import li.cil.oc.util.InventoryUtils
 
-trait InventoryTransfer extends traits.WorldAware with traits.SideRestricted {
+trait InventoryTransfer extends traits.LevelAware with traits.SideRestricted {
   // Return None on success, else Some("failure reason")
   def onTransferContents(): Option[String]
 
-  @Callback(doc = """function(sourceSide:number, sinkSide:number[, count:number[, sourceSlot:number[, sinkSlot:number]]]):number -- Transfer some items between two inventories.""")
+  @Callback(doc = """function(sourceSide:number, sinkSide:number[, count:number[, sourceSlot:number[, sinkSlot:number]]]):boolean -- Transfer some items between two inventories.""")
   def transferItem(context: Context, args: Arguments): Array[AnyRef] = {
     val sourceSide = checkSideForAction(args, 0)
     val sourcePos = position.offset(sourceSide)
@@ -23,11 +23,11 @@ trait InventoryTransfer extends traits.WorldAware with traits.SideRestricted {
 
     onTransferContents() match {
       case Some(reason) =>
-        result(Unit, reason)
+        result((), reason)
       case _ =>
         val extractor = if (args.count > 3) {
-          val sourceSlot = args.checkSlot(InventoryUtils.inventoryAt(sourcePos).getOrElse(throw new IllegalArgumentException("no inventory")), 3)
-          val sinkSlot = args.optSlot(InventoryUtils.inventoryAt(sinkPos).getOrElse(throw new IllegalArgumentException("no inventory")), 4, -1)
+          val sourceSlot = args.checkSlot(InventoryUtils.inventoryAt(sourcePos, sourceSide.getOpposite).getOrElse(throw new IllegalArgumentException("no inventory")), 3)
+          val sinkSlot = args.optSlot(InventoryUtils.inventoryAt(sinkPos, sinkSide.getOpposite).getOrElse(throw new IllegalArgumentException("no inventory")), 4, -1)
 
           InventoryUtils.getTransferBetweenInventoriesSlotsAt(sourcePos, sourceSide.getOpposite, sourceSlot, sinkPos, Option(sinkSide.getOpposite), if (sinkSlot < 0) None else Option(sinkSlot), count)
         }
@@ -36,7 +36,7 @@ trait InventoryTransfer extends traits.WorldAware with traits.SideRestricted {
 
         Option(extractor) match {
           case Some(ex) => result(ex())
-          case _ => result(Unit, "no inventory")
+          case _ => result((), "no inventory")
         }
     }
   }
@@ -52,7 +52,7 @@ trait InventoryTransfer extends traits.WorldAware with traits.SideRestricted {
 
     onTransferContents() match {
       case Some(reason) =>
-        result(Unit, reason)
+        result((), reason)
       case _ =>
         val moved = FluidUtils.transferBetweenFluidHandlersAt(sourcePos, sourceSide.getOpposite, sinkPos, sinkSide.getOpposite, count, sourceTank)
         if (moved > 0) context.pause(moved / Settings.get.transposerFluidTransferRate) // Allow up to 16 buckets per second.

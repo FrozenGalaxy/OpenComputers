@@ -1,32 +1,25 @@
 package li.cil.oc.common
 
+import li.cil.oc.{OpenComputers, Settings}
+import li.cil.oc.api.machine.MachineHost
+import li.cil.oc.api.network.EnvironmentHost
+import li.cil.oc.util.{BlockPosition, SafeThreadPool, ThreadPoolFactory}
+import net.minecraft.nbt.{CompoundTag, NbtIo}
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.{ChunkPos, Level}
+import net.minecraft.world.level.storage.LevelResource
+import net.neoforged.bus.api.{EventPriority, SubscribeEvent}
+import net.neoforged.neoforge.event.level.LevelEvent
+import net.neoforged.neoforge.server.ServerLifecycleHooks
+
 import java.io
 import java.io._
 import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
-import java.util.concurrent.CancellationException
-import java.util.concurrent.ConcurrentLinkedDeque
-import java.util.concurrent.Future
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
-import cpw.mods.fml.common.eventhandler.EventPriority
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
-import li.cil.oc.OpenComputers
-import li.cil.oc.Settings
-import li.cil.oc.api.machine.MachineHost
-import li.cil.oc.api.network.EnvironmentHost
-import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.SafeThreadPool
-import li.cil.oc.util.ThreadPoolFactory
-import net.minecraft.nbt.CompressedStreamTools
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.world.{ChunkCoordIntPair, World, WorldServer}
-import net.minecraftforge.common.DimensionManager
-import net.minecraftforge.event.world.WorldEvent
-import org.apache.commons.lang3.JavaVersion
-import org.apache.commons.lang3.SystemUtils
-
+import java.util.concurrent._
 import scala.collection.mutable
+import scala.collection.concurrent.TrieMap
 
 // Used by the native lua state to store kernel and stack data in auxiliary
 // files instead of directly in the tile entity data, avoiding potential
@@ -46,106 +39,136 @@ object SaveHandler {
   // which takes a lot of time and is completely unnecessary in those cases.
   var savingForClients = false
 
-  class SaveDataEntry(val data: Array[Byte], val pos: ChunkCoordIntPair, val name: String, val dimension: Int) extends Runnable {
+  class SaveDataEntry(val root: File, val data: Array[Byte], val pos: ChunkPos, val name: String, val dimension: ResourceLocation) extends Runnable {
     override def run(): Unit = {
-      val path = statePath
-      val dimPath = new io.File(path, dimension.toString)
-      val chunkPath = new io.File(dimPath, s"${this.pos.chunkXPos}.${this.pos.chunkZPos}")
+      val path = statePath(root)
+      val dimPath = new io.File(path, dimension.toString.replace(':', '/').replace('.', '/'))
+      val chunkPath = new io.File(dimPath, s"${this.pos.x}.${this.pos.z}")
       chunkDirs.add(chunkPath)
       if (!chunkPath.exists()) {
         chunkPath.mkdirs()
       }
       val file = new io.File(chunkPath, this.name)
+      val temporary = new io.File(chunkPath, this.name + ".tmp")
       try {
-        // val fos = new GZIPOutputStream(new io.FileOutputStream(file))
-        val fos = new io.BufferedOutputStream(new io.FileOutputStream(file))
-        fos.write(this.data)
-        fos.close()
+        val raw = new io.FileOutputStream(temporary)
+        val fos = new io.BufferedOutputStream(raw)
+        try {
+          fos.write(this.data)
+          fos.flush()
+          raw.getFD.sync()
+        }
+        finally fos.close()
+        try {
+          Files.move(temporary.toPath, file.toPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        }
+        catch {
+          case _: AtomicMoveNotSupportedException =>
+            Files.move(temporary.toPath, file.toPath, StandardCopyOption.REPLACE_EXISTING)
+        }
       }
       catch {
         case e: io.IOException => OpenComputers.log.warn(s"Error saving auxiliary tile entity data to '${file.getAbsolutePath}.", e)
       }
+      finally temporary.delete()
     }
   }
 
   val stateSaveHandler: SafeThreadPool = ThreadPoolFactory.createSafePool("SaveHandler", 1)
 
   val chunkDirs = new ConcurrentLinkedDeque[io.File]()
-  val saving = mutable.HashMap.empty[String, Future[_]]
+  val saving = TrieMap.empty[String, Future[_]]
 
-  def savePath = new io.File(DimensionManager.getCurrentSaveRootDirectory, Settings.savePath)
+  def savePath = ServerLifecycleHooks.getCurrentServer.getWorldPath(LevelResource.ROOT).resolve(Settings.savePath).toFile
 
-  def statePath = new io.File(savePath, "state")
+  def statePath: File = new io.File(savePath, "state")
 
-  def scheduleSave(host: MachineHost, nbt: NBTTagCompound, name: String, data: Array[Byte]) {
+  private def statePath(root: File): File = new io.File(root, "state")
+
+  def scheduleSave(host: MachineHost, nbt: CompoundTag, name: String, data: Array[Byte]): Unit = {
     scheduleSave(BlockPosition(host), nbt, name, data)
   }
 
-  def scheduleSave(host: MachineHost, nbt: NBTTagCompound, name: String, save: NBTTagCompound => Unit) {
+  def scheduleSave(host: MachineHost, nbt: CompoundTag, name: String, save: CompoundTag => Unit): Unit = {
     scheduleSave(host, nbt, name, writeNBT(save))
   }
 
-  def scheduleSave(host: EnvironmentHost, nbt: NBTTagCompound, name: String, save: NBTTagCompound => Unit) {
+  def scheduleSave(host: EnvironmentHost, nbt: CompoundTag, name: String, save: CompoundTag => Unit): Unit = {
     scheduleSave(BlockPosition(host), nbt, name, writeNBT(save))
   }
 
-  def scheduleSave(world: World, x: Double, z: Double, nbt: NBTTagCompound, name: String, data: Array[Byte]) {
+  def scheduleSave(world: Level, x: Double, z: Double, nbt: CompoundTag, name: String, data: Array[Byte]): Unit = {
     scheduleSave(BlockPosition(x, 0, z, world), nbt, name, data)
   }
 
-  def scheduleSave(world: World, x: Double, z: Double, nbt: NBTTagCompound, name: String, save: NBTTagCompound => Unit) {
+  def scheduleSave(world: Level, x: Double, z: Double, nbt: CompoundTag, name: String, save: CompoundTag => Unit): Unit = {
     scheduleSave(world, x, z, nbt, name, writeNBT(save))
   }
 
-  def scheduleSave(position: BlockPosition, nbt: NBTTagCompound, name: String, data: Array[Byte]) {
+  def scheduleSave(position: BlockPosition, nbt: CompoundTag, name: String, data: Array[Byte]): Unit = {
     val world = position.world.get
-    
     // Try to exclude wrapped/client-side worlds.
-    if (world.isInstanceOf[WorldServer]) {
-      val dimension = world.provider.dimensionId
-      val chunk = new ChunkCoordIntPair(position.x >> 4, position.z >> 4)
+    if (world.isInstanceOf[ServerLevel]) {
+      val dimension = world.dimension.location
+      val chunk = new ChunkPos(position.x >> 4, position.z >> 4)
 
       // We have to save the dimension and chunk coordinates, because they are
       // not available on load / may have changed if the computer was moved.
-      nbt.setInteger("dimension", dimension)
-      nbt.setInteger("chunkX", chunk.chunkXPos)
-      nbt.setInteger("chunkZ", chunk.chunkZPos)
+      nbt.putString("dimension", dimension.toString)
+      nbt.putInt("chunkX", chunk.x)
+      nbt.putInt("chunkZ", chunk.z)
 
       scheduleSave(dimension, chunk, name, data)
     }
   }
 
-  private def writeNBT(save: NBTTagCompound => Unit) = {
-    val tmpNbt = new NBTTagCompound()
+  private def writeNBT(save: CompoundTag => Unit) = {
+    val tmpNbt = new CompoundTag()
     save(tmpNbt)
     val baos = new ByteArrayOutputStream()
     val dos = new DataOutputStream(baos)
-    CompressedStreamTools.write(tmpNbt, dos)
+    NbtIo.write(tmpNbt, dos)
     baos.toByteArray
   }
 
-  def loadNBT(nbt: NBTTagCompound, name: String): NBTTagCompound = {
+  def loadNBT(nbt: CompoundTag, name: String): CompoundTag = {
     val data = load(nbt, name)
+    parseNBT(data)
+  }
+  
+  def loadNBT(dimension: ResourceLocation, chunk: ChunkPos, name: String): CompoundTag = {
+    waitForSaveToComplete(name)
+    val data = load(dimension, chunk, name)
+    parseNBT(data)
+  }
+
+  private def parseNBT(data: Array[Byte]) = {
     if (data.length > 0) try {
       val bais = new ByteArrayInputStream(data)
       val dis = new DataInputStream(bais)
-      CompressedStreamTools.read(dis)
+      NbtIo.read(dis)
     }
     catch {
       case t: Throwable =>
         OpenComputers.log.warn("There was an error trying to restore a block's state from external data. This indicates that data was somehow corrupted.", t)
-        new NBTTagCompound()
+        new CompoundTag()
     }
-    else new NBTTagCompound()
+    else new CompoundTag()
   }
 
-  def load(nbt: NBTTagCompound, name: String): Array[Byte] = {
+  def load(nbt: CompoundTag, name: String): Array[Byte] = {
     // Since we have no world yet, we rely on the dimension we were saved in.
     // Same goes for the chunk. This also works around issues with computers
     // being moved (e.g. Redstone in Motion).
-    val dimension = nbt.getInteger("dimension")
-    val chunk = new ChunkCoordIntPair(nbt.getInteger("chunkX"), nbt.getInteger("chunkZ"))
+    val dimension = nbt.getString("dimension")
+    val chunk = new ChunkPos(nbt.getInt("chunkX"), nbt.getInt("chunkZ"))
 
+    waitForSaveToComplete(name)
+
+    load(ResourceLocation.tryParse(dimension), chunk, name)
+  }
+
+  private def waitForSaveToComplete(name: String) = {
     // Wait for the latest save task for the requested file to complete.
     // This prevents the chance of loading an outdated version
     // of this file.
@@ -156,27 +179,32 @@ object SaveHandler {
       case e: CancellationException => // NO-OP
     })
     saving.remove(name)
-
-    load(dimension, chunk, name)
   }
 
-  def scheduleSave(dimension: Int, chunk: ChunkCoordIntPair, name: String, data: Array[Byte]): Unit = {
+  def scheduleSave(dimension: ResourceLocation, chunk: ChunkPos, name: String, data: CompoundTag => Unit): Unit =
+    scheduleSave(dimension, chunk, name, writeNBT(data))
+
+  def scheduleSave(dimension: ResourceLocation, chunk: ChunkPos, name: String, data: Array[Byte]): Unit = {
     if (chunk == null) throw new IllegalArgumentException("chunk is null")
     else {
       // Disregarding whether or not there already was a
       // save submitted for the requested file
       // allows for better concurrency at the cost of
       // doing more writing operations.
-      stateSaveHandler.withPool(_.submit(new SaveDataEntry(data, chunk, name, dimension))).foreach(saving.put(name, _))
+      // Resolve the world path while the server is guaranteed to be alive.
+      // The worker may execute during shutdown after the global server has
+      // already been cleared.
+      val root = savePath
+      stateSaveHandler.withPool(_.submit(new SaveDataEntry(root, data, chunk, name, dimension))).foreach(saving.put(name, _))
     }
   }
 
-  def load(dimension: Int, chunk: ChunkCoordIntPair, name: String): Array[Byte] = {
+  def load(dimension: ResourceLocation, chunk: ChunkPos, name: String): Array[Byte] = {
     if (chunk == null) throw new IllegalArgumentException("chunk is null")
 
     val path = statePath
-    val dimPath = new io.File(path, dimension.toString)
-    val chunkPath = new io.File(dimPath, s"${chunk.chunkXPos}.${chunk.chunkZPos}")
+    val dimPath = new io.File(path, dimension.toString.replace(':', '/').replace('.', '/'))
+    val chunkPath = new io.File(dimPath, s"${chunk.x}.${chunk.z}")
     val file = new io.File(chunkPath, name)
     if (!file.exists()) return Array.empty[Byte]
     try {
@@ -185,12 +213,11 @@ object SaveHandler {
       val bos = new io.ByteArrayOutputStream
       val buffer = new Array[Byte](8 * 1024)
       var read = 0
-      do {
-        read = bis.read(buffer)
+      while ({ read = bis.read(buffer); read >= 0 }) {
         if (read > 0) {
           bos.write(buffer, 0, read)
         }
-      } while (read >= 0)
+      }
       bis.close()
       bos.toByteArray
     }
@@ -220,26 +247,17 @@ object SaveHandler {
   }
 
   @SubscribeEvent(priority = EventPriority.HIGHEST)
-  def onWorldLoad(e: WorldEvent.Load) {
-    // Touch all externally saved data when loading, to avoid it getting
-    // deleted in the next save (because the now - save time will usually
-    // be larger than the time out after loading a world again).
-    if (SystemUtils.isJavaVersionAtLeast(JavaVersion.JAVA_1_7)) SaveHandlerJava17Functionality.visitJava17(statePath)
-    else visitJava16()
-  }
-
-  private def visitJava16() {
-    // This may run into infinite loops if there are evil symlinks.
-    // But that's really not something I'm bothered by, it's a fallback.
-    def recurse(file: File) {
-      file.setLastModified(System.currentTimeMillis())
-      if (file.exists() && file.isDirectory && file.list() != null) file.listFiles().foreach(recurse)
+  def onWorldLoad(e: LevelEvent.Load): Unit = {
+    if (!e.getLevel.isClientSide) {
+      // Touch all externally saved data when loading, to avoid it getting
+      // deleted in the next save (because the now - save time will usually
+      // be larger than the time out after loading a world again).
+      SaveHandlerJava17Functionality.visitJava17(statePath)
     }
-    recurse(statePath)
   }
 
   @SubscribeEvent(priority = EventPriority.LOWEST)
-  def onWorldSave(e: WorldEvent.Save) {
+  def onWorldSave(e: LevelEvent.Save): Unit = {
     stateSaveHandler.withPool(_.submit(new Runnable {
       override def run(): Unit = cleanSaveData()
     }))
@@ -247,7 +265,7 @@ object SaveHandler {
 }
 
 object SaveHandlerJava17Functionality {
-  def visitJava17(statePath: File) {
+  def visitJava17(statePath: File): Unit = {
     Files.walkFileTree(statePath.toPath, new FileVisitor[Path] {
       override def visitFile(file: Path, attrs: BasicFileAttributes) = {
         file.toFile.setLastModified(System.currentTimeMillis())

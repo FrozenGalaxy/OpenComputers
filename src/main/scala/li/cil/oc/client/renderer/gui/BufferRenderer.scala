@@ -1,114 +1,69 @@
 package li.cil.oc.client.renderer.gui
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, PoseStack, Tesselator, VertexConsumer, VertexFormat}
+import org.joml.Matrix4f
 import li.cil.oc.api
 import li.cil.oc.client.Textures
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.GLAllocation
-import net.minecraft.client.renderer.texture.TextureManager
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.GameRenderer
 
 object BufferRenderer {
-  val margin = 7
-
+  val margin      = 7
   val innerMargin = 1
 
-  private var textureManager: Option[TextureManager] = None
+  def drawBackground(stack: PoseStack, bufferWidth: Int, bufferHeight: Int, forRobot: Boolean = false): Unit = {
+    RenderState.checkError(getClass.getName + ".drawBackground: entering (aka: wasntme)")
 
-  private var displayLists = 0
+    val innerWidth  = innerMargin * 2 + bufferWidth
+    val innerHeight = innerMargin * 2 + bufferHeight
 
-  def init(tm: TextureManager) = this.synchronized(if (textureManager.isEmpty) {
-    RenderState.checkError(getClass.getName + ".displayLists: entering (aka: wasntme)")
+    RenderSystem.setShader(() => GameRenderer.getPositionTexShader)
+    RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f)
+    Textures.bind(Textures.GUI.Borders)
 
-    textureManager = Some(tm)
-    displayLists = GLAllocation.generateDisplayLists(2)
+    val t = Tesselator.getInstance
+    val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
 
-    RenderState.checkError(getClass.getName + ".displayLists: leaving")
-    Textures.init(tm)
-  })
+    val margin           = if (forRobot) 2 else 7
+    val (c0, c1, c2, c3) = if (forRobot) (5, 7, 9, 11) else (0, 7, 9, 16)
 
-  def compileBackground(bufferWidth: Int, bufferHeight: Int, forRobot: Boolean = false) =
-    if (textureManager.isDefined) {
-      RenderState.checkError(getClass.getName + ".compileBackground: entering (aka: wasntme)")
+    // Top border
+    drawQuad(stack.last.pose(), r, 0,                    0,      margin,     margin,      c0,          c0, c1,          c1)
+    drawQuad(stack.last.pose(), r, margin,               0,      innerWidth, margin,      c1 + 0.25f,  c0, c2 - 0.25f, c1)
+    drawQuad(stack.last.pose(), r, margin + innerWidth,  0,      margin,     margin,      c2,          c0, c3,          c1)
 
-      val innerWidth = innerMargin * 2 + bufferWidth
-      val innerHeight = innerMargin * 2 + bufferHeight
+    // Middle area
+    drawQuad(stack.last.pose(), r, 0,                    margin, margin,     innerHeight, c0,          c1 + 0.25f, c1,          c2 - 0.25f)
+    drawQuad(stack.last.pose(), r, margin,               margin, innerWidth, innerHeight, c1 + 0.25f,  c1 + 0.25f, c2 - 0.25f,  c2 - 0.25f)
+    drawQuad(stack.last.pose(), r, margin + innerWidth,  margin, margin,     innerHeight, c2,          c1 + 0.25f, c3,          c2 - 0.25f)
 
-      GL11.glNewList(displayLists, GL11.GL_COMPILE)
+    // Bottom border
+    drawQuad(stack.last.pose(), r, 0,                    margin + innerHeight, margin,     margin, c0,          c2, c1,          c3)
+    drawQuad(stack.last.pose(), r, margin,               margin + innerHeight, innerWidth, margin, c1 + 0.25f,  c2, c2 - 0.25f,  c3)
+    drawQuad(stack.last.pose(), r, margin + innerWidth,  margin + innerHeight, margin,     margin, c2,          c2, c3,          c3)
 
-      textureManager.get.bindTexture(Textures.guiBorders)
+    BufferUploader.drawWithShader(r.buildOrThrow())
 
-      GL11.glBegin(GL11.GL_QUADS)
-
-      val margin = if (forRobot) 2 else 7
-      val (c0, c1, c2, c3) = if (forRobot) (5, 7, 9, 11) else (0, 7, 9, 16)
-
-      // Top border (left corner, middle bar, right corner).
-      drawBorder(
-        0, 0, margin, margin,
-        c0, c0, c1, c1)
-      drawBorder(
-        margin, 0, innerWidth, margin,
-        c1 + 0.25, c0, c2 - 0.25, c1)
-      drawBorder(
-        margin + innerWidth, 0, margin, margin,
-        c2, c0, c3, c1)
-
-      // Middle area (left bar, screen background, right bar).
-      drawBorder(
-        0, margin, margin, innerHeight,
-        c0, c1 + 0.25, c1, c2 - 0.25)
-      drawBorder(
-        margin, margin, innerWidth, innerHeight,
-        c1 + 0.25, c1 + 0.25, c2 - 0.25, c2 - 0.25)
-      drawBorder(
-        margin + innerWidth, margin, margin, innerHeight,
-        c2, c1 + 0.25, c3, c2 - 0.25)
-
-      // Bottom border (left corner, middle bar, right corner).
-      drawBorder(
-        0, margin + innerHeight, margin, margin,
-        c0, c2, c1, c3)
-      drawBorder(
-        margin, margin + innerHeight, innerWidth, margin,
-        c1 + 0.25, c2, c2 - 0.25, c3)
-      drawBorder(
-        margin + innerWidth, margin + innerHeight, margin, margin,
-        c2, c2, c3, c3)
-
-      GL11.glEnd()
-
-      GL11.glEndList()
-
-      RenderState.checkError(getClass.getName + ".compileBackground: leaving")
-    }
-
-  def drawBackground() =
-    if (textureManager.isDefined) {
-      GL11.glCallList(displayLists)
-    }
-
-  def drawText(screen: api.internal.TextBuffer) =
-    if (textureManager.isDefined) {
-      GL11.glPushAttrib(GL11.GL_DEPTH_BUFFER_BIT)
-      GL11.glDepthMask(false)
-      val changed = screen.renderText()
-      GL11.glPopAttrib()
-      changed
-    }
-    else false
-
-  private def drawBorder(x: Double, y: Double, w: Double, h: Double, u1: Double, v1: Double, u2: Double, v2: Double) = {
-    val u1d = u1 / 16.0
-    val u2d = u2 / 16.0
-    val v1d = v1 / 16.0
-    val v2d = v2 / 16.0
-    GL11.glTexCoord2d(u1d, v2d)
-    GL11.glVertex3d(x, y + h, 0)
-    GL11.glTexCoord2d(u2d, v2d)
-    GL11.glVertex3d(x + w, y + h, 0)
-    GL11.glTexCoord2d(u2d, v1d)
-    GL11.glVertex3d(x + w, y, 0)
-    GL11.glTexCoord2d(u1d, v1d)
-    GL11.glVertex3d(x, y, 0)
+    RenderState.checkError(getClass.getName + ".drawBackground: leaving")
   }
+
+  private def drawQuad(
+                        matrix: Matrix4f,
+                        builder: VertexConsumer,
+                        x: Float, y: Float, w: Float, h: Float,
+                        u1: Float, v1: Float, u2: Float, v2: Float
+                      ): Unit = {
+    val u1f = u1 / 16f
+    val u2f = u2 / 16f
+    val v1f = v1 / 16f
+    val v2f = v2 / 16f
+
+    builder.addVertex(matrix, x,     y + h, 0).setUv(u1f, v2f)
+    builder.addVertex(matrix, x + w, y + h, 0).setUv(u2f, v2f)
+    builder.addVertex(matrix, x + w, y,     0).setUv(u2f, v1f)
+    builder.addVertex(matrix, x,     y,     0).setUv(u1f, v1f)
+  }
+
+  def drawText(stack: PoseStack, screen: api.internal.TextBuffer): Unit = screen.renderText(stack)
 }

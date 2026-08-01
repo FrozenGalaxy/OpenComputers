@@ -6,7 +6,6 @@ import java.io.ByteArrayOutputStream
 import java.util
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
-
 import com.google.common.io.Files
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
@@ -21,20 +20,27 @@ import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.network.Visibility
-import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.util.ExtendedDataComponentHolder._
 import li.cil.oc.server.{PacketSender => ServerPacketSender}
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraftforge.common.DimensionManager
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
+import net.minecraft.world.level.storage.LevelResource
+import net.neoforged.neoforge.common.MutableDataComponentHolder
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Option[EnvironmentHost], val sound: Option[String], val speed: Int, val isLocked: Boolean) extends prefab.ManagedEnvironment with DeviceInfo {
+class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Option[EnvironmentHost], val sound: Option[String], val speed: Int, val isLocked: Boolean) extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("drive", Visibility.Neighbors).
     withConnector().
     create()
 
-  private def savePath = new io.File(DimensionManager.getCurrentSaveRootDirectory, Settings.savePath + node.address + ".bin")
+  private def savePath = ServerLifecycleHooks.getCurrentServer.getWorldPath(new LevelResource(Settings.savePath + node.address + ".bin")).toFile
 
   private final val sectorSize = 512
 
@@ -69,7 +75,7 @@ class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Op
 
   @Callback(direct = true, doc = """function():string -- Get the current label of the drive.""")
   def getLabel(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
-    if (label != null) result(label.getLabel) else null
+    if (label != null) result(label.getLabel(ServerLifecycleHooks.getCurrentServer.registryAccess())) else null
   }
 
   @Callback(doc = """function(value:string):string -- Sets the label of the drive. Returns the new value, which may be truncated.""")
@@ -78,7 +84,7 @@ class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Op
     if (label == null) throw new Exception("drive does not support labeling")
     if (args.checkAny(0) == null) label.setLabel(null)
     else label.setLabel(args.checkString(0))
-    result(label.getLabel)
+    result(label.getLabel(ServerLifecycleHooks.getCurrentServer.registryAccess()))
   }
 
   @Callback(direct = true, doc = """function():number -- Returns the total capacity of the drive, in bytes.""")
@@ -134,9 +140,26 @@ class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Op
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) = this.synchronized {
-    super.load(nbt)
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+    loadDriveContents()
 
+    for(headPos <- holder.getComponent(OCComponents.HEAD_POS))
+      this.headPos = headPos
+
+    if(label != null) label.loadData(holder)
+  }
+
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    saveDriveContents()
+
+    holder.setComponent(OCComponents.HEAD_POS, headPos)
+
+    if(label != null) label.saveData(holder)
+  }
+
+  def loadDriveContents(): Unit = {
     if (node.address != null) try {
       val path = savePath
       if (path.exists()) {
@@ -153,17 +176,9 @@ class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Op
     catch {
       case t: Throwable => OpenComputers.log.warn(s"Failed loading drive contents for '${node.address}'.", t)
     }
-
-    headPos = nbt.getInteger("headPos") max 0 min sectorToHeadPos(sectorCount)
-
-    if (label != null) {
-      label.load(nbt)
-    }
   }
 
-  override def save(nbt: NBTTagCompound) = this.synchronized {
-    super.save(nbt)
-
+  def saveDriveContents(): Unit = {
     if (node.address != null) try {
       val path = savePath
       path.getParentFile.mkdirs()
@@ -175,12 +190,6 @@ class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Op
     }
     catch {
       case t: Throwable => OpenComputers.log.warn(s"Failed saving drive contents for '${node.address}'.", t)
-    }
-
-    nbt.setInteger("headPos", headPos)
-
-    if (label != null) {
-      label.save(nbt)
     }
   }
 
@@ -212,7 +221,7 @@ class Drive(val capacity: Int, val platterCount: Int, val label: Label, host: Op
 
   private def offsetSector(offset: Int) = offset / sectorSize
 
-  private def diskActivity() {
+  private def diskActivity(): Unit = {
     (sound, host) match {
       case (Some(s), Some(h)) => ServerPacketSender.sendFileSystemActivity(node, h, s)
       case _ =>

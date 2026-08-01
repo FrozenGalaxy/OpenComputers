@@ -2,10 +2,9 @@ package li.cil.oc.common
 
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-
-import cpw.mods.fml.common.event.FMLInterModComms.IMCEvent
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
+import li.cil.oc.api
 import li.cil.oc.common.item.data.PrintData
 import li.cil.oc.common.template.AssemblerTemplates
 import li.cil.oc.common.template.DisassemblerTemplates
@@ -14,96 +13,105 @@ import li.cil.oc.integration.util.Wrench
 import li.cil.oc.server.driver.Registry
 import li.cil.oc.server.machine.ProgramLocations
 import li.cil.oc.util.ExtendedNBT._
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagString
-import net.minecraftforge.common.util.Constants.NBT
+import net.minecraft.core.component.DataComponentPatch
+import net.minecraft.core.registries.{BuiltInRegistries, Registries}
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.{CompoundTag, NbtOps, StringTag, Tag}
+import net.minecraft.core.{BlockPos, HolderLookup}
+import net.neoforged.fml.InterModComms.IMCMessage
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
+import net.minecraft.resources.{ResourceKey, ResourceLocation}
+import net.minecraft.world.entity.player.Player
+import net.neoforged.neoforge.event.server.ServerLifecycleEvent
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
 object IMC {
-  def handleEvent(e: IMCEvent): Unit = {
-    for (message <- e.getMessages) {
-      if (message.key == "registerAssemblerTemplate" && message.isNBTMessage) {
-        if (message.getNBTValue.hasKey("name", NBT.TAG_STRING))
-          OpenComputers.log.debug(s"Registering new assembler template '${message.getNBTValue.getString("name")}' from mod ${message.getSender}.")
+  def handleMessage(message: IMCMessage): Unit = {
+    message.messageSupplier().get.asInstanceOf[AnyRef] match {
+      case template: CompoundTag if message.method == api.IMC.REGISTER_ASSEMBLER_TEMPLATE => {
+        if (template.contains("name", Tag.TAG_STRING))
+          OpenComputers.log.debug(s"Registering new assembler template '${template.getString("name")}' from mod ${message.senderModId}.")
         else
-          OpenComputers.log.debug(s"Registering new, unnamed assembler template from mod ${message.getSender}.")
-        try AssemblerTemplates.add(message.getNBTValue) catch {
+          OpenComputers.log.debug(s"Registering new, unnamed assembler template from mod ${message.senderModId}.")
+        try AssemblerTemplates.add(template) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering assembler template.", t)
         }
       }
-      else if (message.key == "registerDisassemblerTemplate" && message.isNBTMessage) {
-        if (message.getNBTValue.hasKey("name", NBT.TAG_STRING))
-          OpenComputers.log.debug(s"Registering new disassembler template '${message.getNBTValue.getString("name")}' from mod ${message.getSender}.")
+      case template: CompoundTag if message.method == api.IMC.REGISTER_DISASSEMBLER_TEMPLATE => {
+        if (template.contains("name", Tag.TAG_STRING))
+          OpenComputers.log.debug(s"Registering new disassembler template '${template.getString("name")}' from mod ${message.senderModId}.")
         else
-          OpenComputers.log.debug(s"Registering new, unnamed disassembler template from mod ${message.getSender}.")
-        try DisassemblerTemplates.add(message.getNBTValue) catch {
+          OpenComputers.log.debug(s"Registering new, unnamed disassembler template from mod ${message.senderModId}.")
+        try DisassemblerTemplates.add(template) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering disassembler template.", t)
         }
       }
-      else if (message.key == "registerToolDurabilityProvider" && message.isStringMessage) {
-        OpenComputers.log.debug(s"Registering new tool durability provider '${message.getStringValue}' from mod ${message.getSender}.")
-        try ToolDurabilityProviders.add(getStaticMethod(message.getStringValue, classOf[ItemStack])) catch {
+      case name: String if message.method == api.IMC.REGISTER_TOOL_DURABILITY_PROVIDER => {
+        OpenComputers.log.debug(s"Registering new tool durability provider '${name}' from mod ${message.senderModId}.")
+        try ToolDurabilityProviders.add(getStaticMethod(name, classOf[ItemStack])) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering tool durability provider.", t)
         }
       }
-      else if (message.key == "registerWrenchTool" && message.isStringMessage) {
-        OpenComputers.log.debug(s"Registering new wrench tool usage '${message.getStringValue}' from mod ${message.getSender}.")
-        try Wrench.addUsage(getStaticMethod(message.getStringValue, classOf[EntityPlayer], classOf[Int], classOf[Int], classOf[Int], classOf[Boolean])) catch {
+      case name: String if message.method == api.IMC.REGISTER_WRENCH_TOOL => {
+        OpenComputers.log.debug(s"Registering new wrench usage '$name' from mod ${message.senderModId}.")
+        try Wrench.addUsage(getStaticMethod(name, classOf[Player], classOf[BlockPos], classOf[Boolean])) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering wrench usage.", t)
         }
       }
-      else if (message.key == "registerWrenchToolCheck" && message.isStringMessage) {
-        OpenComputers.log.debug(s"Registering new wrench tool check '${message.getStringValue}' from mod ${message.getSender}.")
-        try Wrench.addCheck(getStaticMethod(message.getStringValue, classOf[ItemStack])) catch {
+      case name: String if message.method == api.IMC.REGISTER_WRENCH_TOOL_CHECK => {
+        OpenComputers.log.debug(s"Registering new wrench tool check '$name' from mod ${message.senderModId}.")
+        try Wrench.addCheck(getStaticMethod(name, classOf[ItemStack])) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering wrench check.", t)
         }
       }
-      else if (message.key == "registerItemCharge" && message.isNBTMessage) {
-        OpenComputers.log.debug(s"Registering new item charge implementation '${message.getNBTValue.getString("name")}' from mod ${message.getSender}.")
+      case implInfo: CompoundTag if message.method == api.IMC.REGISTER_ITEM_CHARGE => {
+        OpenComputers.log.debug(s"Registering new item charge implementation '${implInfo.getString("name")}' from mod ${message.senderModId}.")
         try ItemCharge.add(
-          getStaticMethod(message.getNBTValue.getString("canCharge"), classOf[ItemStack]),
-          getStaticMethod(message.getNBTValue.getString("charge"), classOf[ItemStack], classOf[Double], classOf[Boolean])
+          getStaticMethod(implInfo.getString("canCharge"), classOf[ItemStack]),
+          getStaticMethod(implInfo.getString("charge"), classOf[ItemStack], classOf[Double], classOf[Boolean])
         ) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering item charge implementation.", t)
         }
       }
-      else if (message.key == "blacklistPeripheral" && message.isStringMessage) {
-        OpenComputers.log.debug(s"Blacklisting CC peripheral '${message.getStringValue}' as requested by mod ${message.getSender}.")
-        if (!Settings.get.peripheralBlacklist.contains(message.getStringValue)) {
-          Settings.get.peripheralBlacklist.add(message.getStringValue)
+      case name: String if message.method == api.IMC.BLACKLIST_PERIPHERAL => {
+        OpenComputers.log.debug(s"Blacklisting CC peripheral '$name' as requested by mod ${message.senderModId}.")
+        if (!Settings.get.peripheralBlacklist.contains(name)) {
+          Settings.get.peripheralBlacklist.add(name)
         }
       }
-      else if (message.key == "blacklistHost" && message.isNBTMessage) {
-        OpenComputers.log.debug(s"Blacklisting component '${message.getNBTValue.getString("name")}' for host '${message.getNBTValue.getString("host")}' as requested by mod ${message.getSender}.")
-        try Registry.blacklistHost(ItemStack.loadItemStackFromNBT(message.getNBTValue.getCompoundTag("item")), Class.forName(message.getNBTValue.getString("host"))) catch {
+      case compInfo: CompoundTag if message.method == api.IMC.BLACKLIST_HOST => {
+        OpenComputers.log.debug(s"Blacklisting component '${compInfo.getString("name")}' for host '${compInfo.getString("host")}' as requested by mod ${message.senderModId()}.")
+        val item = compInfo.getCompound("item")
+        val id = ResourceKey.create(Registries.ITEM, ResourceLocation.parse(item.getString("id")))
+        val count = item.getByte("count")
+        val components = DataComponentPatch.CODEC.parse(NbtOps.INSTANCE, item.get("components")).getOrThrow()
+        val stack = new ItemStack(BuiltInRegistries.ITEM.getHolder(id).orElseThrow(), count, components)
+        try Registry.blacklistHost(stack, Class.forName(compInfo.getString("host"))) catch {
           case t: Throwable => OpenComputers.log.warn("Failed blacklisting component.", t)
         }
       }
-      else if (message.key == "registerAssemblerFilter" && message.isStringMessage) {
-        OpenComputers.log.debug(s"Registering new assembler template filter '${message.getStringValue}' from mod ${message.getSender}.")
-        try AssemblerTemplates.addFilter(message.getStringValue) catch {
+      case name: String if message.method == api.IMC.REGISTER_ASSEMBLER_FILTER => {
+        OpenComputers.log.debug(s"Registering new assembler template filter '$name' from mod ${message.senderModId}.")
+        try AssemblerTemplates.addFilter(name) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering assembler template filter.", t)
         }
       }
-      else if (message.key == "registerInkProvider" && message.isStringMessage) {
-        OpenComputers.log.debug(s"Registering new ink provider '${message.getStringValue}' from mod ${message.getSender}.")
-        try PrintData.addInkProvider(getStaticMethod(message.getStringValue, classOf[ItemStack])) catch {
+      case name: String if message.method == api.IMC.REGISTER_INK_PROVIDER => {
+        OpenComputers.log.debug(s"Registering new ink provider '${name}' from mod ${message.senderModId}.")
+        try PrintData.addInkProvider(getStaticMethod(name, classOf[ItemStack])) catch {
           case t: Throwable => OpenComputers.log.warn("Failed registering ink provider.", t)
         }
       }
-      else if (message.key == "registerProgramDiskLabel" && message.isNBTMessage) {
-        OpenComputers.log.debug(s"Registering new program location mapping for program '${message.getNBTValue.getString("program")}' being on disk '${message.getNBTValue.getString("label")}' from mod ${message.getSender}.")
-        ProgramLocations.addMapping(message.getNBTValue.getString("program"), message.getNBTValue.getString("label"), message.getNBTValue.getTagList("architectures", NBT.TAG_STRING).map((tag: NBTTagString) => tag.func_150285_a_()).toArray: _*)
+      case diskInfo: CompoundTag if message.method == api.IMC.REGISTER_PROGRAM_DISK_LABEL => {
+        OpenComputers.log.debug(s"Registering new program location mapping for program '${diskInfo.getString("program")}' being on disk '${diskInfo.getString("label")}' from mod ${message.senderModId}.")
+        ProgramLocations.addMapping(diskInfo.getString("program"), diskInfo.getString("label"), diskInfo.getList("architectures", Tag.TAG_STRING).map((tag: StringTag) => tag.getAsString()).toArray: _*)
       }
-      else {
-        OpenComputers.log.warn(s"Got an unrecognized or invalid IMC message '${message.key}' from mod ${message.getSender}.")
-      }
+      case _ => OpenComputers.log.warn(s"Got an unrecognized or invalid IMC message '${message.method}' from mod ${message.senderModId}.")
     }
   }
 
-  def getStaticMethod(name: String, signature: Class[_]*) = {
+  def getStaticMethod(name: String, signature: Class[_]*): Method = {
     val nameSplit = name.lastIndexOf('.')
     val className = name.substring(0, nameSplit)
     val methodName = name.substring(nameSplit + 1)

@@ -1,88 +1,83 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
 import li.cil.oc.client.Textures
-import li.cil.oc.common.tileentity
+import li.cil.oc.client.renderer.RenderTypes
+import li.cil.oc.common.blockentity.NetSplitter
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import net.minecraftforge.common.util.ForgeDirection
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
+import net.minecraft.core.Direction
+import net.minecraft.world.inventory.InventoryMenu
 
-object NetSplitterRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+class NetSplitterRenderer(ctx: BlockEntityRendererProvider.Context) extends BlockEntityRenderer[NetSplitter] {
 
-    val splitter = tileEntity.asInstanceOf[tileentity.NetSplitter]
+  override def render(splitter: NetSplitter, dt: Float, stack: PoseStack, buffer: MultiBufferSource, light: Int, overlay: Int): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering")
+
+    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F)
+
     if (splitter.openSides.contains(!splitter.isInverted)) {
-      GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+      stack.pushPose()
 
-      RenderState.disableLighting()
-      RenderState.makeItBlend()
+      stack.translate(0.5, 0.5, 0.5)
+      RenderState.mirrorScale(stack, 1.0025f, -1.0025f, 1.0025f)
+      stack.translate(-0.5, -0.5, -0.5)
 
-      GL11.glPushMatrix()
+      RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS)
 
-      GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
-      GL11.glScaled(1.0025, -1.0025, 1.0025)
-      GL11.glTranslatef(-0.5f, -0.5f, -0.5f)
+      val r = buffer.getBuffer(RenderTypes.BLOCK_OVERLAY)
+      val sideActivity = Textures.getSprite(Textures.Block.NetSplitterOn)
+      val matrix = stack.last.pose
 
-      bindTexture(TextureMap.locationBlocksTexture)
-      val t = Tessellator.instance
-      t.startDrawingQuads()
-
-      val sideActivity = Textures.NetSplitter.iconOn
-
-      if (splitter.isSideOpen(ForgeDirection.DOWN)) {
-        t.addVertexWithUV(0, 1, 0, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 1, 0, sideActivity.getMinU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 1, 1, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 1, 1, sideActivity.getMaxU, sideActivity.getMaxV)
+      if (splitter.isSideOpen(Direction.DOWN)) {
+        r.addVertex(matrix, 0, 1, 0).setUv(sideActivity.getU1, sideActivity.getV0)
+        r.addVertex(matrix, 1, 1, 0).setUv(sideActivity.getU0, sideActivity.getV0)
+        r.addVertex(matrix, 1, 1, 1).setUv(sideActivity.getU0, sideActivity.getV1)
+        r.addVertex(matrix, 0, 1, 1).setUv(sideActivity.getU1, sideActivity.getV1)
       }
 
-      if (splitter.isSideOpen(ForgeDirection.UP)) {
-        t.addVertexWithUV(0, 0, 0, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 0, 1, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 1, sideActivity.getMinU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 0, sideActivity.getMinU, sideActivity.getMaxV)
+      if (splitter.isSideOpen(Direction.UP)) {
+        r.addVertex(matrix, 0, 0, 0).setUv(sideActivity.getU1, sideActivity.getV1)
+        r.addVertex(matrix, 0, 0, 1).setUv(sideActivity.getU1, sideActivity.getV0)
+        r.addVertex(matrix, 1, 0, 1).setUv(sideActivity.getU0, sideActivity.getV0)
+        r.addVertex(matrix, 1, 0, 0).setUv(sideActivity.getU0, sideActivity.getV1)
       }
 
-      if (splitter.isSideOpen(ForgeDirection.NORTH)) {
-        t.addVertexWithUV(1, 1, 0, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 1, 0, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 0, 0, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 0, sideActivity.getMinU, sideActivity.getMinV)
+      if (splitter.isSideOpen(Direction.NORTH)) {
+        r.addVertex(matrix, 1, 1, 0).setUv(sideActivity.getU0, sideActivity.getV1)
+        r.addVertex(matrix, 0, 1, 0).setUv(sideActivity.getU1, sideActivity.getV1)
+        r.addVertex(matrix, 0, 0, 0).setUv(sideActivity.getU1, sideActivity.getV0)
+        r.addVertex(matrix, 1, 0, 0).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      if (splitter.isSideOpen(ForgeDirection.SOUTH)) {
-        t.addVertexWithUV(0, 1, 1, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 1, 1, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 0, 1, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(0, 0, 1, sideActivity.getMinU, sideActivity.getMinV)
+      if (splitter.isSideOpen(Direction.SOUTH)) {
+        r.addVertex(matrix, 0, 1, 1).setUv(sideActivity.getU0, sideActivity.getV1)
+        r.addVertex(matrix, 1, 1, 1).setUv(sideActivity.getU1, sideActivity.getV1)
+        r.addVertex(matrix, 1, 0, 1).setUv(sideActivity.getU1, sideActivity.getV0)
+        r.addVertex(matrix, 0, 0, 1).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      if (splitter.isSideOpen(ForgeDirection.WEST)) {
-        t.addVertexWithUV(0, 1, 0, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 1, 1, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(0, 0, 1, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(0, 0, 0, sideActivity.getMinU, sideActivity.getMinV)
+      if (splitter.isSideOpen(Direction.WEST)) {
+        r.addVertex(matrix, 0, 1, 0).setUv(sideActivity.getU0, sideActivity.getV1)
+        r.addVertex(matrix, 0, 1, 1).setUv(sideActivity.getU1, sideActivity.getV1)
+        r.addVertex(matrix, 0, 0, 1).setUv(sideActivity.getU1, sideActivity.getV0)
+        r.addVertex(matrix, 0, 0, 0).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      if (splitter.isSideOpen(ForgeDirection.EAST)) {
-        t.addVertexWithUV(1, 1, 1, sideActivity.getMinU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 1, 0, sideActivity.getMaxU, sideActivity.getMaxV)
-        t.addVertexWithUV(1, 0, 0, sideActivity.getMaxU, sideActivity.getMinV)
-        t.addVertexWithUV(1, 0, 1, sideActivity.getMinU, sideActivity.getMinV)
+      if (splitter.isSideOpen(Direction.EAST)) {
+        r.addVertex(matrix, 1, 1, 1).setUv(sideActivity.getU0, sideActivity.getV1)
+        r.addVertex(matrix, 1, 1, 0).setUv(sideActivity.getU1, sideActivity.getV1)
+        r.addVertex(matrix, 1, 0, 0).setUv(sideActivity.getU1, sideActivity.getV0)
+        r.addVertex(matrix, 1, 0, 1).setUv(sideActivity.getU0, sideActivity.getV0)
       }
 
-      t.draw()
-
-      RenderState.enableLighting()
-
-      GL11.glPopMatrix()
-      GL11.glPopAttrib()
+      stack.popPose()
     }
 
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
 }

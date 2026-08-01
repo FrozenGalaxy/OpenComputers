@@ -16,10 +16,10 @@ import li.cil.oc.util.ScalaClosure
 import li.cil.oc.util.ScalaClosure._
 import li.cil.repack.org.luaj.vm2._
 import li.cil.repack.org.luaj.vm2.lib.jse.JsePlatform
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 
 @Architecture.Name("LuaJ")
 class LuaJLuaArchitecture(val machine: api.machine.Machine) extends Architecture {
@@ -33,7 +33,7 @@ class LuaJLuaArchitecture(val machine: api.machine.Machine) extends Architecture
 
   private var doneWithInitRun = false
 
-  private[machine] var memory = 0
+  @volatile private[machine] var memory = 0
 
   private val apis = Array(
     new ComponentAPI(this),
@@ -109,7 +109,7 @@ class LuaJLuaArchitecture(val machine: api.machine.Machine) extends Architecture
 
   // ----------------------------------------------------------------------- //
 
-  override def runSynchronized() {
+  override def runSynchronized(): Unit = {
     synchronizedResult = synchronizedCall.call()
     synchronizedCall = null
   }
@@ -181,8 +181,9 @@ class LuaJLuaArchitecture(val machine: api.machine.Machine) extends Architecture
         // that pcall goes bad.
         def isInnerError = results.`type`(2) == LuaValue.TBOOLEAN && (results.isstring(3) || results.isnoneornil(3))
         def isOuterError = results.isstring(2) || results.isnoneornil(2)
-        if (results.`type`(1) != LuaValue.TBOOLEAN || !isInnerError || !isOuterError) {
+        if (results.`type`(1) != LuaValue.TBOOLEAN || !(isInnerError || isOuterError)) {
           OpenComputers.log.warn("Kernel returned unexpected results.")
+          OpenComputers.log.warn("Returned: {}", results)
         }
         // The pcall *should* never return normally... but check for it nonetheless.
         if ((isOuterError && results.toboolean(1)) || (isInnerError && results.toboolean(2))) {
@@ -194,8 +195,7 @@ class LuaJLuaArchitecture(val machine: api.machine.Machine) extends Architecture
             if (isInnerError)
               if (results.isuserdata(3)) results.touserdata(3).toString
               else results.tojstring(3)
-            else
-            if (results.isuserdata(2)) results.touserdata(2).toString
+            else if (results.isuserdata(2)) results.touserdata(2).toString
             else results.tojstring(2)
           if (error != null) new ExecutionResult.Error(error)
           else new ExecutionResult.Error("unknown error")
@@ -238,7 +238,7 @@ class LuaJLuaArchitecture(val machine: api.machine.Machine) extends Architecture
     true
   }
 
-  override def onConnect() {
+  override def onConnect(): Unit = {
   }
 
   override def close() = {
@@ -251,12 +251,12 @@ class LuaJLuaArchitecture(val machine: api.machine.Machine) extends Architecture
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
+  override def loadData(nbt: CompoundTag): Unit = {
     if (machine.isRunning) {
       machine.stop()
       machine.start()
     }
   }
 
-  override def save(nbt: NBTTagCompound) {}
+  override def saveData(nbt: CompoundTag): Unit = {}
 }

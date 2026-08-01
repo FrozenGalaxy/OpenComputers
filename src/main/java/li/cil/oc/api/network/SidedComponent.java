@@ -1,15 +1,7 @@
 package li.cil.oc.api.network;
 
-import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraft.core.Direction;
 
-/**
- * This is an extended version of {@link li.cil.oc.api.network.SimpleComponent}
- * which allows controlling connectivity on a side-by-side basis.
- * <br>
- * Like the <tt>SimpleComponent</tt> interface, this is intended to be used
- * with tile entities that should act as OC components. Please see the
- * <tt>SimpleComponent</tt> interface for more information.
- */
 public interface SidedComponent {
     /**
      * Whether this component can connect to a node on the specified side.
@@ -22,5 +14,5 @@ public interface SidedComponent {
      * @param side the side to check for.
      * @return whether the component may be connected to from the specified side.
      */
-    boolean canConnectNode(ForgeDirection side);
+    boolean canConnectNode(Direction side);
 }

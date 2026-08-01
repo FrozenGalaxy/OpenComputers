@@ -1,57 +1,42 @@
 package li.cil.oc.common.block
 
 import java.util
-
-import cpw.mods.fml.relauncher.Side
-import cpw.mods.fml.relauncher.SideOnly
-import li.cil.oc.Settings
-import li.cil.oc.common.tileentity
-import li.cil.oc.integration.coloredlights.ModColoredLights
-import li.cil.oc.util.Rarity
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.blockentity.BlockEntityTypes
 import li.cil.oc.util.Tooltip
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.IBlockAccess
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.item.{TooltipFlag => ITooltipFlag}
+import net.minecraft.world.item.ItemStack
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.shapes.{CollisionContext => ISelectionContext}
+import net.minecraft.world.phys.shapes.VoxelShape
+import net.minecraft.world.phys.shapes.{Shapes => VoxelShapes}
+import net.minecraft.network.chat.{Component => ITextComponent}
+import net.minecraft.world.item.Item.TooltipContext
+import net.minecraft.world.level.block.entity.{BlockEntity, BlockEntityType}
+import net.minecraft.world.level.{BlockGetter => IBlockReader}
 
-class Hologram(val tier: Int) extends SimpleBlock with traits.SpecialBlock {
-  if (Settings.get.hologramLight) {
-    ModColoredLights.setLightLevel(this, 15, 15, 15)
-  }
-  setBlockBounds(0, 0, 0, 1, 0.5f, 1)
+import scala.collection.convert.ImplicitConversionsToScala._
 
-  // ----------------------------------------------------------------------- //
-
-  override protected def customTextures = Array(
-    None,
-    Some("HologramTop" + tier),
-    Some("HologramSide"),
-    Some("HologramSide"),
-    Some("HologramSide"),
-    Some("HologramSide")
-  )
-
-  override def isBlockSolid(world: IBlockAccess, x: Int, y: Int, z: Int, side: ForgeDirection) = side == ForgeDirection.DOWN
-
-  @SideOnly(Side.CLIENT)
-  override def shouldSideBeRendered(world: IBlockAccess, x: Int, y: Int, z: Int, side: ForgeDirection) = {
-    super.shouldSideBeRendered(world, x, y, z, side) || side == ForgeDirection.UP
-  }
-
-  override def isSideSolid(world: IBlockAccess, x: Int, y: Int, z: Int, side: ForgeDirection) = side == ForgeDirection.DOWN
+class Hologram(props: Properties, val tier: Int) extends SimpleBlock(props) with traits.Tickable {
+  val shape = VoxelShapes.box(0, 0, 0, 1, 0.5, 1)
 
   // ----------------------------------------------------------------------- //
 
-  override def rarity(stack: ItemStack) = Rarity.byTier(tier)
+  override def getShape(state: BlockState, world: IBlockReader, pos: BlockPos, ctx: ISelectionContext): VoxelShape = shape
 
-  override protected def tooltipBody(metadata: Int, stack: ItemStack, player: EntityPlayer, tooltip: util.List[String], advanced: Boolean) {
-    tooltip.addAll(Tooltip.get(getClass.getSimpleName + tier))
+  // ----------------------------------------------------------------------- //
+
+  override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
+    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase() + tier)) {
+      tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
+    }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def hasTileEntity(metadata: Int) = true
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.Hologram(pos, state, tier)
 
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Hologram(tier)
+  override def getBlockEntityType: BlockEntityType[_ <: BlockEntity] = BlockEntityTypes.HOLOGRAM.get()
 }

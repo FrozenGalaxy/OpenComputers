@@ -12,14 +12,14 @@ import li.cil.oc.common.entity.Drone
 import li.cil.oc.common.item.TabletWrapper
 import li.cil.oc.server.component
 import li.cil.oc.server.component.UpgradeTractorBeam
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
 
 object DriverUpgradeTractorBeam extends Item with HostAware {
   override def worksWith(stack: ItemStack) = isOneOf(stack,
     api.Items.get(Constants.ItemName.TractorBeamUpgrade))
 
   override def createEnvironment(stack: ItemStack, host: EnvironmentHost) =
-    if (host.world != null && host.world.isRemote) null
+    if (host.getEnvironmentLevel != null && host.getEnvironmentLevel.isClientSide) null
     else host match {
       case drone: Drone => new UpgradeTractorBeam.Drone(drone)
       case robot: Robot => new component.UpgradeTractorBeam.Player(host, robot.player)

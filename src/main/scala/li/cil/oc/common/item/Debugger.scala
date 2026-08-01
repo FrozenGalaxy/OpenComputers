@@ -4,32 +4,35 @@ import li.cil.oc.OpenComputers
 import li.cil.oc.api
 import li.cil.oc.api.network._
 import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.ExtendedWorld._
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.entity.player.EntityPlayerMP
-import net.minecraft.item.ItemStack
-import net.minecraftforge.common.util.FakePlayer
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.util.ExtendedLevel._
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.minecraft.core.Direction
+import net.minecraft.world.entity.player.Player
+import net.minecraft.server.level.ServerPlayer
+import net.neoforged.neoforge.common.util.FakePlayer
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class Debugger(val parent: Delegator) extends traits.Delegate {
-  override def onItemUse(stack: ItemStack, player: EntityPlayer, position: BlockPosition, side: Int, hitX: Float, hitY: Float, hitZ: Float) = {
+class Debugger(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
+  override def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float) = {
     val world = position.world.get
     player match {
       case _: FakePlayer => false // Nope
-      case realPlayer: EntityPlayerMP =>
-        world.getTileEntity(position) match {
+      case realPlayer: ServerPlayer =>
+        world.getBlockEntity(position) match {
           case host: SidedEnvironment =>
-            if (!world.isRemote) {
-              Debugger.reconnect(Array(host.sidedNode(ForgeDirection.getOrientation(side))))
+            if (!world.isClientSide) {
+              Debugger.reconnect(Array(host.sidedNode(side)))
             }
             true
           case host: Environment =>
-            if (!world.isRemote) {
+            if (!world.isClientSide) {
               Debugger.reconnect(Array(host.node))
             }
             true
           case _ =>
-            if (!world.isRemote) {
+            if (!world.isClientSide) {
               Debugger.node.remove()
             }
             true
@@ -42,19 +45,19 @@ class Debugger(val parent: Delegator) extends traits.Delegate {
 object Debugger extends Environment {
   var node = api.Network.newNode(this, Visibility.Network).create()
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     OpenComputers.log.info(s"[NETWORK DEBUGGER] New node in network: ${nodeInfo(node)}")
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     OpenComputers.log.info(s"[NETWORK DEBUGGER] Node removed from network: ${nodeInfo(node)}")
   }
 
-  override def onMessage(message: Message) {
+  override def onMessage(message: Message): Unit = {
     OpenComputers.log.info(s"[NETWORK DEBUGGER] Received message: ${messageInfo(message)}.")
   }
 
-  def reconnect(nodes: Array[Node]) {
+  def reconnect(nodes: Array[Node]): Unit = {
     node.remove()
     api.Network.joinNewNetwork(node)
     for (node <- nodes if node != null) {

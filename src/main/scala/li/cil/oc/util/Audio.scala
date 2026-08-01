@@ -1,30 +1,31 @@
 package li.cil.oc.util
 
+import java.nio.Buffer
 import java.nio.ByteBuffer
-
-import cpw.mods.fml.common.FMLCommonHandler
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
-import cpw.mods.fml.common.gameevent.TickEvent.ClientTickEvent
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
+import li.cil.oc.client.PacketHandler
 import net.minecraft.client.Minecraft
-import net.minecraft.client.audio.PositionedSoundRecord
-import net.minecraft.client.audio.SoundCategory
-import net.minecraft.util.ResourceLocation
+import net.minecraft.core.BlockPos
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.client.event.ClientTickEvent
 import org.lwjgl.BufferUtils
-import org.lwjgl.openal.AL
 import org.lwjgl.openal.AL10
-import org.lwjgl.openal.OpenALException
 
 import scala.collection.mutable
+import net.minecraft.sounds.{SoundEvents, SoundSource}
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
+import net.minecraft.world.phys.Vec3
+
+import java.util.concurrent.Executor
 
 /**
- * This class contains the logic used by computers' internal "speakers".
- * It can generate square waves with a specific frequency and duration
- * and will play them through OpenAL, acquiring sources as necessary.
- * Tones that have finished playing are disposed automatically in the
- * tick handler.
- */
+  * This class contains the logic used by computers' internal "speakers".
+  * It can generate square waves with a specific frequency and duration
+  * and will play them through OpenAL, acquiring sources as necessary.
+  * Tones that have finished playing are disposed automatically in the
+  * tick handler.
+  */
 object Audio {
   private def sampleRate = Settings.get.beepSampleRate
 
@@ -34,17 +35,35 @@ object Audio {
 
   private val sources = mutable.Set.empty[Source]
 
-  private def volume = Minecraft.getMinecraft.gameSettings.getSoundLevel(SoundCategory.BLOCKS)
+  private def volume = Minecraft.getInstance.options.getSoundSourceVolume(SoundSource.BLOCKS)
 
   private var disableAudio = false
+  
+  def play(x: Float, y: Float, z: Float, pcm: Array[Byte], gain: Float): Unit = {
+    if (pcm == null || pcm.isEmpty) return
 
+    val mc = Minecraft.getInstance
+    if (mc.getSoundManager == null || mc.getSoundManager.soundEngine == null) return
+
+    mc.getSoundManager.soundEngine.executor.execute(() => {
+      try {
+        sources.synchronized {
+          sources += new Source(x, y, z, ByteBuffer.wrap(pcm), gain)
+        }
+      } catch {
+        case e: OpenALException =>
+          if (e.errorCode == AL10.AL_OUT_OF_MEMORY) disableAudio = true
+      }
+    })
+  }
+  
   def play(x: Float, y: Float, z: Float, frequencyInHz: Int, durationInMilliseconds: Int): Unit = {
     play(x, y, z, ".", frequencyInHz, durationInMilliseconds)
   }
 
   def play(x: Float, y: Float, z: Float, pattern: String, frequencyInHz: Int = 1000, durationInMilliseconds: Int = 200): Unit = {
-    val mc = Minecraft.getMinecraft
-    val distanceBasedGain = math.max(0, 1 - mc.thePlayer.getDistance(x, y, z) / maxDistance).toFloat
+    val mc = Minecraft.getInstance
+    val distanceBasedGain = math.max(0, 1 - mc.player.position.distanceTo(new Vec3(x, y, z)) / maxDistance).toFloat
     val gain = distanceBasedGain * volume
     if (gain <= 0 || amplitude <= 0) return
 
@@ -58,70 +77,77 @@ object Audio {
       val clampedFrequency = ((frequencyInHz - 20) max 0 min 1980) / 1980f + 0.5f
       var delay = 0
       for (ch <- pattern) {
-        val record = new PositionedSoundRecord(new ResourceLocation("note.harp"), gain, clampedFrequency, x, y, z)
-        if (delay == 0) mc.getSoundHandler.playSound(record)
-        else mc.getSoundHandler.playDelayedSound(record, delay)
+        val record = new SimpleSoundInstance(SoundEvents.NOTE_BLOCK_HARP.value, SoundSource.BLOCKS, gain, clampedFrequency, mc.level.random, new BlockPos(x.toInt, y.toInt, z.toInt))
+        if (delay == 0) mc.getSoundManager.play(record)
+        else mc.getSoundManager.playDelayed(record, delay)
         delay += ((if (ch == '.') durationInMilliseconds else 2 * durationInMilliseconds) * 20 / 1000) max 1
       }
     }
     else {
-      if (AL.isCreated) {
-        val sampleCounts = pattern.toCharArray.
-          map(ch => if (ch == '.') durationInMilliseconds else 2 * durationInMilliseconds).
-          map(_ * sampleRate / 1000)
-        // 50ms pause between pattern parts.
-        val pauseSampleCount = 50 * sampleRate / 1000
-        val data = BufferUtils.createByteBuffer(sampleCounts.sum + (sampleCounts.length - 1) * pauseSampleCount)
-        val step = frequencyInHz / sampleRate.toFloat
-        var offset = 0f
-        for (sampleCount <- sampleCounts) {
-          for (sample <- 0 until sampleCount) {
-            val angle = 2 * math.Pi * offset
-            val value = (math.signum(math.sin(angle)) * amplitude).toByte ^ 0x80
-            offset += step
-            if (offset > 1) offset -= 1
-            data.put(value.toByte)
-          }
-          if (data.hasRemaining) {
-            for (sample <- 0 until pauseSampleCount) {
-              data.put(127: Byte)
-            }
+      val sampleCounts = pattern.toCharArray.
+        map(ch => if (ch == '.') durationInMilliseconds else 2 * durationInMilliseconds).
+        map(_ * sampleRate / 1000)
+      // 50ms pause between pattern parts.
+      val pauseSampleCount = 50 * sampleRate / 1000
+      val data = BufferUtils.createByteBuffer(sampleCounts.sum + (sampleCounts.length - 1) * pauseSampleCount)
+      val step = frequencyInHz / sampleRate.toFloat
+      var offset = 0f
+      for (sampleCount <- sampleCounts) {
+        for (sample <- 0 until sampleCount) {
+          val angle = 2 * math.Pi * offset
+          val value = (math.signum(math.sin(angle)) * amplitude).toByte ^ 0x80
+          offset += step
+          if (offset > 1) offset -= 1
+          data.put(value.toByte)
+        }
+        if (data.hasRemaining) {
+          for (sample <- 0 until pauseSampleCount) {
+            data.put(127: Byte)
           }
         }
-        data.rewind()
+      }
+      data.asInstanceOf[Buffer].rewind()
 
-        // Watch out for sound cards running out of memory... this apparently
-        // really does happen. I'm assuming this is due to too many sounds being
-        // kept loaded, since from what I can see OC's releasing its audio
-        // memory as it should.
-        try sources.synchronized(sources += new Source(x, y, z, data, gain)) catch {
-          case e: LessUselessOpenALException =>
-            if (e.errorCode == AL10.AL_OUT_OF_MEMORY) {
-              // Well... let's just stop here.
-              OpenComputers.log.info("Couldn't play computer speaker sound because your sound card ran out of memory. Either your sound card is just really low-end, or there are just too many sounds in use already by other mods. Disabling computer speakers to avoid spamming your log file now.")
-              disableAudio = true
-            }
-            else {
-              OpenComputers.log.warn("Error playing computer speaker sound.", e)
-            }
-        }
+      // Watch out for sound cards running out of memory... this apparently
+      // really does happen. I'm assuming this is due to too many sounds being
+      // kept loaded, since from what I can see OC's releasing its audio
+      // memory as it should.
+      val mc = Minecraft.getInstance
+      if (mc.getSoundManager != null && mc.getSoundManager.soundEngine != null && mc.getSoundManager.soundEngine.executor != null) {
+        mc.getSoundManager.soundEngine.executor.asInstanceOf[Executor].execute(() => {
+          try sources.synchronized(sources += new Source(x, y, z, data, gain)) catch {
+            case e: OpenALException =>
+              if (e.errorCode == AL10.AL_OUT_OF_MEMORY) {
+                // Well... let's just stop here.
+                OpenComputers.log.info("Couldn't play computer speaker sound because your sound card ran out of memory. Either your sound card is just really low-end, or there are just too many sounds in use already by other mods. Disabling computer speakers to avoid spamming your log file now.")
+                disableAudio = true
+              }
+              else {
+                OpenComputers.log.warn("Error playing computer speaker sound.", e)
+              }
+          }
+        })
       }
     }
   }
 
-  def update() {
+  def update(): Unit = {
     if (!disableAudio) {
-      sources.synchronized(sources --= sources.filter(_.checkFinished))
+      val mc = Minecraft.getInstance
+      if (mc.getSoundManager != null && mc.getSoundManager.soundEngine != null && mc.getSoundManager.soundEngine.executor != null) {
+        mc.getSoundManager.soundEngine.executor.asInstanceOf[Executor].execute(() => {
+          sources.synchronized(sources --= sources.filter(_.checkFinished))
 
-      // Clear error stack.
-      if (AL.isCreated) {
-        try AL10.alGetError() catch {
-          case _: UnsatisfiedLinkError =>
-            OpenComputers.log.warn("Negotiations with OpenAL broke down, disabling sounds.")
-            disableAudio = true
-        }
+          // Clear error stack.
+          try AL10.alGetError() catch {
+            case _: UnsatisfiedLinkError =>
+              OpenComputers.log.warn("Negotiations with OpenAL broke down, disabling sounds.")
+              disableAudio = true
+          }
+        })
       }
     }
+    PacketHandler.update()
   }
 
   private class Source(val x: Float, y: Float, z: Float, val data: ByteBuffer, val gain: Float) {
@@ -175,20 +201,20 @@ object Audio {
   }
 
   // Having the error code in an accessible way is really cool, you know.
-  class LessUselessOpenALException(val errorCode: Int) extends OpenALException(errorCode)
+  class OpenALException(val errorCode: Int) extends RuntimeException {
+    override def getMessage: String = errorCode.toString
+  }
 
   // Custom implementation of Util.checkALError() that uses our custom exception.
   def checkALError(): Unit = {
     val errorCode = AL10.alGetError()
     if (errorCode != AL10.AL_NO_ERROR) {
-      throw new LessUselessOpenALException(errorCode)
+      throw new OpenALException(errorCode)
     }
   }
 
-  FMLCommonHandler.instance.bus.register(this)
-
   @SubscribeEvent
-  def onTick(e: ClientTickEvent) {
+  def onTick(e: ClientTickEvent.Pre): Unit = {
     update()
   }
 }

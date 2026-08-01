@@ -8,16 +8,20 @@ import li.cil.oc.common.Slot
 import li.cil.oc.common.Tier
 import li.cil.oc.common.item.data.TabletData
 import li.cil.oc.util.ItemUtils
-import net.minecraft.inventory.IInventory
-import net.minecraft.item.ItemStack
+import net.minecraft.core.component.DataComponents
+import net.minecraft.world.Container
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.component.CustomData
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.JavaConverters.asJavaIterable
+import scala.collection.convert.ImplicitConversionsToJava._
 
 object TabletTemplate extends Template {
   override protected val suggestedComponents = Array(
     "BIOS" -> hasComponent(Constants.ItemName.EEPROM) _,
     "Keyboard" -> hasComponent(Constants.BlockName.Keyboard) _,
-    "GraphicsCard" -> ((inventory: IInventory) => Array(
+    "GraphicsCard" -> ((inventory: Container) => Array(
       Constants.ItemName.APUCreative,
       Constants.ItemName.APUTier1,
       Constants.ItemName.APUTier2,
@@ -33,20 +37,22 @@ object TabletTemplate extends Template {
 
   def selectTier2(stack: ItemStack) = api.Items.get(stack) == api.Items.get(Constants.ItemName.TabletCaseTier2)
 
+  def selectTier3(stack: ItemStack) = api.Items.get(stack) == api.Items.get(Constants.ItemName.TabletCaseTier3)
+
   def selectCreative(stack: ItemStack) = api.Items.get(stack) == api.Items.get(Constants.ItemName.TabletCaseCreative)
 
-  def validate(inventory: IInventory): Array[AnyRef] = validateComputer(inventory)
+  def validate(inventory: Container): Array[AnyRef] = validateComputer(inventory)
 
-  def assemble(inventory: IInventory): Array[AnyRef] = {
-    val items = (1 until inventory.getSizeInventory).map(slot => Option(inventory.getStackInSlot(slot)))
+  def assemble(inventory: Container): Array[AnyRef] = {
+    val items = (1 until inventory.getContainerSize).map(slot => inventory.getItem(slot))
     val data = new TabletData()
-    data.tier = ItemUtils.caseTier(inventory.getStackInSlot(0))
-    data.container = items.headOption.getOrElse(None)
-    data.items = Array(Option(api.Items.get(Constants.BlockName.ScreenTier1).createItemStack(1))) ++ items.drop(if (data.tier == Tier.One) 0 else 1).filter(_.isDefined)
+    data.tier = ItemUtils.caseTier(inventory.getItem(0))
+    data.container = items.headOption.getOrElse(ItemStack.EMPTY)
+    data.items = Array(api.Items.get(Constants.BlockName.ScreenTier1).createItemStack(1)) ++ items.drop(if (data.tier == Tier.One) 0 else 1).filter(!_.isEmpty)
     data.energy = Settings.get.bufferTablet
     data.maxEnergy = data.energy
     val stack = api.Items.get(Constants.ItemName.Tablet).createItemStack(1)
-    data.save(stack)
+    CustomData.update(DataComponents.CUSTOM_DATA, stack, nbt => data.saveData(nbt, ServerLifecycleHooks.getCurrentServer.registryAccess()))
     val energy = Settings.get.tabletBaseCost + complexity(inventory) * Settings.get.tabletComplexityCost
 
     Array(stack, Double.box(energy))
@@ -57,12 +63,10 @@ object TabletTemplate extends Template {
   def disassemble(stack: ItemStack, ingredients: Array[ItemStack]) = {
     val info = new TabletData(stack)
     val itemName = Constants.ItemName.TabletCase(info.tier)
-    (Array(api.Items.get(itemName).createItemStack(1), info.container.orNull) ++ info.items.collect {
-      case Some(item) => item
-    }.drop(1) /* Screen */).filter(_ != null)
+    (Array(api.Items.get(itemName).createItemStack(1), info.container) ++ info.items.filter(!_.isEmpty).drop(1) /* Screen */).filter(!_.isEmpty)
   }
 
-  def register() {
+  def register(): Unit = {
     // Tier 1
     api.IMC.registerAssemblerTemplate(
       "Tablet (Tier 1)",
@@ -113,6 +117,32 @@ object TabletTemplate extends Template {
         (Slot.HDD, Tier.Two)
       ).map(toPair)))
 
+    // Tier 3
+    api.IMC.registerAssemblerTemplate(
+      "Tablet (Tier 3)",
+      "li.cil.oc.common.template.TabletTemplate.selectTier3",
+      "li.cil.oc.common.template.TabletTemplate.validate",
+      "li.cil.oc.common.template.TabletTemplate.assemble",
+      hostClass,
+      Array(
+        Tier.Three
+      ),
+      Array(
+        Tier.Four,
+        Tier.Three,
+        Tier.Three
+      ),
+      asJavaIterable(Iterable(
+        (Slot.Card, Tier.Four),
+        (Slot.Card, Tier.Three),
+        null,
+        (Slot.CPU, Tier.Four),
+        (Slot.Memory, Tier.Three),
+        (Slot.Memory, Tier.Three),
+        (Slot.EEPROM, Tier.Any),
+        (Slot.HDD, Tier.Three)
+      ).map(toPair)))
+
     // Creative
     api.IMC.registerAssemblerTemplate(
       "Tablet (Creative)",
@@ -152,7 +182,7 @@ object TabletTemplate extends Template {
       "li.cil.oc.common.template.TabletTemplate.disassemble")
   }
 
-  override protected def maxComplexity(inventory: IInventory) = super.maxComplexity(inventory) / 2 + 5
+  override protected def maxComplexity(inventory: Container) = super.maxComplexity(inventory) / 2 + 5
 
-  override protected def caseTier(inventory: IInventory) = ItemUtils.caseTier(inventory.getStackInSlot(0))
+  override protected def caseTier(inventory: Container) = ItemUtils.caseTier(inventory.getItem(0))
 }

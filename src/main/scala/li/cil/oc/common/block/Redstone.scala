@@ -1,40 +1,32 @@
 package li.cil.oc.common.block
 
 import java.util
-
-import li.cil.oc.common.tileentity
+import li.cil.oc.common.blockentity
 import li.cil.oc.integration.Mods
 import li.cil.oc.util.Tooltip
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.item.{TooltipFlag => ITooltipFlag}
+import net.minecraft.world.entity.player.{Player => PlayerEntity}
+import net.minecraft.world.item.ItemStack
+import net.minecraft.network.chat.{Component => ITextComponent}
+import net.minecraft.world.item.Item.TooltipContext
+import net.minecraft.world.level.{BlockGetter => IBlockReader}
+import net.minecraft.world.level.{Level => World}
+import net.minecraft.world.level.block.state.BlockState
 
-class Redstone extends RedstoneAware {
-  override protected def customTextures = Array(
-    Some("RedstoneBottom"),
-    Some("RedstoneTop"),
-    Some("RedstoneNorth"),
-    Some("RedstoneSouth"),
-    Some("RedstoneWest"),
-    Some("RedstoneEast")
-  )
+import scala.collection.convert.ImplicitConversionsToScala._
 
-  // ----------------------------------------------------------------------- //
-
-  override protected def tooltipTail(metadata: Int, stack: ItemStack, player: EntityPlayer, tooltip: util.List[String], advanced: Boolean) {
-    super.tooltipTail(metadata, stack, player, tooltip, advanced)
-    if (Mods.ProjectRedTransmission.isAvailable) {
-      tooltip.addAll(Tooltip.get("RedstoneCard.ProjectRed"))
-    }
-    if (Mods.RedLogic.isAvailable) {
-      tooltip.addAll(Tooltip.get("RedstoneCard.RedLogic"))
-    }
-    if (Mods.MineFactoryReloaded.isAvailable) {
-      tooltip.addAll(Tooltip.get("RedstoneCard.RedNet"))
+class Redstone(props: Properties) extends RedstoneAware(props) {
+  override protected def tooltipTail(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
+    super.tooltipTail(stack, context, tooltip, advanced)
+    // todo more generic way for redstone mods to provide lines
+    if (Mods.ProjectRedTransmission.isModAvailable) {
+      for (curr <- Tooltip.get("redstonecard.ProjectRed")) tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Redstone()
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.Redstone(pos, state)
 }

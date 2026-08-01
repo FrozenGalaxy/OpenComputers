@@ -1,61 +1,140 @@
 package li.cil.oc.common.item.traits
 
 import java.util
-import java.util.Random
-
-import cpw.mods.fml.relauncher.Side
-import cpw.mods.fml.relauncher.SideOnly
-import li.cil.oc.CreativeTab
-import li.cil.oc.Localization
 import li.cil.oc.Settings
-import li.cil.oc.client.KeyBindings
-import li.cil.oc.common.tileentity
-import li.cil.oc.util.ItemCosts
-import li.cil.oc.util.Tooltip
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.Item
-import net.minecraft.item.ItemStack
-import net.minecraft.util.WeightedRandomChestContent
-import net.minecraft.world.World
-import net.minecraftforge.common.ChestGenHooks
+import li.cil.oc.api
+import li.cil.oc.api.event.RobotRenderEvent.MountPoint
+import li.cil.oc.api.internal.Robot
+import li.cil.oc.client.renderer.item.ItemUpgradeRenderer
+import li.cil.oc.common.blockentity
+import li.cil.oc.util.{BlockPosition, ClientAccessHelper, ItemUtils, Rarity, Tooltip}
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.LevelReader
+import net.minecraft.core.Direction
+import net.minecraft.world.{InteractionHand, InteractionResult, InteractionResultHolder, item}
+import net.minecraft.core.BlockPos
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.context.UseOnContext
+import net.minecraft.world.level.Level
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.network.chat.Component
+import net.minecraft.world.item.TooltipFlag
+import net.neoforged.api.distmarker.Dist
+import net.neoforged.api.distmarker.OnlyIn
 
-trait SimpleItem extends Item {
-  setCreativeTab(CreativeTab)
-  setTextureName(Settings.resourceDomain + ":" + getClass.getSimpleName)
+import scala.collection.convert.ImplicitConversionsToScala._
+import com.mojang.blaze3d.vertex.PoseStack
+import li.cil.oc.common.item.data.TabletData
+import net.minecraft.core.component.DataComponents
+import net.minecraft.world.item.Item.TooltipContext
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
+trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExtension {
   def createItemStack(amount: Int = 1) = new ItemStack(this, amount)
 
-  override def isBookEnchantable(stack: ItemStack, book: ItemStack) = false
+  def getRarity(stack: ItemStack): item.Rarity = item.Rarity.COMMON
 
-  override def getChestGenBase(chest: ChestGenHooks, rnd: Random, original: WeightedRandomChestContent) = original
+  // bruh
+  override def verifyComponentsAfterLoad(stack: ItemStack): Unit = {
+    super.verifyComponentsAfterLoad(stack)
+    stack.set(DataComponents.RARITY, this.getRarity(stack))
+  }
 
-  override def doesSneakBypassUse(world: World, x: Int, y: Int, z: Int, player: EntityPlayer) = {
-    world.getTileEntity(x, y, z) match {
-      case drive: tileentity.DiskDrive => true
-      case _ => super.doesSneakBypassUse(world, x, y, z, player)
+  @Deprecated
+  protected var unlocalizedName = getClass.getSimpleName.toLowerCase
+
+  @Deprecated
+  override def getDescriptionId = "item.oc." + unlocalizedName
+
+  override def doesSneakBypassUse(stack: ItemStack, level: LevelReader, pos: BlockPos, player: Player): Boolean = {
+    level.getBlockEntity(pos) match {
+      case drive: blockentity.DiskDrive => true
+      case _ => super.doesSneakBypassUse(stack, level, pos, player)
     }
   }
 
-  @SideOnly(Side.CLIENT)
-  override def addInformation(stack: ItemStack, player: EntityPlayer, tooltip: util.List[_], advanced: Boolean): Unit = {
-    val tt = tooltip.asInstanceOf[util.List[String]]
-    tt.addAll(Tooltip.get(getClass.getSimpleName))
+  @Deprecated
+  override def onItemUseFirst(stack: ItemStack, ctx: UseOnContext): InteractionResult = {
+    val pos = ctx.getClickedPos
+    val hitPos = ctx.getClickLocation
+    onItemUseFirst(stack, ctx.getPlayer, ctx.getPlayer.level, pos, ctx.getClickedFace,
+      (hitPos.x - pos.getX).toFloat, (hitPos.y - pos.getY).toFloat, (hitPos.z - pos.getZ).toFloat, ctx.getHand)
+  }
 
-    if (ItemCosts.hasCosts(stack)) {
-      if (KeyBindings.showMaterialCosts) {
-        ItemCosts.addTooltip(stack, tt)
+  @Deprecated
+  def onItemUseFirst(stack: ItemStack, player: Player, level: Level, pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float, hand: InteractionHand): InteractionResult = InteractionResult.PASS
+
+  @Deprecated
+  override def useOn(ctx: UseOnContext): InteractionResult =
+    ctx.getItemInHand match {
+      case stack: ItemStack => {
+        val world = ctx.getLevel
+        val pos = BlockPosition(ctx.getClickedPos, world)
+        val hitPos = ctx.getClickLocation
+        val success = onItemUse(stack, ctx.getPlayer, pos, ctx.getClickedFace,
+          (hitPos.x - pos.x).toFloat, (hitPos.y - pos.y).toFloat, (hitPos.z - pos.z).toFloat)
+        if (success) InteractionResult.sidedSuccess(world.isClientSide) else InteractionResult.PASS
       }
-      else {
-        tt.add(Localization.localizeImmediately(
-          Settings.namespace + "tooltip.MaterialCosts",
-          KeyBindings.getKeyBindingName(KeyBindings.materialCosts)))
+      case _ => super.useOn(ctx)
+    }
+
+  @Deprecated
+  def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = false
+
+  @Deprecated
+  override def use(world: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] =
+    player.getItemInHand(hand) match {
+      case stack: ItemStack => use(stack, world, player)
+      case _ => super.use(world, player, hand)
+    }
+
+  @Deprecated
+  def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = new InteractionResultHolder(InteractionResult.PASS, stack)
+
+  protected def tierFromDriver(stack: ItemStack): Int =
+    api.Driver.driverFor(stack) match {
+      case driver: api.driver.DriverItem => driver.tier(stack)
+      case _ => 0
+    }
+
+  protected def tooltipName = Option(unlocalizedName)
+
+  protected def tooltipData = Seq.empty[Any]
+
+  @OnlyIn(Dist.CLIENT)
+  override def appendHoverText(stack: ItemStack, context: TooltipContext, tooltip: util.List[Component], flag: TooltipFlag): Unit = {
+    if (tooltipName.isDefined) {
+      for (curr <- Tooltip.get(tooltipName.get, tooltipData: _*)) {
+        tooltip.add(Component.literal(curr).setStyle(Tooltip.DefaultStyle))
+      }
+      tooltipExtended(stack, tooltip)
+    }
+    else {
+      for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase)) {
+        tooltip.add(Component.literal(curr).setStyle(Tooltip.DefaultStyle))
       }
     }
-    if (stack.hasTagCompound && stack.getTagCompound.hasKey(Settings.namespace + "data")) {
-      val data = stack.getTagCompound.getCompoundTag(Settings.namespace + "data")
-      if (data.hasKey("node") && data.getCompoundTag("node").hasKey("address")) {
-        tt.add("§8" + data.getCompoundTag("node").getString("address").substring(0, 13) + "...§7")
+    tooltipCosts(stack, tooltip)
+  }
+
+  // For stuff that goes to the normal 'extended' tooltip, before the costs.
+  protected def tooltipExtended(stack: ItemStack, tooltip: java.util.List[Component]): Unit = {}
+
+  protected def tooltipCosts(stack: ItemStack, tooltip: java.util.List[Component]): Unit = {
+    val tag = ItemUtils.getTag(stack)
+    if (tag != null && tag.contains(Settings.namespace + "data")) {
+      val data = tag.getCompound(Settings.namespace + "data")
+      if (data.contains("node") && data.getCompound("node").contains("address")) {
+        tooltip.add(Component.literal("§8" + data.getCompound("node").getString("address").substring(0, 13) + "...§7"))
       }
     }
   }
+
+  // ----------------------------------------------------------------------- //
+
+  override def computePreferredMountPoint(stack: ItemStack, robot: Robot, availableMountPoints: util.Set[String]): String = ItemUpgradeRenderer.preferredMountPoint(stack, availableMountPoints)
+
+  @OnlyIn(Dist.CLIENT)
+  override def render(matrix: PoseStack, buffer: MultiBufferSource, light: Int, stack: ItemStack, mountPoint: MountPoint, robot: Robot, pt: Float): Unit = ItemUpgradeRenderer.render(matrix, buffer, light, stack, mountPoint)
 }

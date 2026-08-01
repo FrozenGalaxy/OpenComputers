@@ -1,72 +1,76 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.systems.RenderSystem
 import li.cil.oc.client.Textures
-import li.cil.oc.common.tileentity
+import li.cil.oc.client.renderer.RenderTypes
+import li.cil.oc.common.blockentity
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.blockentity.{BlockEntityRenderer => TileEntityRenderer}
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 
-object PowerDistributorRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+object PowerDistributorRenderer extends BlockEntityRendererProvider[blockentity.PowerDistributor] {
+  override def create(ctx: BlockEntityRendererProvider.Context): PowerDistributorRenderer =
+    new PowerDistributorRenderer()
+}
 
-    val distributor = tileEntity.asInstanceOf[tileentity.PowerDistributor]
+class PowerDistributorRenderer extends TileEntityRenderer[blockentity.PowerDistributor] {
+  override def render(
+                       distributor: blockentity.PowerDistributor,
+                       dt: Float,
+                       stack: PoseStack,
+                       buffer: MultiBufferSource,
+                       light: Int,
+                       overlay: Int
+                     ): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering (aka: wasntme)")
+
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+
     if (distributor.globalBuffer > 0) {
-      GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+      stack.pushPose()
 
-      RenderState.disableLighting()
-      RenderState.makeItBlend()
-      RenderState.setBlendAlpha((distributor.globalBuffer / distributor.globalBufferSize).toFloat)
+      stack.translate(0.5, 0.5, 0.5)
+      RenderState.mirrorScale(stack, 1.0025f, -1.0025f, 1.0025f)
+      stack.translate(-0.5f, -0.5f, -0.5f)
 
-      GL11.glPushMatrix()
+      val r = buffer.getBuffer(RenderTypes.BLOCK_OVERLAY)
 
-      GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
-      GL11.glScaled(1.0025, -1.0025, 1.0025)
-      GL11.glTranslatef(-0.5f, -0.5f, -0.5f)
+      {
+        val icon = Textures.getSprite(Textures.Block.PowerDistributorTopOn)
+        r.addVertex(stack.last.pose, 0, 0, 1).setUv(icon.getU0, icon.getV1)
+        r.addVertex(stack.last.pose, 1, 0, 1).setUv(icon.getU1, icon.getV1)
+        r.addVertex(stack.last.pose, 1, 0, 0).setUv(icon.getU1, icon.getV0)
+        r.addVertex(stack.last.pose, 0, 0, 0).setUv(icon.getU0, icon.getV0)
+      }
 
-      bindTexture(TextureMap.locationBlocksTexture)
-      val t = Tessellator.instance
-      t.startDrawingQuads()
+      {
+        val icon = Textures.getSprite(Textures.Block.PowerDistributorSideOn)
+        r.addVertex(stack.last.pose, 1, 1, 0).setUv(icon.getU0, icon.getV1)
+        r.addVertex(stack.last.pose, 0, 1, 0).setUv(icon.getU1, icon.getV1)
+        r.addVertex(stack.last.pose, 0, 0, 0).setUv(icon.getU1, icon.getV0)
+        r.addVertex(stack.last.pose, 1, 0, 0).setUv(icon.getU0, icon.getV0)
 
-      val topOn = Textures.PowerDistributor.iconTopOn
-      t.addVertexWithUV(0, 0, 1, topOn.getMinU, topOn.getMaxV)
-      t.addVertexWithUV(1, 0, 1, topOn.getMaxU, topOn.getMaxV)
-      t.addVertexWithUV(1, 0, 0, topOn.getMaxU, topOn.getMinV)
-      t.addVertexWithUV(0, 0, 0, topOn.getMinU, topOn.getMinV)
+        r.addVertex(stack.last.pose, 0, 1, 1).setUv(icon.getU0, icon.getV1)
+        r.addVertex(stack.last.pose, 1, 1, 1).setUv(icon.getU1, icon.getV1)
+        r.addVertex(stack.last.pose, 1, 0, 1).setUv(icon.getU1, icon.getV0)
+        r.addVertex(stack.last.pose, 0, 0, 1).setUv(icon.getU0, icon.getV0)
 
-      val sideOn = Textures.PowerDistributor.iconSideOn
-      t.addVertexWithUV(1, 1, 0, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 1, 0, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 0, 0, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(1, 0, 0, sideOn.getMinU, sideOn.getMinV)
+        r.addVertex(stack.last.pose, 1, 1, 1).setUv(icon.getU0, icon.getV1)
+        r.addVertex(stack.last.pose, 1, 1, 0).setUv(icon.getU1, icon.getV1)
+        r.addVertex(stack.last.pose, 1, 0, 0).setUv(icon.getU1, icon.getV0)
+        r.addVertex(stack.last.pose, 1, 0, 1).setUv(icon.getU0, icon.getV0)
 
-      t.addVertexWithUV(0, 1, 1, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 1, 1, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 0, 1, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(0, 0, 1, sideOn.getMinU, sideOn.getMinV)
+        r.addVertex(stack.last.pose, 0, 1, 0).setUv(icon.getU0, icon.getV1)
+        r.addVertex(stack.last.pose, 0, 1, 1).setUv(icon.getU1, icon.getV1)
+        r.addVertex(stack.last.pose, 0, 0, 1).setUv(icon.getU1, icon.getV0)
+        r.addVertex(stack.last.pose, 0, 0, 0).setUv(icon.getU0, icon.getV0)
+      }
 
-      t.addVertexWithUV(1, 1, 1, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 1, 0, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 0, 0, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(1, 0, 1, sideOn.getMinU, sideOn.getMinV)
-
-      t.addVertexWithUV(0, 1, 0, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 1, 1, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 0, 1, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(0, 0, 0, sideOn.getMinU, sideOn.getMinV)
-
-      t.draw()
-
-      RenderState.enableLighting()
-
-      GL11.glPopMatrix()
-      GL11.glPopAttrib()
+      stack.popPose()
     }
 
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
-
 }

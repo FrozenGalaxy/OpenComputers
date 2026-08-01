@@ -1,89 +1,68 @@
 package li.cil.oc.client.renderer.font
 
+import com.mojang.blaze3d.platform.NativeImage
+import com.mojang.blaze3d.vertex.VertexConsumer
+import org.joml.Matrix4f
 import li.cil.oc.Settings
-import li.cil.oc.client.renderer.font.DynamicFontRenderer.CharTexture
+import li.cil.oc.client.renderer.RenderTypes
 import li.cil.oc.util.FontUtils
-import li.cil.oc.util.RenderState
 import net.minecraft.client.Minecraft
-import net.minecraft.client.resources.IReloadableResourceManager
-import net.minecraft.client.resources.IResourceManager
-import net.minecraft.client.resources.IResourceManagerReloadListener
-import org.lwjgl.BufferUtils
-import org.lwjgl.opengl._
-
+import net.minecraft.client.renderer.RenderType
+import net.minecraft.client.renderer.texture.DynamicTexture
+import net.minecraft.server.packs.resources.ResourceManager
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener
+import net.minecraft.server.packs.resources.ReloadableResourceManager
 import scala.collection.mutable
 
-/**
- * Font renderer that dynamically generates lookup textures by rendering a font
- * to it. It's pretty broken right now, and font rendering looks crappy as hell.
- */
-class DynamicFontRenderer extends TextureFontRenderer with IResourceManagerReloadListener {
-  private val glyphProvider: IGlyphProvider = Settings.get.fontRenderer match {
-    case _ => new FontParserHex()
-  }
-
-  private val textures = mutable.ArrayBuffer.empty[CharTexture]
-
+class DynamicFontRenderer extends TextureFontRenderer with ResourceManagerReloadListener {
+  private val glyphProvider: IGlyphProvider = new FontParserHex()
+  private val textures = mutable.ArrayBuffer.empty[DynamicFontRenderer.CharTexture]
   private val charMap = mutable.Map.empty[Int, DynamicFontRenderer.CharIcon]
-
-  private var activeTexture: CharTexture = _
+  private var activeTextureIndex: Int = 0
 
   initialize()
 
-  Minecraft.getMinecraft.getResourceManager match {
-    case reloadable: IReloadableResourceManager => reloadable.registerReloadListener(this)
+  Minecraft.getInstance.getResourceManager match {
+    case reloadable: ReloadableResourceManager => reloadable.registerReloadListener(this)
     case _ =>
   }
 
-  def initialize() {
-    for (texture <- textures) {
-      texture.delete()
-    }
+  def initialize(): Unit = {
+    textures.foreach(_.delete())
     textures.clear()
     charMap.clear()
+    glyphProvider.initialize()
     textures += new DynamicFontRenderer.CharTexture(this)
-    activeTexture = textures.head
     generateChars(basicChars.toCharArray)
   }
 
-  def onResourceManagerReload(manager: IResourceManager) {
-    glyphProvider.initialize()
-    initialize()
-  }
+  override def onResourceManagerReload(manager: ResourceManager): Unit = initialize()
 
   override protected def charWidth = glyphProvider.getGlyphWidth
-
   override protected def charHeight = glyphProvider.getGlyphHeight
-
   override protected def textureCount = textures.length
-
-  override protected def bindTexture(index: Int) {
-    activeTexture = textures(index)
-    activeTexture.bind()
-    RenderState.checkError(getClass.getName + ".bindTexture")
+  override protected def selectType(index: Int): RenderType = {
+    activeTextureIndex = index
+    textures(index).getType
   }
 
-  override protected def generateChar(char: Int) {
+  override protected def generateChar(char: Int): Unit = {
     charMap.getOrElseUpdate(char, createCharIcon(char))
   }
 
-  override protected def drawChar(tx: Float, ty: Float, char: Int) {
-    charMap.get(char) match {
-      case Some(icon) if icon.texture == activeTexture => icon.draw(tx, ty)
-      case _ =>
+  override protected def drawChar(builder: VertexConsumer, matrix: Matrix4f, color: Int, tx: Float, ty: Float, char: Int): Unit = {
+    charMap.get(char).foreach { icon =>
+      if (icon.texture == textures(activeTextureIndex)) {
+        icon.draw(builder, matrix, color, tx, ty)
+      }
     }
   }
 
   private def createCharIcon(char: Int): DynamicFontRenderer.CharIcon = {
     if (FontUtils.wcwidth(char) < 1 || glyphProvider.getGlyph(char) == null) {
-      if (char == '?') null
-      else charMap.getOrElseUpdate('?', createCharIcon('?'))
-    }
-    else {
-      if (textures.last.isFull(char)) {
-        textures += new DynamicFontRenderer.CharTexture(this)
-        textures.last.bind()
-      }
+      if (char == '?') null else charMap.getOrElseUpdate('?', createCharIcon('?'))
+    } else {
+      if (textures.last.isFull(char)) textures += new DynamicFontRenderer.CharTexture(this)
       textures.last.add(char)
     }
   }
@@ -93,71 +72,65 @@ object DynamicFontRenderer {
   private val size = 256
 
   class CharTexture(val owner: DynamicFontRenderer) {
-    private val id = GL11.glGenTextures()
-    GL11.glBindTexture(GL11.GL_TEXTURE_2D, id)
-    if (Settings.get.textLinearFiltering) {
-      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
-    } else {
-      GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST)
-    }
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST)
-    GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, size, size, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, BufferUtils.createByteBuffer(size * size * 4))
+    private val texture = new DynamicTexture(size, size, false)
+    private val name = "oc_font_cache_" + System.nanoTime()
+    private val location = Minecraft.getInstance.getTextureManager.register(name, texture)
+    private val rt = RenderTypes.createFontTex(name, location, Settings.get.textAntiAlias)
 
-    RenderState.checkError(getClass.getName + ".<init>: create texture")
-
-    // Some padding to avoid bleeding.
     private val cellWidth = owner.charWidth + 2
     private val cellHeight = owner.charHeight + 2
     private val cols = size / cellWidth
     private val rows = size / cellHeight
-    private val uStep = cellWidth / size.toDouble
-    private val vStep = cellHeight / size.toDouble
-    private val pad = 1.0 / size
+    private val uStep = cellWidth / size.toFloat
+    private val vStep = cellHeight / size.toFloat
+    private val pad = 1f / size
     private val capacity = cols * rows
-
     private var chars = 0
 
-    def delete() {
-      GL11.glDeleteTextures(id)
+    def delete(): Unit = {
+      texture.close()
+      Minecraft.getInstance.getTextureManager.release(location)
     }
 
-    def bind() {
-      GL11.glBindTexture(GL11.GL_TEXTURE_2D, id)
-    }
-
+    def getType = rt
     def isFull(char: Int) = chars + FontUtils.wcwidth(char) > capacity
 
-    def add(char: Int) = {
+    def add(char: Int): CharIcon = {
       val glyphWidth = FontUtils.wcwidth(char)
       val w = owner.charWidth * glyphWidth
       val h = owner.charHeight
-      // Force line break if we have a char that's wider than what space remains in this row.
-      if (chars % cols + glyphWidth > cols) {
-        chars += 1
-      }
+      if (chars % cols + glyphWidth > cols) chars += (cols - (chars % cols))
       val x = chars % cols
       val y = chars / cols
 
-      GL11.glBindTexture(GL11.GL_TEXTURE_2D, id)
-      GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 1 + x * cellWidth, 1 + y * cellHeight, w, h, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, owner.glyphProvider.getGlyph(char))
+      val glyphData = owner.glyphProvider.getGlyph(char)
+      val pixels = texture.getPixels
+      for (gy <- 0 until h; gx <- 0 until w) {
+        val i = (gx + gy * w) * 4
+        val r = glyphData.get(i) & 0xFF
+        val g = glyphData.get(i + 1) & 0xFF
+        val b = glyphData.get(i + 2) & 0xFF
+        val a = glyphData.get(i + 3) & 0xFF
+        val abgr = (a << 24) | (b << 16) | (g << 8) | r
+        pixels.setPixelRGBA(1 + x * cellWidth + gx, 1 + y * cellHeight + gy, abgr)
+      }
+      texture.upload()
 
+      val icon = new CharIcon(this, w, h, pad + x * uStep, pad + y * vStep, (x + glyphWidth) * uStep - pad, (y + 1) * vStep - pad)
       chars += glyphWidth
-
-      new CharIcon(this, w, h, pad + x * uStep, pad + y * vStep, (x + glyphWidth) * uStep - pad, (y + 1) * vStep - pad)
+      icon
     }
   }
 
-  class CharIcon(val texture: CharTexture, val w: Int, val h: Int, val u1: Double, val v1: Double, val u2: Double, val v2: Double) {
-    def draw(tx: Float, ty: Float) {
-      GL11.glTexCoord2d(u1, v2)
-      GL11.glVertex2f(tx, ty + h)
-      GL11.glTexCoord2d(u2, v2)
-      GL11.glVertex2f(tx + w, ty + h)
-      GL11.glTexCoord2d(u2, v1)
-      GL11.glVertex2f(tx + w, ty)
-      GL11.glTexCoord2d(u1, v1)
-      GL11.glVertex2f(tx, ty)
+  class CharIcon(val texture: CharTexture, val w: Int, val h: Int, val u1: Float, val v1: Float, val u2: Float, val v2: Float) {
+    def draw(builder: VertexConsumer, matrix: Matrix4f, color: Int, tx: Float, ty: Float): Unit = {
+      val r = (color >> 16) & 0xFF
+      val g = (color >> 8) & 0xFF
+      val b = color & 0xFF
+      builder.addVertex(matrix, tx, ty + h, 0).setColor(r, g, b, 255).setUv(u1, v2)
+      builder.addVertex(matrix, tx + w, ty + h, 0).setColor(r, g, b, 255).setUv(u2, v2)
+      builder.addVertex(matrix, tx + w, ty, 0).setColor(r, g, b, 255).setUv(u2, v1)
+      builder.addVertex(matrix, tx, ty, 0).setColor(r, g, b, 255).setUv(u1, v1)
     }
   }
-
 }

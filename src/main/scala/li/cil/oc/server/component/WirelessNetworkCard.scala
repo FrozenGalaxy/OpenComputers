@@ -2,7 +2,6 @@ package li.cil.oc.server.component
 
 import java.io._
 import java.util
-
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
@@ -15,10 +14,16 @@ import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network._
+import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.util.BlockPosition
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.util.ExtendedLevel._
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
 import scala.language.implicitConversions
 
 abstract class WirelessNetworkCard(host: EnvironmentHost) extends NetworkCard(host) with WirelessEndpoint {
@@ -28,22 +33,24 @@ abstract class WirelessNetworkCard(host: EnvironmentHost) extends NetworkCard(ho
     create()
 
   protected def wirelessCostPerRange: Double
-  
+
   protected def maxWirelessRange: Double
-  
+
   protected def shouldSendWiredTraffic: Boolean
-  
+
   var strength = maxWirelessRange
-    
-  override def x = BlockPosition(host).x
 
-  override def y = BlockPosition(host).y
+  def position = BlockPosition(host)
 
-  override def z = BlockPosition(host).z
+  override def x = position.x
 
-  override def world = host.world
+  override def y = position.y
 
-  def receivePacket(packet: Packet, source: WirelessEndpoint) {
+  override def z = position.z
+
+  override def getWirelessLevel = host.getEnvironmentLevel
+
+  def receivePacket(packet: Packet, source: WirelessEndpoint): Unit = {
     val (dx, dy, dz) = ((source.x + 0.5) - host.xPosition, (source.y + 0.5) - host.yPosition, (source.z + 0.5) - host.zPosition)
     val distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
     receivePacket(packet, distance, host)
@@ -64,7 +71,7 @@ abstract class WirelessNetworkCard(host: EnvironmentHost) extends NetworkCard(ho
   
   override def isWired(context: Context, args: Arguments): Array[AnyRef] = result(shouldSendWiredTraffic)
   
-  override protected def doSend(packet: Packet) {
+  override protected def doSend(packet: Packet): Unit = {
     if (strength > 0) {
       checkPower()
       api.Network.sendWirelessPacket(this, strength, packet)
@@ -73,7 +80,7 @@ abstract class WirelessNetworkCard(host: EnvironmentHost) extends NetworkCard(ho
       super.doSend(packet)
   }
 
-  override protected def doBroadcast(packet: Packet) {
+  override protected def doBroadcast(packet: Packet): Unit = {
     if (strength > 0) {
       checkPower()
       api.Network.sendWirelessPacket(this, strength, packet)
@@ -82,10 +89,10 @@ abstract class WirelessNetworkCard(host: EnvironmentHost) extends NetworkCard(ho
       super.doBroadcast(packet)
   }
   
-  private def checkPower() {
+  private def checkPower(): Unit = {
     val cost = wirelessCostPerRange
     if (cost > 0 && !Settings.get.ignorePower) {
-      if (!node.tryChangeBuffer(-strength * cost)) {
+      if (!node.asInstanceOf[Connector].tryChangeBuffer(-strength * cost)) {
         throw new IOException("not enough energy")
       }
     }
@@ -95,39 +102,39 @@ abstract class WirelessNetworkCard(host: EnvironmentHost) extends NetworkCard(ho
 
   override val canUpdate = true
 
-  override def update() {
+  override def update(): Unit = {
     super.update()
-    if (world.getTotalWorldTime % 20 == 0) {
+    if (getWirelessLevel.getGameTime % 20 == 0) {
       api.Network.updateWirelessNetwork(this)
     }
   }
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     super.onConnect(node)
     if (node == this.node) {
       api.Network.joinWirelessNetwork(this)
     }
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     super.onDisconnect(node)
-    if (node == this.node || !world.blockExists(x, y, z)) {
+    if (node == this.node || !getWirelessLevel.isLoaded(position)) {
       api.Network.leaveWirelessNetwork(this)
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    if (nbt.hasKey("strength")) {
-      strength = nbt.getDouble("strength") max 0 min maxWirelessRange
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+    for(strength <- holder.getComponent(OCComponents.STRENGTH)) {
+      this.strength = strength
     }
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setDouble("strength", strength)
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    holder.setComponent(OCComponents.STRENGTH, strength)
   }
 }
 

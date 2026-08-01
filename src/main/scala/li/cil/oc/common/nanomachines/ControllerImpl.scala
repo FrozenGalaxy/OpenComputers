@@ -2,7 +2,6 @@ package li.cil.oc.common.nanomachines
 
 import java.lang
 import java.util.UUID
-
 import com.google.common.base.Charsets
 import com.google.common.base.Strings
 import li.cil.oc.Constants
@@ -21,27 +20,31 @@ import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.ExtendedNBT._
 import li.cil.oc.util.InventoryUtils
 import li.cil.oc.util.PlayerUtils
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.entity.player.EntityPlayerMP
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.potion.Potion
-import net.minecraft.potion.PotionEffect
-import net.minecraft.world.World
+import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.core.registries.Registries
+import net.minecraft.world.entity.player.Player
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.resources.{ResourceKey, ResourceLocation}
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.damagesource.{DamageSource, DamageType}
+import net.minecraft.world.effect.{MobEffectInstance, MobEffects}
+import net.minecraft.world.level.Level
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
 
-class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessEndpoint {
+class ControllerImpl(val player: Player) extends Controller with WirelessEndpoint {
   if (isServer) api.Network.joinWirelessNetwork(this)
-  var previousDimension = player.worldObj.provider.dimensionId
+  var previousDimension = player.level.dimension
 
   lazy val CommandRange = Settings.get.nanomachinesCommandRange * Settings.get.nanomachinesCommandRange
   final val FullSyncInterval = 20 * 60
 
-  final val OverloadDamage = new DamageSourceWithRandomCause("oc.nanomachinesOverload", 3).
-    setDamageBypassesArmor().
-    setDamageIsAbsolute()
+  val OverloadDamageKey: ResourceKey[DamageType] = ResourceKey.create(
+    Registries.DAMAGE_TYPE,
+    ResourceLocation.fromNamespaceAndPath("opencomputers", "nanomachines_overload")
+  )
 
   var uuid = UUID.randomUUID.toString
   var responsePort = 0
@@ -54,7 +57,7 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
   var activeBehaviorsDirty = true
   var hasSentConfiguration = false
 
-  override def world: World = player.getEntityWorld
+  override def getWirelessLevel: Level = player.level
 
   override def x: Int = BlockPosition(player).x
 
@@ -63,8 +66,8 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
   override def z: Int = BlockPosition(player).z
 
   override def receivePacket(packet: Packet, sender: WirelessEndpoint): Unit = {
-    if (getLocalBuffer > 0 && commandDelay < 1 && !player.isDead) {
-      val (dx, dy, dz) = ((sender.x + 0.5) - player.posX, (sender.y + 0.5) - player.posY, (sender.z + 0.5) - player.posZ)
+    if (getLocalBuffer > 0 && commandDelay < 1 && player.isAlive) {
+      val (dx, dy, dz) = ((sender.x + 0.5) - player.getX, (sender.y + 0.5) - player.getY, (sender.z + 0.5) - player.getZ)
       val dSquared = Math.sqrt(dx * dx + dy * dy + dz * dz)
       if (dSquared <= CommandRange) packet.data.headOption match {
         case Some(header: Array[Byte]) if new String(header, Charsets.UTF_8) == "nanomachines" =>
@@ -81,11 +84,11 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
             case Array("saveConfiguration") =>
               val nanomachines = api.Items.get(Constants.ItemName.Nanomachines)
               try {
-                val index = player.inventory.mainInventory.indexWhere(stack => api.Items.get(stack) == nanomachines && new NanomachineData(stack).configuration.isEmpty)
+                val index = player.inventory.items.indexWhere(stack => api.Items.get(stack) == nanomachines && new NanomachineData(stack).configuration.isEmpty)
                 if (index >= 0) {
-                  val stack = player.inventory.decrStackSize(index, 1)
-                  new NanomachineData(this).save(stack)
-                  player.inventory.addItemStackToInventory(stack)
+                  val stack = player.inventory.removeItem(index, 1)
+                  new NanomachineData(this).saveData(stack)
+                  player.inventory.add(stack)
                   InventoryUtils.spawnStackInWorld(BlockPosition(player), stack)
                   respond(sender, "saved", true)
                 }
@@ -98,11 +101,11 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
             case Array("getHealth") =>
               respond(sender, "health", player.getHealth, player.getMaxHealth)
             case Array("getHunger") =>
-              respond(sender, "hunger", player.getFoodStats.getFoodLevel, player.getFoodStats.getSaturationLevel)
+              respond(sender, "hunger", player.getFoodData.getFoodLevel, player.getFoodData.getSaturationLevel)
             case Array("getAge") =>
-              respond(sender, "age", (player.getAge / 20f).toInt)
+              respond(sender, "age", (player.getNoActionTime / 20f).toInt)
             case Array("getName") =>
-              respond(sender, "name", player.getDisplayName)
+              respond(sender, "name", player.getDisplayName.getString)
             case Array("getExperience") =>
               respond(sender, "experience", player.experienceLevel)
 
@@ -169,10 +172,10 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
       activeBehaviorsDirty = true
 
       player match {
-        case playerMP: EntityPlayerMP if playerMP.playerNetServerHandler != null =>
-          player.addPotionEffect(new PotionEffect(Potion.blindness.id, 100))
-          player.addPotionEffect(new PotionEffect(Potion.poison.id, 150))
-          player.addPotionEffect(new PotionEffect(Potion.moveSlowdown.id, 200))
+        case playerMP: ServerPlayer if playerMP.connection != null =>
+          player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 100))
+          player.addEffect(new MobEffectInstance(MobEffects.POISON, 150))
+          player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 200))
           changeBuffer(-Settings.get.nanomachineReconfigureCost)
 
           hasSentConfiguration = false
@@ -215,7 +218,7 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
 
   override def changeBuffer(delta: Double): Double = {
     if (isClient) delta
-    else if (delta < 0 && (Settings.get.ignorePower || player.capabilities.isCreativeMode)) 0.0
+    else if (delta < 0 && (Settings.get.ignorePower || player.isCreative)) 0.0
     else {
       val newValue = storedEnergy + delta
       storedEnergy = math.min(math.max(newValue, 0), getLocalBufferSize)
@@ -226,7 +229,7 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
   // ----------------------------------------------------------------------- //
 
   def update(): Unit = {
-    if (player.isDead) {
+    if (!player.isAlive) {
       return
     }
 
@@ -243,10 +246,10 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
       // load is called while the world is still set to the overworld, but
       // no dimension change event is fired if the player actually logged
       // out in another dimension... yay)
-      if (player.worldObj.provider.dimensionId != previousDimension) {
+      if (player.level.dimension != previousDimension) {
         api.Network.leaveWirelessNetwork(this, previousDimension)
         api.Network.joinWirelessNetwork(this)
-        previousDimension = player.worldObj.provider.dimensionId
+        previousDimension = player.level.dimension
       }
       else {
         api.Network.updateWirelessNetwork(this)
@@ -269,14 +272,16 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
       active.foreach(_.update())
 
       if (isServer) {
-        if (player.getEntityWorld.getTotalWorldTime % Settings.get.tickFrequency == 0) {
+        if (player.level.getGameTime % Settings.get.tickFrequency == 0) {
           changeBuffer(-Settings.get.nanomachineCost * Settings.get.tickFrequency * (activeInputs + 0.5))
           PacketSender.sendNanomachinePower(player)
         }
 
         val overload = activeInputs - getSafeActiveInputs
-        if (!player.capabilities.isCreativeMode && overload > 0 && player.getEntityWorld.getTotalWorldTime % 20 == 0) {
-          player.attackEntityFrom(OverloadDamage, overload)
+        if (!player.isCreative && overload > 0 && player.level().getGameTime % 20 == 0) {
+          val src = new DamageSourceWithRandomCause(OverloadDamageKey, 3, player.level())
+
+          player.hurt(src, overload.toFloat)
         }
       }
 
@@ -284,7 +289,7 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
         val energyRatio = getLocalBuffer / (getLocalBufferSize + 1)
         val triggerRatio = activeInputs / (configuration.triggers.length + 1)
         val intensity = (energyRatio + triggerRatio) * 0.25
-        PlayerUtils.spawnParticleAround(player, "portal", intensity)
+        PlayerUtils.spawnParticleAround(player, ParticleTypes.PORTAL, intensity)
       }
     }
 
@@ -297,7 +302,7 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
       // Send a full sync every now and then, e.g. for other players coming
       // closer that weren't there to get the initial info for an enabled
       // input.
-      if (!hasSentConfiguration || player.getEntityWorld.getTotalWorldTime % FullSyncInterval == 0) {
+      if (!hasSentConfiguration || player.level.getGameTime % FullSyncInterval == 0) {
         hasSentConfiguration = true
         PacketSender.sendNanomachineConfiguration(player)
       }
@@ -338,24 +343,26 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
 
   // ----------------------------------------------------------------------- //
 
-  def save(nbt: NBTTagCompound): Unit = configuration.synchronized {
-    nbt.setString("uuid", uuid)
-    nbt.setInteger("port", responsePort)
-    nbt.setDouble("energy", storedEnergy)
-    nbt.setNewCompoundTag("configuration", configuration.save)
+  def saveData(nbt: CompoundTag): Unit = configuration.synchronized {
+    val provider = player.level.registryAccess()
+    nbt.putString("uuid", uuid)
+    nbt.putInt("port", responsePort)
+    nbt.putDouble("energy", storedEnergy)
+    nbt.setNewCompoundTag("configuration", (nbt: CompoundTag) => configuration.saveData(nbt, provider))
   }
 
-  def load(nbt: NBTTagCompound): Unit = configuration.synchronized {
+  def loadData(nbt: CompoundTag): Unit = configuration.synchronized {
+    val provider = player.level.registryAccess()
     uuid = nbt.getString("uuid")
-    responsePort = nbt.getInteger("port")
+    responsePort = nbt.getInt("port")
     storedEnergy = nbt.getDouble("energy")
-    configuration.load(nbt.getCompoundTag("configuration"))
+    configuration.loadData(nbt.getCompound("configuration"))
     activeBehaviorsDirty = true
   }
 
   // ----------------------------------------------------------------------- //
 
-  private def isClient = world.isRemote
+  private def isClient = getWirelessLevel.isClientSide
 
   private def isServer = !isClient
 
@@ -363,8 +370,8 @@ class ControllerImpl(val player: EntityPlayer) extends Controller with WirelessE
     if (activeBehaviorsDirty) {
       configuration.synchronized(if (activeBehaviorsDirty) {
         val newBehaviors = configuration.behaviors.filter(_.isActive).map(_.behavior)
-        val addedBehaviors = newBehaviors -- activeBehaviors
-        val removedBehaviors = activeBehaviors -- newBehaviors
+        val addedBehaviors = newBehaviors.clone --= activeBehaviors
+        val removedBehaviors = activeBehaviors.clone --= newBehaviors
         activeBehaviors.clear()
         activeBehaviors ++= newBehaviors
         activeBehaviorsDirty = false

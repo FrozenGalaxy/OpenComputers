@@ -1,71 +1,77 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
 import li.cil.oc.client.Textures
-import li.cil.oc.common.tileentity
+import li.cil.oc.client.renderer.RenderTypes
+import li.cil.oc.common.blockentity
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 
-object DisassemblerRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+object DisassemblerRenderer extends BlockEntityRendererProvider[blockentity.Disassembler] {
+  override def create(ctx: BlockEntityRendererProvider.Context): DisassemblerRenderer =
+    new DisassemblerRenderer()
+}
 
-    val disassembler = tileEntity.asInstanceOf[tileentity.Disassembler]
+class DisassemblerRenderer extends BlockEntityRenderer[blockentity.Disassembler] {
+
+  override def render(disassembler: blockentity.Disassembler, dt: Float, stack: PoseStack, buffer: MultiBufferSource, light: Int, overlay: Int): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering")
+
+    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F)
+
     if (disassembler.isActive) {
-      GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+      stack.pushPose()
 
-      RenderState.disableLighting()
-      RenderState.makeItBlend()
+      stack.translate(0.5, 0.5, 0.5)
+      RenderState.mirrorScale(stack, 1.0025f, -1.0025f, 1.0025f)
+      stack.translate(-0.5, -0.5, -0.5)
 
-      GL11.glPushMatrix()
+      val vBuffer = buffer.getBuffer(RenderTypes.BLOCK_OVERLAY)
+      val matrix = stack.last.pose
 
-      GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
-      GL11.glScaled(1.0025, -1.0025, 1.0025)
-      GL11.glTranslatef(-0.5f, -0.5f, -0.5f)
+      {
+        val icon = Textures.getSprite(Textures.Block.DisassemblerTopOn)
+        vBuffer.addVertex(matrix, 0, 0, 1).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 1, 0, 1).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 1, 0, 0).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 0, 0, 0).setUv(icon.getU0, icon.getV0)
+      }
 
-      bindTexture(TextureMap.locationBlocksTexture)
-      val t = Tessellator.instance
-      t.startDrawingQuads()
+      {
+        val icon = Textures.getSprite(Textures.Block.DisassemblerSideOn)
 
-      val topOn = Textures.Disassembler.iconTopOn
-      t.addVertexWithUV(0, 0, 1, topOn.getMinU, topOn.getMaxV)
-      t.addVertexWithUV(1, 0, 1, topOn.getMaxU, topOn.getMaxV)
-      t.addVertexWithUV(1, 0, 0, topOn.getMaxU, topOn.getMinV)
-      t.addVertexWithUV(0, 0, 0, topOn.getMinU, topOn.getMinV)
+        // North
+        vBuffer.addVertex(matrix, 1, 1, 0).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 0, 1, 0).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 0, 0, 0).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 1, 0, 0).setUv(icon.getU0, icon.getV0)
 
-      val sideOn = Textures.Disassembler.iconSideOn
-      t.addVertexWithUV(1, 1, 0, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 1, 0, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 0, 0, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(1, 0, 0, sideOn.getMinU, sideOn.getMinV)
+        // South
+        vBuffer.addVertex(matrix, 0, 1, 1).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 1, 1, 1).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 1, 0, 1).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 0, 0, 1).setUv(icon.getU0, icon.getV0)
 
-      t.addVertexWithUV(0, 1, 1, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 1, 1, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 0, 1, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(0, 0, 1, sideOn.getMinU, sideOn.getMinV)
+        // East
+        vBuffer.addVertex(matrix, 1, 1, 1).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 1, 1, 0).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 1, 0, 0).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 1, 0, 1).setUv(icon.getU0, icon.getV0)
 
-      t.addVertexWithUV(1, 1, 1, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 1, 0, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(1, 0, 0, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(1, 0, 1, sideOn.getMinU, sideOn.getMinV)
+        // West
+        vBuffer.addVertex(matrix, 0, 1, 0).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 0, 1, 1).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 0, 0, 1).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 0, 0, 0).setUv(icon.getU0, icon.getV0)
+      }
 
-      t.addVertexWithUV(0, 1, 0, sideOn.getMinU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 1, 1, sideOn.getMaxU, sideOn.getMaxV)
-      t.addVertexWithUV(0, 0, 1, sideOn.getMaxU, sideOn.getMinV)
-      t.addVertexWithUV(0, 0, 0, sideOn.getMinU, sideOn.getMinV)
-
-      t.draw()
-
-      RenderState.enableLighting()
-
-      GL11.glPopMatrix()
-      GL11.glPopAttrib()
+      stack.popPose()
     }
 
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
-
 }

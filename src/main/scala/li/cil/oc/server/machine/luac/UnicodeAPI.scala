@@ -5,7 +5,7 @@ import li.cil.oc.util.ExtendedLuaState.extendLuaState
 import li.cil.oc.util.{ExtendedUnicodeHelper, FontUtils}
 
 class UnicodeAPI(owner: NativeLuaArchitecture) extends NativeLuaAPI(owner) {
-  override def initialize() {
+  override def initialize(): Unit = {
     // Provide some better Unicode support.
     lua.newTable()
 
@@ -77,7 +77,7 @@ class UnicodeAPI(owner: NativeLuaArchitecture) extends NativeLuaAPI(owner) {
     lua.pushScalaFunction(lua => {
       val value = lua.checkString(1)
       lua.pushInteger(value.codePoints().map(new IntUnaryOperator {
-        override def applyAsInt(ch: Int): Int = math.max(1, FontUtils.wcwidth(ch))
+        override def applyAsInt(ch: Int): Int = FontUtils.wcwidth(ch)
       }).sum)
       1
     })
@@ -86,14 +86,7 @@ class UnicodeAPI(owner: NativeLuaArchitecture) extends NativeLuaAPI(owner) {
     lua.pushScalaFunction(lua => {
       val value = lua.checkString(1)
       val count = lua.checkInteger(2)
-      var width = 0
-      var end = 0
-      while (width < count) {
-        width += math.max(1, FontUtils.wcwidth(value.codePointAt(end)))
-        end = value.offsetByCodePoints(end, 1)
-      }
-      if (end > 1) lua.pushString(value.substring(0, end - 1))
-      else lua.pushString("")
+      lua.pushString(FontUtils.wtrunc(value, count))
       1
     })
     lua.setField(-2, "wtrunc")

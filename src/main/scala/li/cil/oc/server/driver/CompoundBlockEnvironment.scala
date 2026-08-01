@@ -1,24 +1,27 @@
 package li.cil.oc.server.driver
 
 import java.nio.charset.Charset
-
 import com.google.common.hash.Hashing
 import li.cil.oc.OpenComputers
 import li.cil.oc.api
 import li.cil.oc.api.network._
+import li.cil.oc.common.datacomponents.{CompoundStorage, OCComponents}
 import li.cil.oc.util.ExtendedNBT._
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-// TODO Remove block in OC 1.7.
 class CompoundBlockEnvironment(val name: String, val environments: (String, ManagedEnvironment)*) extends ManagedEnvironment {
   // Block drivers with visibility < network usually won't make much sense,
   // but let's play it safe and use the least possible visibility based on
   // the drivers we encapsulate.
-  val node = api.Network.newNode(this, (environments.filter(_._2.node != null).map(_._2.node.reachability) ++ Seq(Visibility.None)).max).
+  val node: Component = api.Network.newNode(this, (environments.filter(_._2.node != null).map(_._2.node.reachability) ++ Seq(Visibility.None)).maxBy(_.ordinal())).
     withComponent(name).
     create()
 
-  val updatingEnvironments = environments.map(_._2).filter(_.canUpdate)
+  val updatingEnvironments: Seq[ManagedEnvironment] = environments.map(_._2).filter(_.canUpdate)
 
   // Force all wrapped components to be neighbor visible, since we as their
   // only neighbor will take care of all component-related interaction.
@@ -27,17 +30,17 @@ class CompoundBlockEnvironment(val name: String, val environments: (String, Mana
     case _ =>
   }
 
-  override def canUpdate = environments.exists(_._2.canUpdate)
+  override def canUpdate: Boolean = environments.exists(_._2.canUpdate)
 
-  override def update() {
+  override def update(): Unit = {
     for (environment <- updatingEnvironments) {
       environment.update()
     }
   }
 
-  override def onMessage(message: Message) {}
+  override def onMessage(message: Message): Unit = {}
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     if (node == this.node) {
       for ((_, environment) <- environments if environment.node != null) {
         node.connect(environment.node)
@@ -45,7 +48,7 @@ class CompoundBlockEnvironment(val name: String, val environments: (String, Mana
     }
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     if (node == this.node) {
       for ((_, environment) <- environments if environment.node != null) {
         environment.node.remove()
@@ -53,31 +56,32 @@ class CompoundBlockEnvironment(val name: String, val environments: (String, Mana
     }
   }
 
-  override def load(nbt: NBTTagCompound) {
-    // Ignore existing data if the underlying type is different.
-    if (nbt.hasKey("typeHash") && nbt.getLong("typeHash") != typeHash) return
-    node.load(nbt)
-    for ((driver, environment) <- environments) {
-      if (nbt.hasKey(driver)) {
-        try {
-          environment.load(nbt.getCompoundTag(driver))
-        } catch {
-          case e: Throwable => OpenComputers.log.warn(s"A block component of type '${environment.getClass.getName}' (provided by driver '$driver') threw an error while loading.", e)
+  private final val TypeHashTag = "typeHash"
+
+  override def loadData(holder: DataComponentHolder): Unit = {
+    for(saveTypeHash -> storage <- holder.getComponent(OCComponents.COMPOUND_DRIVER)) {
+      if(saveTypeHash != typeHash) return
+      node.loadData(holder)
+
+      for ((driver, environment) <- environments) {
+        if (storage.contains(driver)) {
+          try {
+            environment.loadData(storage(driver))
+          } catch {
+            case e: Throwable => OpenComputers.log.warn(s"A block component of type '${environment.getClass.getName}' (provided by driver '$driver') threw an error while loading.", e)
+          }
         }
       }
     }
   }
 
-  override def save(nbt: NBTTagCompound) {
-    nbt.setLong("typeHash", typeHash)
-    node.save(nbt)
-    for ((driver, environment) <- environments) {
-      try {
-        nbt.setNewCompoundTag(driver, environment.save)
-      } catch {
-        case e: Throwable => OpenComputers.log.warn(s"A block component of type '${environment.getClass.getName}' (provided by driver '$driver') threw an error while saving.", e)
-      }
-    }
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    holder.setComponent(OCComponents.COMPOUND_DRIVER, typeHash -> Map.from(environments.map {
+      case (driver, environment) =>
+        val storage = new CompoundStorage()
+        environment.saveData(storage)
+        driver -> storage
+    }))
   }
 
   private def typeHash = {

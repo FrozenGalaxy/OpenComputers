@@ -4,13 +4,17 @@ import java.util
 
 import com.google.common.base.Charsets
 import li.cil.oc.api.machine.Arguments
-import net.minecraft.item.Item
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.CompressedStreamTools
-import net.minecraft.nbt.NBTSizeTracker
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.util.ItemUtils
+import li.cil.oc.util.ResultWrapper
+import net.minecraft.core.component.DataComponents
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.item.component.CustomData
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
 import scala.collection.mutable
 
 class ArgumentsImpl(val args: Seq[AnyRef]) extends Arguments {
@@ -21,7 +25,7 @@ class ArgumentsImpl(val args: Seq[AnyRef]) extends Arguments {
   def checkAny(index: Int) = {
     checkIndex(index, "value")
     args(index) match {
-      case Unit | None => null
+      case ResultWrapper.unit | None => null
       case arg => arg
     }
   }
@@ -321,7 +325,7 @@ class ArgumentsImpl(val args: Seq[AnyRef]) extends Arguments {
       s"bad argument #${index + 1} (${typeName(have)} has no integer representation)")
 
   private def typeName(value: AnyRef): String = value match {
-    case null | Unit | None => "nil"
+    case null | ResultWrapper.unit | None => "nil"
     case _: java.lang.Boolean => "boolean"
     case _: java.lang.Byte => "integer"
     case _: java.lang.Short => "integer"
@@ -336,15 +340,20 @@ class ArgumentsImpl(val args: Seq[AnyRef]) extends Arguments {
     case _ => value.getClass.getSimpleName
   }
 
-  private def makeStack(name: String, damage: Int, tag: Option[NBTTagCompound]) = {
-    Item.itemRegistry.getObject(name) match {
+  private def makeStack(name: String, damage: Int, tag: Option[CompoundTag]) = {
+    BuiltInRegistries.ITEM.get(ResourceLocation.parse(name)) match {
       case item: Item =>
-        val stack = new ItemStack(item, 1, damage)
-        tag.foreach(stack.setTagCompound)
+        val stack = new ItemStack(item, 1)
+        stack.setDamageValue(damage)
+
+        for(tag <- tag) {
+          CustomData.set(DataComponents.CUSTOM_DATA, stack, tag)
+        }
+
         stack
       case _ => throw new IllegalArgumentException("invalid item stack")
     }
   }
 
-  private def toNbtTagCompound(data: Array[Byte]) = Option(CompressedStreamTools.func_152457_a(data, NBTSizeTracker.field_152451_a))
+  private def toNbtTagCompound(data: Array[Byte]) = Option(ItemUtils.loadTag(data))
 }

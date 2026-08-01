@@ -3,7 +3,7 @@ package li.cil.oc.api.machine;
 import li.cil.oc.api.network.EnvironmentHost;
 import li.cil.oc.api.network.Environment;
 import li.cil.oc.api.network.Node;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * This interface has to be implemented by 'hosts' of machine instances.
@@ -59,8 +59,8 @@ public interface MachineHost extends EnvironmentHost {
     /** Helper method for printing the machine position in error messages and debug statements. */
     default String machinePosition()
     {
-        if (world() != null && world().provider != null)
-            return String.format("(%g, %g, %g, %d)", xPosition(), yPosition(), zPosition(), world().provider.dimensionId);
+        if (getEnvironmentLevel() != null && getEnvironmentLevel().dimension() != null)
+            return String.format("(%g, %g, %g, %s)", xPosition(), yPosition(), zPosition(), getEnvironmentLevel().dimension().location());
         else
             return String.format("(%g, %g, %g)", xPosition(), yPosition(), zPosition());
     }

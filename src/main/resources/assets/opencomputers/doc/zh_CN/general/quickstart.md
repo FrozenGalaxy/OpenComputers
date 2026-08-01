@@ -6,7 +6,7 @@
 
 首先，你需要一个[电脑机箱](../block/case1.md)。这个方块会容纳所有组件，也决定了你所搭建电脑的行为。
 
-![一个T2机箱](oredict:oc:case2)
+![一个T2机箱](oredict:opencomputers:case2)
 
 举例而言，你还需要决定使用什么等级的[显卡](../item/graphicsCard1.md)，是否要安装[网卡](../item/lanCard.md)、[红石卡](../item/redstoneCard1.md)，或者你只是想在创造模式中随便游玩的话，可能还要装一张[调试卡](../item/debugCard.md)。
 
@@ -39,7 +39,7 @@
 它活了！或者说应该是。如果它没能启动的话，代表有什么东西出错了，你可以用[分析器](../item/analyzer.md)排查。不过我们先假设它现在已经开始运行了，你已经接近完工了，最困难的部分已经结束了。剩下要做的就是让它接收输入并显示输出。
 
 要让[电脑](computer.md)显示输出，你需要取一块[显示屏](../block/screen1.md)和一张[显卡](../item/graphicsCard1.md)。
-![这不是纯平显示器。](oredict:oc:screen2)
+![这不是纯平显示器。](oredict:opencomputers:screen2)
 
 请将[显示屏](../block/screen1.md)放置于直接相邻机箱的位置，或者再次通过[线缆](../block/cable.md)连接。然后将你选好的[显卡](../item/graphicsCard1.md)装进[电脑机箱](../block/case2.md)里。你应该会在[显示屏](../block/screen1.md)上看到闪烁的光标。最后，将[键盘](../block/keyboard.md)放置在[显示屏](../block/screen1.md)身上，或将其面对[显示屏](../block/screen1.md)放置，以启用[键盘](../block/keyboard.md)输入。
 

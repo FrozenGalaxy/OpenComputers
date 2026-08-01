@@ -2,13 +2,13 @@ package li.cil.oc.util
 
 import li.cil.oc.api.internal.MultiTank
 import li.cil.oc.api.machine.Arguments
-import net.minecraft.inventory.IInventory
-import net.minecraftforge.common.util.ForgeDirection
-import net.minecraftforge.fluids.FluidContainerRegistry
-import net.minecraftforge.fluids.FluidTankInfo
-import net.minecraftforge.fluids.IFluidHandler
+import net.minecraft.core.Direction
+import net.neoforged.neoforge.fluids.{FluidStack, FluidType}
+import net.neoforged.neoforge.fluids.capability.IFluidHandler
+import net.neoforged.neoforge.items.IItemHandler
 
 import scala.language.implicitConversions
+import net.minecraft.world.Container
 
 object ExtendedArguments {
 
@@ -19,22 +19,26 @@ object ExtendedArguments {
       if (!isDefined(index) || !hasValue(index)) default
       else math.max(0, math.min(64, args.checkInteger(index)))
 
-    def optFluidCount(index: Int, default: Int = FluidContainerRegistry.BUCKET_VOLUME) =
+    def optFluidCount(index: Int, default: Int = FluidType.BUCKET_VOLUME) =
       if (!isDefined(index) || !hasValue(index)) default
       else math.max(0, args.checkInteger(index))
 
-    def checkSlot(inventory: IInventory, n: Int) = {
+    def checkSlot(inventory: IItemHandler, n: Int): Int = {
       val slot = args.checkInteger(n) - 1
-      if (slot < 0 || slot >= inventory.getSizeInventory) {
+      if (slot < 0 || slot >= inventory.getSlots) {
         throw new IllegalArgumentException("invalid slot")
       }
       slot
     }
 
-    def optSlot(inventory: IInventory, index: Int, default: Int) = {
+    def optSlot(inventory: IItemHandler, index: Int, default: Int): Int = {
       if (!isDefined(index)) default
       else checkSlot(inventory, index)
     }
+
+    def checkSlot(inventory: Container, n: Int): Int = checkSlot(InventoryUtils.asItemHandler(inventory), n)
+
+    def optSlot(inventory: Container, index: Int, default: Int): Int = optSlot(InventoryUtils.asItemHandler(inventory), index, default)
 
     def checkTank(multi: MultiTank, n: Int) = {
       val tank = args.checkInteger(n) - 1
@@ -44,56 +48,55 @@ object ExtendedArguments {
       tank
     }
 
-    def checkTankInfo(handler: IFluidHandler, side: ForgeDirection, n: Int) = {
+    def checkTankProperties(handler: IFluidHandler, n: Int) = {
       val tank = args.checkInteger(n) - 1
-      val tankInfo = handler.getTankInfo(side)
-      if (tankInfo == null || tank < 0 || tank >= tankInfo.length) {
+      if (tank < 0 || tank >= handler.getTanks) {
         throw new IllegalArgumentException("invalid tank index")
       }
-      tankInfo(tank)
+      new TankProperties(handler.getTankCapacity(tank), handler.getFluidInTank(tank))
     }
 
-    def optTankInfo(handler: IFluidHandler, side: ForgeDirection, n: Int, default: FluidTankInfo) = {
+    def optTankProperties(handler: IFluidHandler, n: Int, default: TankProperties) = {
       if (!isDefined(n)) default
-      else checkTankInfo(handler, side, n)
+      else checkTankProperties(handler, n)
     }
 
-    def checkSideAny(index: Int) = checkSide(index, ForgeDirection.VALID_DIRECTIONS: _*)
+    def checkSideAny(index: Int) = checkSide(index, Direction.values: _*)
 
-    def optSideAny(index: Int, default: ForgeDirection) =
+    def optSideAny(index: Int, default: Direction) =
       if (!isDefined(index)) default
       else checkSideAny(index)
 
-    def checkSideExcept(index: Int, invalid: ForgeDirection*) = checkSide(index, ForgeDirection.VALID_DIRECTIONS.filterNot(invalid.contains): _*)
+    def checkSideExcept(index: Int, invalid: Direction*) = checkSide(index, Direction.values.filterNot(invalid.contains): _*)
 
-    def optSideExcept(index: Int, default: ForgeDirection, invalid: ForgeDirection*) =
+    def optSideExcept(index: Int, default: Direction, invalid: Direction*) =
       if (!isDefined(index)) default
       else checkSideExcept(index, invalid: _*)
 
-    def checkSideForAction(index: Int) = checkSide(index, ForgeDirection.SOUTH, ForgeDirection.UP, ForgeDirection.DOWN)
+    def checkSideForAction(index: Int) = checkSide(index, Direction.SOUTH, Direction.UP, Direction.DOWN)
 
-    def optSideForAction(index: Int, default: ForgeDirection) =
+    def optSideForAction(index: Int, default: Direction) =
       if (!isDefined(index)) default
       else checkSideForAction(index)
 
-    def checkSideForMovement(index: Int) = checkSide(index, ForgeDirection.SOUTH, ForgeDirection.NORTH, ForgeDirection.UP, ForgeDirection.DOWN)
+    def checkSideForMovement(index: Int) = checkSide(index, Direction.SOUTH, Direction.NORTH, Direction.UP, Direction.DOWN)
 
-    def optSideForMovement(index: Int, default: ForgeDirection) =
+    def optSideForMovement(index: Int, default: Direction) =
       if (!isDefined(index)) default
       else checkSideForMovement(index)
 
-    def checkSideForFace(index: Int, facing: ForgeDirection) = checkSideExcept(index, facing.getOpposite)
+    def checkSideForFace(index: Int, facing: Direction) = checkSideExcept(index, facing.getOpposite)
 
-    def optSideForFace(index: Int, default: ForgeDirection) =
+    def optSideForFace(index: Int, default: Direction) =
       if (!isDefined(index)) default
       else checkSideForAction(index)
 
-    private def checkSide(index: Int, allowed: ForgeDirection*) = {
+    private def checkSide(index: Int, allowed: Direction*) = {
       val side = args.checkInteger(index)
       if (side < 0 || side > 5) {
         throw new IllegalArgumentException("invalid side")
       }
-      val direction = ForgeDirection.getOrientation(side)
+      val direction = Direction.from3DDataValue(side)
       if (allowed.isEmpty || (allowed contains direction)) direction
       else throw new IllegalArgumentException("unsupported side")
     }
@@ -102,5 +105,8 @@ object ExtendedArguments {
 
     private def hasValue(index: Int) = args.checkAny(index) != null
   }
+
+  @Deprecated
+  class TankProperties(val capacity: Int, val contents: FluidStack)
 
 }

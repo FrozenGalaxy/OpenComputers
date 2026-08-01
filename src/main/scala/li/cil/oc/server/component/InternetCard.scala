@@ -22,20 +22,23 @@ import li.cil.oc.api.Network
 import li.cil.oc.api.driver.DeviceInfo
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
+import li.cil.oc.api.Network
+import li.cil.oc.api.driver.DeviceInfo
 import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network._
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.api.prefab.AbstractValue
 import li.cil.oc.util.ThreadPoolFactory
-import net.minecraft.server.MinecraftServer
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
 
-class InternetCard extends prefab.ManagedEnvironment with DeviceInfo {
+class InternetCard extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("internet", Visibility.Neighbors).
     create()
@@ -65,10 +68,10 @@ class InternetCard extends prefab.ManagedEnvironment with DeviceInfo {
     checkOwner(context)
     val address = args.checkString(0)
     if (!Settings.get.internetAccessAllowed()) {
-      return result(Unit, "internet access is unavailable")
+      return result((), "internet access is unavailable")
     }
     if (!Settings.get.httpEnabled) {
-      return result(Unit, "http requests are unavailable")
+      return result((), "http requests are unavailable")
     }
     if (connections.size >= Settings.get.maxConnections) {
       throw new IOException("too many open connections")
@@ -79,7 +82,7 @@ class InternetCard extends prefab.ManagedEnvironment with DeviceInfo {
     }.toMap
     else Map.empty[String, String]
     if (!Settings.get.httpHeadersEnabled && headers.nonEmpty) {
-      return result(Unit, "http request headers are unavailable")
+      return result((), "http request headers are unavailable")
     }
     val method = if (args.isString(3)) Option(args.checkString(3)) else None
     val request = new InternetCard.HTTPRequest(this, checkAddress(address), post, headers, method)
@@ -96,10 +99,10 @@ class InternetCard extends prefab.ManagedEnvironment with DeviceInfo {
     val address = args.checkString(0)
     val port = args.optInteger(1, -1)
     if (!Settings.get.internetAccessAllowed()) {
-      return result(Unit, "internet access is unavailable")
+      return result((), "internet access is unavailable")
     }
     if (!Settings.get.tcpEnabled) {
-      return result(Unit, "tcp connections are unavailable")
+      return result((), "tcp connections are unavailable")
     }
     if (connections.size >= Settings.get.maxConnections) {
       throw new IOException("too many open connections")
@@ -110,7 +113,7 @@ class InternetCard extends prefab.ManagedEnvironment with DeviceInfo {
     result(socket)
   }
 
-  private def checkOwner(context: Context) {
+  private def checkOwner(context: Context): Unit = {
     if (owner.isEmpty || context.node != owner.get.node) {
       throw new IllegalArgumentException("can only be used by the owning computer")
     }
@@ -118,7 +121,7 @@ class InternetCard extends prefab.ManagedEnvironment with DeviceInfo {
 
   // ----------------------------------------------------------------------- //
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     super.onConnect(node)
     if (owner.isEmpty && node.host.isInstanceOf[Context] && node.isNeighborOf(this.node)) {
       owner = Some(node.host.asInstanceOf[Context])
@@ -210,7 +213,6 @@ object InternetCard {
 
           selector.select()
 
-          import scala.collection.JavaConversions._
           val selectedKeys = selector.selectedKeys
           val readableKeys = mutable.HashSet[SelectionKey]()
           selectedKeys.filter(_.isReadable).foreach(key => {
@@ -233,7 +235,7 @@ object InternetCard {
       }
     }
 
-    def add(e: (SocketChannel, () => Unit)) {
+    def add(e: (SocketChannel, () => Unit)): Unit = {
       toAccept.offer(e)
       selector.wakeup()
     }
@@ -242,7 +244,7 @@ object InternetCard {
   TCPNotifier.start()
 
   class TCPSocket extends AbstractValue with Closable {
-    def this(owner: InternetCard, uri: URI, port: Int) {
+    def this(owner: InternetCard, uri: URI, port: Int) = {
       this()
       this.owner = Some(owner)
       channel = SocketChannel.open()
@@ -256,7 +258,7 @@ object InternetCard {
     private var isAddressResolved = false
     private val id = UUID.randomUUID()
 
-    private def setupSelector() {
+    private def setupSelector(): Unit = {
       if (channel == null) return
       TCPNotifier.add((channel, () => {
         owner match {
@@ -281,10 +283,10 @@ object InternetCard {
       if (checkConnected()) {
         val buffer = ByteBuffer.allocate(n)
         val read = channel.read(buffer)
-        if (read == -1) result(Unit)
+        if (read == -1) result()
         else {
           setupSelector()
-          result(buffer.array.view(0, read).toArray)
+          result(buffer.array.view.slice(0, read).toArray)
         }
       }
       else result(Array.empty[Byte])
@@ -404,7 +406,7 @@ object InternetCard {
   }
 
   class HTTPRequest extends AbstractValue with Closable {
-    def this(owner: InternetCard, url: URL, post: Option[String], headers: Map[String, String], method: Option[String]) {
+    def this(owner: InternetCard, url: URL, post: Option[String], headers: Map[String, String], method: Option[String]) = {
       this()
       this.owner = Some(owner)
       this.stream = threadPool.submit(new RequestSender(url, post, headers, method))
@@ -424,7 +426,7 @@ object InternetCard {
     def response(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
       response match {
         case Some((code, message, headers)) => result(code, message, headers)
-        case _ => result(Unit)
+        case _ => result()
       }
     }
 
@@ -432,7 +434,7 @@ object InternetCard {
     def read(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
       val n = math.min(Settings.get.maxReadBuffer, math.max(0, args.optInteger(0, Int.MaxValue)))
       if (checkResponse()) {
-        if (eof && queue.isEmpty) result(Unit)
+        if (eof && queue.isEmpty) result()
         else {
           val buffer = ByteBuffer.allocate(n)
           var read = 0
@@ -443,7 +445,7 @@ object InternetCard {
           if (read == 0) {
             readMore()
           }
-          result(buffer.array.view(0, read).toArray)
+          result(buffer.array.view.slice(0, read).toArray)
         }
       }
       else result(Array.empty[Byte])
@@ -509,17 +511,21 @@ object InternetCard {
     private class RequestSender(val url: URL, val post: Option[String], val headers: Map[String, String], val method: Option[String]) extends Callable[InputStream] {
       override def call() = try {
         checkLists(InetAddress.getByName(url.getHost), url.getHost)
-        val proxy = Option(MinecraftServer.getServer.getServerProxy).getOrElse(java.net.Proxy.NO_PROXY)
+        val proxy = ServerLifecycleHooks.getCurrentServer.proxy
         url.openConnection(proxy) match {
           case http: HttpURLConnection => try {
+            // Redirect destinations must be checked just like the original URL.
+            // Do not let HttpURLConnection silently follow a redirect to a
+            // private or otherwise blocked address.
+            http.setInstanceFollowRedirects(false)
+            http.setConnectTimeout(Settings.get.httpTimeout)
+            http.setReadTimeout(Settings.get.httpTimeout)
             http.setDoInput(true)
             http.setDoOutput(post.isDefined)
             http.setRequestMethod(if (method.isDefined) method.get else if (post.isDefined) "POST" else "GET")
             http.setRequestProperty("User-Agent", Settings.get.httpUserAgent.replace("$version", OpenComputers.Version))
             headers.foreach(Function.tupled(http.setRequestProperty))
             if (post.isDefined) {
-              http.setReadTimeout(Settings.get.httpTimeout)
-
               val out = new BufferedWriter(new OutputStreamWriter(http.getOutputStream))
               out.write(post.get)
               out.close()

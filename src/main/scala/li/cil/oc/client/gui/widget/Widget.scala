@@ -1,5 +1,7 @@
 package li.cil.oc.client.gui.widget
 
+import net.minecraft.client.gui.GuiGraphics
+
 abstract class Widget {
   var owner: WidgetContainer = _
 
@@ -11,5 +13,5 @@ abstract class Widget {
 
   def height: Int
 
-  def draw(): Unit
+  def draw(graphics: GuiGraphics): Unit
 }

@@ -2,6 +2,7 @@ package li.cil.oc.server.machine.luac
 
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.security.MessageDigest
 
 import com.google.common.base.Strings
 import li.cil.oc.OpenComputers
@@ -15,10 +16,12 @@ import li.cil.oc.common.SaveHandler
 import li.cil.oc.server.machine.Machine
 import li.cil.oc.util.ExtendedLuaState.extendLuaState
 import li.cil.repack.com.naef.jnlua._
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.core.component.DataComponentHolder
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 
 @Architecture.Name("Lua 5.2")
 class NativeLua52Architecture(machine: api.machine.Machine) extends NativeLuaArchitecture(machine) {
@@ -40,11 +43,26 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
 
   private[machine] var lua: LuaState = null
 
-  private[machine] var kernelMemory = 0
+  @volatile private[machine] var kernelMemory = 0
 
   private[machine] var ramScale: Double = 1.0
 
   private val persistence = new PersistenceAPI(this)
+
+  private[luac] var userdataLoadHolder: DataComponentHolder = _
+  private[luac] var userdataSaveHolder: MutableDataComponentHolder = _
+
+  private def persistenceFingerprint(data: Array[Byte]): String =
+    MessageDigest.getInstance("SHA-256").digest(data).map(byte => f"${byte & 0xff}%02x").mkString
+
+  private def logPersistenceData(operation: String, name: String, data: Array[Byte]): Unit = {
+    if (Settings.get.debugPersistence) {
+      OpenComputers.log.info(
+        s"$operation Lua persistence '$name' for ${machine.node.address}: " +
+          s"${data.length} bytes, sha256=${persistenceFingerprint(data)}, " +
+          s"persistKey=${persistence.currentPersistKey}")
+    }
+  }
 
   private val apis = Array(
     new ComponentAPI(this),
@@ -169,7 +187,7 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
 
   // ----------------------------------------------------------------------- //
 
-  override def runSynchronized() {
+  override def runSynchronized(): Unit = {
     // These three asserts are all guaranteed by run().
     assert(lua.getTop == 2)
     assert(lua.isThread(1))
@@ -324,10 +342,10 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
     true
   }
 
-  override def onConnect() {
+  override def onConnect(): Unit = {
   }
 
-  override def close() {
+  override def close(): Unit = {
     if (lua != null) {
       if (Settings.get.limitMemory) {
         lua.setTotalMemory(Integer.MAX_VALUE)
@@ -346,7 +364,7 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
   @Deprecated
   private def state = machine.asInstanceOf[Machine].state
 
-  override def load(nbt: NBTTagCompound) {
+  override def loadData(nbt: CompoundTag): Unit = {
     if (!machine.isRunning) return
 
     // Unlimit memory use while unpersisting.
@@ -359,14 +377,20 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
       // on. First, clear the stack, meaning the current kernel.
       lua.setTop(0)
 
-      persistence.unpersist(SaveHandler.load(nbt, machine.node.address + "_kernel"))
+      val kernelName = machine.node.address + "_kernel"
+      val kernelData = SaveHandler.load(nbt, kernelName)
+      logPersistenceData("Loading", kernelName, kernelData)
+      persistence.unpersist(kernelData)
       if (!lua.isThread(1)) {
         // This shouldn't really happen, but there's a chance it does if
         // the save was corrupt (maybe someone modified the Lua files).
         throw new LuaRuntimeException("Invalid kernel.")
       }
       if (state.contains(Machine.State.SynchronizedCall) || state.contains(Machine.State.SynchronizedReturn)) {
-        persistence.unpersist(SaveHandler.load(nbt, machine.node.address + "_stack"))
+        val stackName = machine.node.address + "_stack"
+        val stackData = SaveHandler.load(nbt, stackName)
+        logPersistenceData("Loading", stackName, stackData)
+        persistence.unpersist(stackData)
         if (!(if (state.contains(Machine.State.SynchronizedCall)) lua.isFunction(2) else lua.isTable(2))) {
           // Same as with the above, should not really happen normally, but
           // could for the same reasons.
@@ -374,10 +398,10 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
         }
       }
 
-      kernelMemory = (nbt.getInteger("kernelMemory") * ramScale).toInt
+      kernelMemory = (nbt.getInt("kernelMemory") * ramScale).toInt
 
       for (api <- apis) {
-        api.load(nbt)
+        api.loadData(nbt)
       }
 
       try lua.gc(LuaState.GcAction.COLLECT, 0) catch {
@@ -393,7 +417,17 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
     recomputeMemory(machine.host.internalComponents)
   }
 
-  override def save(nbt: NBTTagCompound) {
+  override def loadData(holder: DataComponentHolder, nbt: CompoundTag): Unit = {
+    userdataLoadHolder = holder
+    try loadData(nbt)
+    finally userdataLoadHolder = null
+  }
+
+  override def saveData(nbt: CompoundTag): Unit = {
+    // A stopped/new machine may have selected an architecture without having
+    // initialized its Lua state yet. There is no VM state to persist then.
+    if (lua == null) return
+
     // Unlimit memory while persisting.
     if (Settings.get.limitMemory) {
       lua.setTotalMemory(Integer.MAX_VALUE)
@@ -404,18 +438,24 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
       // Save the kernel state (which is always at stack index one).
       assert(lua.isThread(1))
 
-      SaveHandler.scheduleSave(machine.host, nbt, machine.node.address + "_kernel", persistence.persist(1))
+      val kernelName = machine.node.address + "_kernel"
+      val kernelData = persistence.persist(1)
+      logPersistenceData("Saving", kernelName, kernelData)
+      SaveHandler.scheduleSave(machine.host, nbt, kernelName, kernelData)
       // While in a driver call we have one object on the global stack: either
       // the function to call the driver with, or the result of the call.
       if (state.contains(Machine.State.SynchronizedCall) || state.contains(Machine.State.SynchronizedReturn)) {
         assert(if (state.contains(Machine.State.SynchronizedCall)) lua.isFunction(2) else lua.isTable(2))
-        SaveHandler.scheduleSave(machine.host, nbt, machine.node.address + "_stack", persistence.persist(2))
+        val stackName = machine.node.address + "_stack"
+        val stackData = persistence.persist(2)
+        logPersistenceData("Saving", stackName, stackData)
+        SaveHandler.scheduleSave(machine.host, nbt, stackName, stackData)
       }
 
-      nbt.setInteger("kernelMemory", math.ceil(kernelMemory / ramScale).toInt)
+      nbt.putInt("kernelMemory", math.ceil(kernelMemory / ramScale).toInt)
 
       for (api <- apis) {
-        api.save(nbt)
+        api.saveData(nbt)
       }
 
       try lua.gc(LuaState.GcAction.COLLECT, 0) catch {
@@ -426,13 +466,19 @@ abstract class NativeLuaArchitecture(val machine: api.machine.Machine) extends A
     } catch {
       case e: LuaRuntimeException =>
         OpenComputers.log.warn(s"Could not persist computer @ ${machine.host().machinePosition()}.\n${e.toString}" + (if (e.getLuaStackTrace.isEmpty) "" else "\tat " + e.getLuaStackTrace.mkString("\n\tat ")))
-        nbt.removeTag("state")
+        nbt.remove("state")
       case e: LuaGcMetamethodException =>
         OpenComputers.log.warn(s"Could not persist computer @ ${machine.host().machinePosition()}.\n${e.toString}")
-        nbt.removeTag("state")
+        nbt.remove("state")
     }
 
     // Limit memory again.
     recomputeMemory(machine.host.internalComponents)
+  }
+
+  override def saveData(holder: MutableDataComponentHolder, nbt: CompoundTag): Unit = {
+    userdataSaveHolder = holder
+    try saveData(nbt)
+    finally userdataSaveHolder = null
   }
 }

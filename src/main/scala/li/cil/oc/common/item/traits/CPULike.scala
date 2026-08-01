@@ -7,26 +7,32 @@ import li.cil.oc.api
 import li.cil.oc.api.driver.item.MutableProcessor
 import li.cil.oc.integration.opencomputers.DriverCPU
 import li.cil.oc.util.Tooltip
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.util.ChatComponentTranslation
-import net.minecraft.world.World
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.language.existentials
+import net.minecraft.world.item.ItemStack
+import net.minecraft.network.chat.Component
+import net.minecraft.world.level.Level
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.InteractionResultHolder
+import net.minecraft.world.InteractionResult
+import net.minecraft.world.InteractionHand
+import net.minecraft.Util
 
-trait CPULike extends Delegate {
+trait CPULike extends SimpleItem {
   def cpuTier: Int
 
   override protected def tooltipData: Seq[Any] = Seq(Settings.get.cpuComponentSupport(cpuTier))
 
-  override protected def tooltipExtended(stack: ItemStack, tooltip: util.List[String]) {
-    tooltip.addAll(Tooltip.get("CPU.Architecture", api.Machine.getArchitectureName(DriverCPU.architecture(stack))))
+  override protected def tooltipExtended(stack: ItemStack, tooltip: util.List[Component]): Unit = {
+    for (curr <- Tooltip.get("cpu.Architecture", api.Machine.getArchitectureName(DriverCPU.architecture(stack)))) {
+      tooltip.add(Component.literal(curr).setStyle(Tooltip.DefaultStyle))
+    }
   }
 
-  override def onItemRightClick(stack: ItemStack, world: World, player: EntityPlayer) = {
-    if (player.isSneaking) {
-      if (!world.isRemote) {
+  override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
+    if (player.isCrouching) {
+      if (!level.isClientSide) {
         api.Driver.driverFor(stack) match {
           case driver: MutableProcessor =>
             val architectures = driver.allArchitectures.toList
@@ -36,13 +42,13 @@ trait CPULike extends Delegate {
               val archClass = architectures(newIndex)
               val archName = api.Machine.getArchitectureName(archClass)
               driver.setArchitecture(stack, archClass)
-              player.addChatMessage(new ChatComponentTranslation(Settings.namespace + "tooltip.CPU.Architecture", archName))
+              player.sendSystemMessage(Component.translatable(Settings.namespace + "tooltip.cpu.Architecture", archName))
             }
-            player.swingItem()
+            player.swing(InteractionHand.MAIN_HAND)
           case _ => // No known driver for this processor.
         }
       }
     }
-    stack
+    new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
   }
 }

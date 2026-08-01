@@ -1,84 +1,106 @@
 package li.cil.oc.client.gui
 
-import cpw.mods.fml.relauncher.Side
-import cpw.mods.fml.relauncher.SideOnly
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, Tesselator, VertexFormat}
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiButton
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureUtil
-import net.minecraft.util.ResourceLocation
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.renderer.GameRenderer
+import net.minecraft.network.chat.Component
+import net.minecraft.resources.ResourceLocation
+import net.neoforged.api.distmarker.Dist
+import net.neoforged.api.distmarker.OnlyIn
 
-@SideOnly(Side.CLIENT)
-class ImageButton(id: Int, x: Int, y: Int, w: Int, h: Int,
+@OnlyIn(Dist.CLIENT)
+class ImageButton(xPos: Int, yPos: Int, w: Int, h: Int,
+                  handler: Button.OnPress,
                   val image: ResourceLocation = null,
-                  text: String = null,
+                  text: Component = Component.empty(),
                   val canToggle: Boolean = false,
                   val textColor: Int = 0xE0E0E0,
                   val textDisabledColor: Int = 0xA0A0A0,
                   val textHoverColor: Int = 0xFFFFA0,
-                  val textIndent: Int = -1) extends GuiButton(id, x, y, w, h, text) {
+                  val textIndent: Int = -1,
+                  val textureWidth: Int = -1,
+                  val textureHeight: Int = -1)
+  extends Button(xPos, yPos, w, h, text, handler, _ => Component.empty()) {
 
   var toggled = false
-
   var hoverOverride = false
 
-  override def drawButton(mc: Minecraft, mouseX: Int, mouseY: Int) {
+  override def renderWidget(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTicks: Float): Unit = {
     if (visible) {
       if (image != null) {
-        mc.renderEngine.bindTexture(image)
+        RenderSystem.setShaderTexture(0, image)
       }
-      else {
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
-      }
-      GL11.glColor4f(1, 1, 1, 1)
-      field_146123_n = mouseX >= xPosition && mouseY >= yPosition && mouseX < xPosition + width && mouseY < yPosition + height
+      RenderSystem.setShaderColor(1, 1, 1, 1)
+      val isHov = hoverOverride || (isHovered && active)
 
-      val x0 = xPosition
-      val x1 = xPosition + width
-      val y0 = yPosition
-      val y1 = yPosition + height
+      val x0 = x.toFloat
+      val x1 = (x + width).toFloat
+      val y0 = y.toFloat
+      val y1 = (y + height).toFloat
 
-      val isHovered = hoverOverride || getHoverState(field_146123_n) == 2
+      val t = Tesselator.getInstance
 
-      val t = Tessellator.instance
-      t.startDrawingQuads()
       if (image != null) {
-        val u0 = if (toggled) 0.5 else 0
-        val u1 = u0 + (if (canToggle) 0.5 else 1)
-        val v0 = if (isHovered) 0.5 else 0
-        val v1 = v0 + 0.5
+        val (ru0, ru1, rv0, rv1) = if (textureWidth > 0 && textureHeight > 0) {
+          val texW = textureWidth.toFloat
+          val texH = textureHeight.toFloat
+          val tu0 = if (toggled) w.toFloat / texW else 0f
+          val tu1 = tu0 + w.toFloat / texW
+          val tv0 = if (isHov) h.toFloat / texH else 0f
+          val tv1 = tv0 + h.toFloat / texH
+          (tu0, tu1, tv0, tv1)
+        } else {
+          val u0 = if (toggled) 0.5f else 0f
+          val u1 = u0 + (if (canToggle) 0.5f else 1f)
+          val v0 = if (isHov) 0.5f else 0f
+          val v1 = v0 + 0.5f
+          (u0, u1, v0, v1)
+        }
 
-        t.addVertexWithUV(x0, y1, zLevel, u0, v1)
-        t.addVertexWithUV(x1, y1, zLevel, u1, v1)
-        t.addVertexWithUV(x1, y0, zLevel, u1, v0)
-        t.addVertexWithUV(x0, y0, zLevel, u0, v0)
+        val z = 0
+        RenderSystem.setShader(() => GameRenderer.getPositionTexShader)
+        RenderSystem.enableBlend()
+        RenderSystem.defaultBlendFunc()
+        RenderSystem.enableDepthTest()
+
+        val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
+        r.addVertex(graphics.pose().last.pose(), x0, y1, z).setUv(ru0, rv1)
+        r.addVertex(graphics.pose().last.pose(), x1, y1, z).setUv(ru1, rv1)
+        r.addVertex(graphics.pose().last.pose(), x1, y0, z).setUv(ru1, rv0)
+        r.addVertex(graphics.pose().last.pose(), x0, y0, z).setUv(ru0, rv0)
+        BufferUploader.drawWithShader(r.buildOrThrow())
+        RenderSystem.disableBlend()
+      } else {
+        val alpha = if (isHov) 0.4f else 0.0f
+        if (alpha > 0f) {
+          val z = 0
+          RenderSystem.setShader(() => GameRenderer.getPositionColorShader)
+          RenderSystem.enableBlend()
+          RenderSystem.defaultBlendFunc()
+
+          val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR)
+          r.addVertex(graphics.pose().last.pose(), x0, y1, z).setColor(1f, 1f, 1f, alpha)
+          r.addVertex(graphics.pose().last.pose(), x1, y1, z).setColor(1f, 1f, 1f, alpha)
+          r.addVertex(graphics.pose().last.pose(), x1, y0, z).setColor(1f, 1f, 1f, alpha)
+          r.addVertex(graphics.pose().last.pose(), x0, y0, z).setColor(1f, 1f, 1f, alpha)
+          BufferUploader.drawWithShader(r.buildOrThrow())
+          RenderSystem.disableBlend()
+        }
       }
-      else if (isHovered) {
-        GL11.glColor4f(1, 1, 1, 0.8f)
 
-        t.addVertex(x0, y1, zLevel)
-        t.addVertex(x1, y1, zLevel)
-        t.addVertex(x1, y0, zLevel)
-        t.addVertex(x0, y0, zLevel)
-      }
-      else {
-        GL11.glColor4f(1, 1, 1, 0.4f)
-
-        t.addVertex(x0, y1, zLevel)
-        t.addVertex(x1, y1, zLevel)
-        t.addVertex(x1, y0, zLevel)
-        t.addVertex(x0, y0, zLevel)
-      }
-      t.draw()
-
-      if (displayString != null) {
+      if (getMessage.getString.nonEmpty) {
         val color =
-          if (!enabled) textDisabledColor
-          else if (hoverOverride || field_146123_n) textHoverColor
+          if (!active) textDisabledColor
+          else if (isHov) textHoverColor
           else textColor
-        if (textIndent >= 0) drawString(mc.fontRenderer, displayString, textIndent + xPosition, yPosition + (height - 8) / 2, color)
-        else drawCenteredString(mc.fontRenderer, displayString, xPosition + width / 2, yPosition + (height - 8) / 2, color)
+        val font = Minecraft.getInstance.font
+        if (textIndent >= 0)
+          graphics.drawString(font, getMessage, textIndent + x, y + (height - 8) / 2, color)
+        else
+          graphics.drawCenteredString(font, getMessage, x + width / 2, y + (height - 8) / 2, color)
       }
     }
   }

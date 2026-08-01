@@ -1,6 +1,8 @@
 package li.cil.oc.api;
 
-import net.minecraft.creativetab.CreativeTabs;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.CreativeModeTabs;
 
 /**
  * Allows access to the creative tab used by OpenComputers.
@@ -13,7 +15,7 @@ public final class CreativeTab {
      * <em>not</em> try to access this anyway when OpenComputers isn't
      * present (don't ship the API in your mod), so don't rely on this!
      */
-    public static CreativeTabs instance = CreativeTabs.tabRedstone;
+    public static ResourceKey<CreativeModeTab> instance = CreativeModeTabs.REDSTONE_BLOCKS;
 
     private CreativeTab() {
     }

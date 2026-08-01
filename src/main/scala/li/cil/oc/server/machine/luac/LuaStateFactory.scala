@@ -16,7 +16,8 @@ import li.cil.oc.api.machine.Architecture
 import li.cil.oc.server.machine.Machine
 import li.cil.oc.util.ExtendedLuaState._
 import li.cil.repack.com.naef.jnlua
-import net.minecraft.item.ItemStack
+import li.cil.repack.com.naef.jnlua.LuaState
+import net.minecraft.world.item.ItemStack
 import org.apache.commons.lang3.SystemUtils
 
 import scala.util.Random
@@ -180,7 +181,7 @@ abstract class LuaStateFactory {
   // shared libraries somewhere so that we can load them, because we cannot
   // load them directly from a JAR. Lastly, we need to handle library overrides in
   // case the user wants to use custom libraries, or are not on a supported platform.
-  def init() {
+  def init(): Unit = {
     if (libraryName == null) {
       return
     }
@@ -210,9 +211,19 @@ abstract class LuaStateFactory {
     }
 
     if (currentLib.isEmpty) {
-      val libraryUrl = classOf[Machine].getResource(s"/assets/${Settings.resourceDomain}/lib/$libraryName")
+      val libraryPath = s"/assets/${Settings.resourceDomain}/lib/$libraryName"
+      val libraryUrl = {
+        val path = libraryPath.stripPrefix("/")
+        val loaders = Seq(
+          Thread.currentThread().getContextClassLoader,
+          getClass.getClassLoader,
+          ClassLoader.getSystemClassLoader,
+          classOf[LuaState].getClassLoader
+        )
+        loaders.iterator.flatMap(cl => Option(cl.getResource(path))).nextOption().orNull
+      }
       if (libraryUrl == null) {
-        OpenComputers.log.warn(s"Native library with name '$libraryName' not found.")
+        OpenComputers.log.warn(s"Native library with name '$libraryPath' not found.")
         return
       }
 
@@ -247,16 +258,14 @@ abstract class LuaStateFactory {
           val inExisting = new BufferedInputStream(new FileInputStream(tmpLibFile))
           var inCurrentByte = 0
           var inExistingByte = 0
-          do {
+          while (matching && {
             inCurrentByte = inCurrent.read()
             inExistingByte = inExisting.read()
             if (inCurrentByte != inExistingByte) {
               matching = false
-              inCurrentByte = -1
-              inExistingByte = -1
             }
-          }
-          while (inCurrentByte != -1 && inExistingByte != -1)
+            inCurrentByte != -1 && inExistingByte != -1
+          }) ()
           inCurrent.close()
           inExisting.close()
         }

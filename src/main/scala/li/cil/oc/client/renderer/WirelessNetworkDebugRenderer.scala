@@ -1,102 +1,107 @@
 package li.cil.oc.client.renderer
 
-import cpw.mods.fml.common.ObfuscationReflectionHelper
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.{DefaultVertexFormat, PoseStack, VertexFormat}
 import li.cil.oc.Settings
 import li.cil.oc.server.network.WirelessNetwork
-import li.cil.oc.util.RenderState
 import net.minecraft.client.Minecraft
-import net.minecraft.world.World
-import net.minecraftforge.client.event.RenderWorldLastEvent
+import net.minecraft.client.renderer.{
+  GameRenderer,
+  RenderStateShard,
+  RenderType
+}
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent
 import org.lwjgl.opengl.GL11
 
 object WirelessNetworkDebugRenderer {
   val colors = Array(0xFF0000, 0x00FFFF, 0x00FF00, 0x0000FF, 0xFF00FF, 0xFFFF00, 0xFFFFFF, 0x000000)
 
+  private val RENDER_TYPE = RenderType.create(
+    "oc_wireless_debug",
+    DefaultVertexFormat.POSITION_COLOR,
+    VertexFormat.Mode.QUADS,
+    131072, false, true,
+    RenderType.CompositeState.builder()
+      .setShaderState(new RenderStateShard.ShaderStateShard(GameRenderer.getPositionColorShader _))
+      .setTransparencyState(new RenderStateShard.TransparencyStateShard("translucent",
+        () => {
+          RenderSystem.enableBlend()
+          RenderSystem.defaultBlendFunc()
+        },
+        () => RenderSystem.disableBlend()
+      ))
+      .setCullState(new RenderStateShard.CullStateShard(false))
+      .setDepthTestState(new RenderStateShard.DepthTestStateShard("always", GL11.GL_ALWAYS))
+      .setWriteMaskState(new RenderStateShard.WriteMaskStateShard(true, false))
+      .createCompositeState(false)
+  )
+
   @SubscribeEvent
-  def onRenderWorldLastEvent(e: RenderWorldLastEvent) {
-    if (Settings.rTreeDebugRenderer) {
-      RenderState.checkError(getClass.getName + ".onRenderWorldLastEvent: entering (aka: wasntme)")
+  def onRenderWorldLastEvent(e: RenderLevelStageEvent): Unit = {
+    if (e.getStage != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return
+    if (!Settings.rTreeDebugRenderer) return
 
-      val world = ObfuscationReflectionHelper.getPrivateValue(classOf[net.minecraft.client.renderer.RenderGlobal], e.context, "theWorld", "field_72769_h", "r").asInstanceOf[World]
-      WirelessNetwork.dimensions.get(world.provider.dimensionId) match {
-        case Some(tree) =>
-          val mc = Minecraft.getMinecraft
-          val player = mc.thePlayer
-          val px = player.lastTickPosX + (player.posX - player.lastTickPosX) * e.partialTicks
-          val py = player.lastTickPosY + (player.posY - player.lastTickPosY) * e.partialTicks
-          val pz = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * e.partialTicks
+    val world = Minecraft.getInstance.level
+    WirelessNetwork.dimensions.get(world.dimension) match {
+      case Some(tree) =>
+        val player = Minecraft.getInstance.player
+        val px = player.xOld + (player.getX - player.xOld) * e.getPartialTick.getGameTimeDeltaTicks.toDouble
+        val py = player.yOld + (player.getY - player.yOld) * e.getPartialTick.getGameTimeDeltaTicks.toDouble
+        val pz = player.zOld + (player.getZ - player.zOld) * e.getPartialTick.getGameTimeDeltaTicks.toDouble
 
-          GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
-          GL11.glPushMatrix()
-          GL11.glTranslated(-px, -py, -pz)
-          RenderState.makeItBlend()
-          GL11.glDisable(GL11.GL_LIGHTING)
-          GL11.glDisable(GL11.GL_TEXTURE_2D)
-          GL11.glDisable(GL11.GL_DEPTH_TEST)
-          GL11.glDisable(GL11.GL_CULL_FACE)
+        val stack = e.getPoseStack
+        stack.pushPose()
+        stack.translate(-px, -py, -pz)
 
-          def drawBox(minX: Double, minY: Double, minZ: Double, maxX: Double, maxY: Double, maxZ: Double) {
-            GL11.glBegin(GL11.GL_QUADS)
-            GL11.glVertex3d(minX, minY, minZ)
-            GL11.glVertex3d(minX, minY, maxZ)
-            GL11.glVertex3d(maxX, minY, maxZ)
-            GL11.glVertex3d(maxX, minY, minZ)
-            GL11.glEnd()
-            GL11.glBegin(GL11.GL_QUADS)
-            GL11.glVertex3d(minX, minY, minZ)
-            GL11.glVertex3d(maxX, minY, minZ)
-            GL11.glVertex3d(maxX, maxY, minZ)
-            GL11.glVertex3d(minX, maxY, minZ)
-            GL11.glEnd()
-            GL11.glBegin(GL11.GL_QUADS)
-            GL11.glVertex3d(maxX, maxY, minZ)
-            GL11.glVertex3d(maxX, maxY, maxZ)
-            GL11.glVertex3d(minX, maxY, maxZ)
-            GL11.glVertex3d(minX, maxY, minZ)
-            GL11.glEnd()
-            GL11.glBegin(GL11.GL_QUADS)
-            GL11.glVertex3d(maxX, maxY, maxZ)
-            GL11.glVertex3d(maxX, minY, maxZ)
-            GL11.glVertex3d(minX, minY, maxZ)
-            GL11.glVertex3d(minX, maxY, maxZ)
-            GL11.glEnd()
-            GL11.glBegin(GL11.GL_QUADS)
-            GL11.glVertex3d(minX, minY, minZ)
-            GL11.glVertex3d(minX, maxY, minZ)
-            GL11.glVertex3d(minX, maxY, maxZ)
-            GL11.glVertex3d(minX, minY, maxZ)
-            GL11.glEnd()
-            GL11.glBegin(GL11.GL_QUADS)
-            GL11.glVertex3d(maxX, minY, minZ)
-            GL11.glVertex3d(maxX, minY, maxZ)
-            GL11.glVertex3d(maxX, maxY, maxZ)
-            GL11.glVertex3d(maxX, maxY, minZ)
-            GL11.glEnd()
-          }
+        val bufferSource = Minecraft.getInstance.renderBuffers.bufferSource
+        val consumer = bufferSource.getBuffer(RENDER_TYPE)
 
-          GL11.glPolygonMode(GL11.GL_FRONT_AND_BACK, GL11.GL_LINE)
-          for (((min, max), level) <- tree.allBounds) {
-            val (minX, minY, minZ) = min
-            val (maxX, maxY, maxZ) = max
-            val color = colors(level % colors.length)
-            GL11.glColor4f(
-              ((color >> 16) & 0xFF) / 255f,
-              ((color >> 8) & 0xFF) / 255f,
-              ((color >> 0) & 0xFF) / 255f,
-              0.25f)
-            val size = 0.5 - level * 0.05
-            drawBox(minX - size, minY - size, minZ - size, maxX + size, maxY + size, maxZ + size)
-          }
-          GL11.glPolygonMode(GL11.GL_FRONT_AND_BACK, GL11.GL_FILL)
+        for (((min, max), level) <- tree.allBounds) {
+          val (minX, minY, minZ) = min
+          val (maxX, maxY, maxZ) = max
+          val color = colors(level % colors.length)
+          val r = ((color >> 16) & 0xFF)
+          val g = ((color >> 8) & 0xFF)
+          val b = ((color >> 0) & 0xFF)
+          val a = 64 // 0.25 * 255
 
-          GL11.glPopMatrix()
-          GL11.glPopAttrib()
-        case _ =>
-      }
+          val size = 0.5f - level * 0.05f
+          drawBox(stack, consumer,
+            minX.toFloat - size, minY.toFloat - size, minZ.toFloat - size,
+            maxX.toFloat + size, maxY.toFloat + size, maxZ.toFloat + size,
+            r, g, b, a)
+        }
 
-      RenderState.checkError(getClass.getName + ".onRenderWorldLastEvent: leaving")
+        bufferSource.endBatch(RENDER_TYPE)
+        stack.popPose()
+
+      case _ =>
     }
   }
 
+  private def vertex(stack: PoseStack, consumer: com.mojang.blaze3d.vertex.VertexConsumer,
+                     x: Float, y: Float, z: Float, r: Int, g: Int, b: Int, a: Int): Unit = {
+    consumer.addVertex(stack.last.pose, x, y, z).setColor(r, g, b, a)
+  }
+
+  private def drawBox(stack: PoseStack, consumer: com.mojang.blaze3d.vertex.VertexConsumer,
+                      minX: Float, minY: Float, minZ: Float,
+                      maxX: Float, maxY: Float, maxZ: Float,
+                      r: Int, g: Int, b: Int, a: Int): Unit = {
+    def v(x: Float, y: Float, z: Float) = vertex(stack, consumer, x, y, z, r, g, b, a)
+
+    // Bottom
+    v(minX, minY, minZ); v(minX, minY, maxZ); v(maxX, minY, maxZ); v(maxX, minY, minZ)
+    // Front
+    v(minX, minY, minZ); v(maxX, minY, minZ); v(maxX, maxY, minZ); v(minX, maxY, minZ)
+    // Top
+    v(maxX, maxY, minZ); v(maxX, maxY, maxZ); v(minX, maxY, maxZ); v(minX, maxY, minZ)
+    // Back
+    v(maxX, maxY, maxZ); v(maxX, minY, maxZ); v(minX, minY, maxZ); v(minX, maxY, maxZ)
+    // Left
+    v(minX, minY, minZ); v(minX, maxY, minZ); v(minX, maxY, maxZ); v(minX, minY, maxZ)
+    // Right
+    v(maxX, minY, minZ); v(maxX, minY, maxZ); v(maxX, maxY, maxZ); v(maxX, maxY, minZ)
+  }
 }

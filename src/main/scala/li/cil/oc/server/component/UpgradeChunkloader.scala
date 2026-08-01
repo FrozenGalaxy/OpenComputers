@@ -1,7 +1,6 @@
 package li.cil.oc.server.component
 
 import java.util
-
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
@@ -15,14 +14,16 @@ import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.network._
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.common.event.ChunkloaderUpgradeHandler
-import net.minecraftforge.common.ForgeChunkManager
-import net.minecraftforge.common.ForgeChunkManager.Ticket
-import net.minecraft.entity.Entity
+import net.minecraft.world.level.ChunkPos
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.Level
+import net.minecraft.world.entity.Entity
 
-class UpgradeChunkloader(val host: EnvironmentHost) extends prefab.ManagedEnvironment with DeviceInfo {
+class UpgradeChunkloader(val host: EnvironmentHost) extends AbstractManagedEnvironment with DeviceInfo {
   override val node = api.Network.newNode(this, Visibility.Network).
     withComponent("chunkloader").
     withConnector().
@@ -37,17 +38,19 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends prefab.ManagedEnviro
 
   override def getDeviceInfo: util.Map[String, String] = deviceInfo
 
-  var ticket: Option[Ticket] = None
+  var ticket: Option[ChunkPos] = None
 
   override val canUpdate = true
 
-  override def update() {
+  override def update(): Unit = {
     super.update()
-    if (host.world.getTotalWorldTime % Settings.get.tickFrequency == 0 && ticket.isDefined) {
+    if (host.getEnvironmentLevel.getGameTime % Settings.get.tickFrequency == 0 && ticket.isDefined) {
       if (!node.tryChangeBuffer(-Settings.get.chunkloaderCost * Settings.get.tickFrequency)) {
-        ticket.foreach(ticket => try ForgeChunkManager.releaseTicket(ticket) catch {
-          case _: Throwable => // Ignored.
-        })
+        host.getEnvironmentLevel match {
+          case world: ServerLevel => {
+            ticket.foreach(pos => ChunkloaderUpgradeHandler.releaseTicket(world, node.address, pos))
+          }
+        }
         ticket = None
       }
       else if (host.isInstanceOf[Entity]) // Robot move events are not fired for entities (drones)
@@ -61,18 +64,18 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends prefab.ManagedEnviro
   @Callback(doc = "function(enabled:boolean):boolean -- Enables or disables the chunkloader, returns true if active changed")
   def setActive(context: Context, args: Arguments): Array[AnyRef] = result(setActive(args.checkBoolean(0), throwIfBlocked = true))
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     super.onConnect(node)
     if (node == this.node) {
-      val restoredTicket = ChunkloaderUpgradeHandler.restoredTickets.remove(node.address)
+      val restoredTicket = ChunkloaderUpgradeHandler.claimTicket(node.address)
       if (restoredTicket.isDefined) {
         if (!isDimensionAllowed) {
-          try ForgeChunkManager.releaseTicket(restoredTicket.get) catch {
-            case _: Throwable => // Ignored.
+          host.getEnvironmentLevel match {
+            case world: ServerLevel => ChunkloaderUpgradeHandler.releaseTicket(world, node.address, restoredTicket.get)
           }
-          OpenComputers.log.info(s"Releasing chunk loader ticket at (${host.xPosition()}, ${host.yPosition()}, ${host.zPosition()}) in blacklisted dimension ${host.world().provider.dimensionId}.")
+          OpenComputers.log.info(s"Releasing chunk loader ticket at (${host.xPosition()}, ${host.yPosition()}, ${host.zPosition()}) in blacklisted dimension ${host.getEnvironmentLevel().dimension}.")
         } else {
-          OpenComputers.log.info(s"Reclaiming chunk loader ticket at (${host.xPosition()}, ${host.yPosition()}, ${host.zPosition()}) in dimension ${host.world().provider.dimensionId}.")
+          OpenComputers.log.info(s"Reclaiming chunk loader ticket at (${host.xPosition()}, ${host.yPosition()}, ${host.zPosition()}) in dimension ${host.getEnvironmentLevel().dimension}.")
           ticket = restoredTicket
           ChunkloaderUpgradeHandler.updateLoadedChunk(this)
         }
@@ -83,17 +86,17 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends prefab.ManagedEnviro
     }
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     super.onDisconnect(node)
     if (node == this.node) {
-      ticket.foreach(ticket => try ForgeChunkManager.releaseTicket(ticket) catch {
-        case _: Throwable => // Ignored.
+      ticket.foreach(pos => host.getEnvironmentLevel match {
+        case world: ServerLevel => ChunkloaderUpgradeHandler.releaseTicket(world, node.address, pos)
       })
       ticket = None
     }
   }
 
-  override def onMessage(message: Message) {
+  override def onMessage(message: Message): Unit = {
     super.onMessage(message)
     if (message.name == "computer.stopped") {
       setActive(enabled = false)
@@ -109,8 +112,8 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends prefab.ManagedEnviro
       ticket.isDefined
     }
     else if (!enabled && ticket.isDefined) {
-      ticket.foreach(ticket => try ForgeChunkManager.releaseTicket(ticket) catch {
-        case _: Throwable => // Ignored.
+      ticket.foreach(pos => host.getEnvironmentLevel match {
+        case world: ServerLevel => ChunkloaderUpgradeHandler.releaseTicket(world, node.address, pos)
       })
       ticket = None
       true
@@ -119,8 +122,14 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends prefab.ManagedEnviro
     }
   }
 
+  @Deprecated
   private def isDimensionAllowed: Boolean = {
-    val id: Int = host.world().provider.dimensionId
+    val id: Int = host.getEnvironmentLevel().dimension match {
+      case Level.OVERWORLD => 0
+      case Level.NETHER => -1
+      case Level.END => 1
+      case _ => throw new Error("deprecated")
+    }
     val whitelist = Settings.get.chunkloadDimensionWhitelist
     val blacklist = Settings.get.chunkloadDimensionBlacklist
     if (!whitelist.isEmpty) {
@@ -141,7 +150,8 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends prefab.ManagedEnviro
         throw new Exception("this dimension is blacklisted")
       }
     } else {
-      ticket = Option(ForgeChunkManager.requestTicket(OpenComputers, host.world, ForgeChunkManager.Type.NORMAL))
+      // This ticket is a lie, but ChunkloaderUpgradeHandler won't crash or load it.
+      ticket = Some(new ChunkPos(0, 0))
       ChunkloaderUpgradeHandler.updateLoadedChunk(this)
     }
   }

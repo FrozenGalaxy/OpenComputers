@@ -1,13 +1,12 @@
 package li.cil.oc.util
 
 import java.io.InputStreamReader
-import java.net.URL
+import java.net.URI
 import com.google.gson.Gson
 import com.google.gson.stream.JsonReader
-import cpw.mods.fml.common.Loader
-import cpw.mods.fml.common.versioning.ComparableVersion
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
+import org.apache.maven.artifact.versioning.ComparableVersion
 
 import java.util.Objects
 import scala.collection.mutable
@@ -15,7 +14,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object UpdateCheck {
-  private val releasesUrl = new URL("https://api.github.com/repos/MightyPirates/OpenComputers/releases")
+  private val releasesUrl = URI.create("https://api.github.com/repos/CaitlynMainer/OpenComputers/releases").toURL
 
   var info = Future {
     initialize()
@@ -50,7 +49,7 @@ object UpdateCheck {
         if (candidates.nonEmpty) {
           val latest = candidates.maxBy(release => new ComparableVersion(release.tag_name.stripPrefix("v")))
           val remoteVersion = new ComparableVersion(latest.tag_name.stripPrefix("v"))
-          val localVersion = new ComparableVersion(Loader.instance.getIndexedModList.get(OpenComputers.ID).getVersion)
+          val localVersion = new ComparableVersion(OpenComputers.Version)
           if (remoteVersion.compareTo(localVersion) > 0) {
             OpenComputers.log.info(s"A newer version of OpenComputers is available: ${latest.tag_name}.")
             return Some(latest)

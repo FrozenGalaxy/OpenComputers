@@ -1,8 +1,8 @@
 package li.cil.oc.api.detail;
 
-import net.minecraft.block.Block;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 public interface ItemInfo {
     /**
@@ -18,10 +18,10 @@ public interface ItemInfo {
 
     /**
      * Returns the block type of the represented item. In case the item is not
-     * a block this will return <tt>null</tt>.
+     * a block this will return {@code null}.
      * <br>
      * Note that OpenComputers represents most of its items using just a few
-     * actual <tt>Block</tt> instances, so descriptors for different blocks may
+     * actual {@link Block} instances, so descriptors for different blocks may
      * return the same object here.
      *
      * @return the block type of the represented block.
@@ -30,10 +30,10 @@ public interface ItemInfo {
 
     /**
      * Returns the item type of the represented item. In case the item is a
-     * blocks this will return <tt>null</tt>.
+     * blocks this will return {@code null}.
      * <br>
      * Note that OpenComputers represents most of its items using just a few
-     * actual <tt>Item</tt> instances, so descriptors for different items may
+     * actual {@link Item} instances, so descriptors for different items may
      * return the same object here.
      *
      * @return the item type of the represented item.

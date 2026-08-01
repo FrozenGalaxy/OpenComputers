@@ -1,257 +1,255 @@
 package li.cil.oc.server.agent
 
-import java.util.UUID
-
 import com.mojang.authlib.GameProfile
-import cpw.mods.fml.common.ObfuscationReflectionHelper
-import cpw.mods.fml.common.eventhandler.Event
-import li.cil.oc.OpenComputers
-import li.cil.oc.Settings
+import com.mojang.datafixers.util.Either
+import li.cil.oc.{OpenComputers, Settings}
 import li.cil.oc.api.event._
 import li.cil.oc.api.internal
 import li.cil.oc.api.network.Connector
 import li.cil.oc.common.EventHandler
-import li.cil.oc.integration.Mods
-import li.cil.oc.integration.magtools.ModMagnanimousTools
-import li.cil.oc.integration.tcon.ModTinkersConstruct
-import li.cil.oc.integration.util.PortalGun
-import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.InventoryUtils
-import net.minecraft.block.Block
-import net.minecraft.block.BlockPistonBase
-import net.minecraft.entity.Entity
-import net.minecraft.entity.EntityLivingBase
-import net.minecraft.entity.IMerchant
-import net.minecraft.entity.item.EntityItem
-import net.minecraft.entity.item.EntityMinecartHopper
-import net.minecraft.entity.passive.EntityHorse
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.entity.player.EntityPlayer.EnumStatus
-import net.minecraft.init.Blocks
-import net.minecraft.init.Items
-import net.minecraft.inventory.{IInventory, ContainerPlayer}
-import net.minecraft.item.ItemBlock
-import net.minecraft.item.ItemStack
-import net.minecraft.network.NetHandlerPlayServer
-import net.minecraft.potion.PotionEffect
-import net.minecraft.server.MinecraftServer
-import net.minecraft.server.management.UserListOpsEntry
-import net.minecraft.tileentity._
-import net.minecraft.util._
-import net.minecraft.world.WorldServer
-import net.minecraftforge.common.ForgeHooks
-import net.minecraftforge.common.MinecraftForge
-import net.minecraftforge.common.util.FakePlayer
-import net.minecraftforge.common.util.ForgeDirection
-import net.minecraftforge.event.ForgeEventFactory
-import net.minecraftforge.event.entity.player.EntityInteractEvent
-import net.minecraftforge.event.entity.player.PlayerInteractEvent
-import net.minecraftforge.event.entity.player.PlayerInteractEvent.Action
-import net.minecraftforge.event.world.BlockEvent
-import net.minecraftforge.fluids.FluidRegistry
+import li.cil.oc.server.agent.{Inventory => AgentInventory}
+import li.cil.oc.util.{BlockPosition, InventoryUtils}
+import net.minecraft.core.{BlockPos, Direction, NonNullList}
+import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action
+import net.minecraft.server.level.{ClientInformation, ServerLevel}
+import net.minecraft.server.network.{CommonListenerCookie, ServerGamePacketListenerImpl}
+import net.minecraft.server.players.ServerOpListEntry
+import net.minecraft.world.{Container, InteractionHand, InteractionResult, MenuProvider}
+import net.minecraft.world.damagesource.DamageSource
+import net.minecraft.world.effect.MobEffectInstance
+import net.minecraft.world.entity.Entity.RemovalReason
+import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.entity.player.Player.{BedSleepingProblem => BedStatus}
+import net.minecraft.world.entity.player.{Player => PlayerEntity}
+import net.minecraft.world.entity._
+import net.minecraft.world.inventory.InventoryMenu
+import net.minecraft.world.item.{BlockItem, ItemStack, Items}
+import net.minecraft.world.item.context.UseOnContext
+import net.minecraft.world.item.trading.MerchantOffers
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.entity.{CommandBlockEntity, SignBlockEntity}
+import net.minecraft.world.level.block.piston.PistonBaseBlock
+import net.minecraft.world.level.{BaseCommandBlock, Level}
+import net.minecraft.world.phys.{BlockHitResult, Vec3}
+import net.neoforged.bus.api.{EventPriority, ICancellableEvent, SubscribeEvent}
+import net.neoforged.neoforge.common.NeoForge
+import net.neoforged.neoforge.common.util.{FakePlayer, TriState}
+import net.neoforged.neoforge.event.entity.living.LivingEntityUseItemEvent
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent
+import net.neoforged.neoforge.event.entity.player.PlayerEvent
+import net.neoforged.neoforge.network.connection.ConnectionType
+import net.neoforged.neoforge.common.CommonHooks
 
-import scala.collection.convert.WrapAsScala._
-import scala.reflect.ClassTag
-import scala.reflect.classTag
+import java.util
+import java.util.UUID
+import scala.jdk.CollectionConverters._
 
 object Player {
-  def profileFor(agent: internal.Agent) = {
+  def profileFor(agent: internal.Agent): GameProfile = {
     val uuid = agent.ownerUUID
-    val randomId = (agent.world.rand.nextInt(0xFFFFFF) + 1).toString
+    val randomId = (agent.getEnvironmentLevel.random.nextInt(0xFFFFFF) + 1).toString
     val name = Settings.get.nameFormat.
       replace("$player$", agent.ownerName).
       replace("$random$", randomId)
     new GameProfile(uuid, name)
   }
 
-  def determineUUID(playerUUID: Option[UUID] = None) = {
+  def determineUUID(playerUUID: Option[UUID] = None): UUID = {
     val format = Settings.get.uuidFormat
     val randomUUID = UUID.randomUUID()
     try UUID.fromString(format.
-      replaceAllLiterally("$random$", randomUUID.toString).
-      replaceAllLiterally("$player$", playerUUID.getOrElse(randomUUID).toString)) catch {
+      replace("$random$", randomUUID.toString).
+      replace("$player$", playerUUID.getOrElse(randomUUID).toString)) catch {
       case t: Throwable =>
         OpenComputers.log.warn("Failed determining robot UUID, check your config's `uuidFormat` entry!", t)
         randomUUID
     }
   }
 
-  def updatePositionAndRotation(player: Player, facing: ForgeDirection, side: ForgeDirection) {
+  def updatePositionAndRotation(player: Player, facing: Direction, side: Direction): Unit = {
     player.facing = facing
     player.side = side
-    val direction = Vec3.createVectorHelper(
-      facing.offsetX + side.offsetX,
-      facing.offsetY + side.offsetY,
-      facing.offsetZ + side.offsetZ).normalize()
-    val yaw = Math.toDegrees(-Math.atan2(direction.xCoord, direction.zCoord)).toFloat
-    val pitch = Math.toDegrees(-Math.atan2(direction.yCoord, Math.sqrt((direction.xCoord * direction.xCoord) + (direction.zCoord * direction.zCoord)))).toFloat * 0.99f
-    player.setLocationAndAngles(player.agent.xPosition, player.agent.yPosition - player.yOffset, player.agent.zPosition, yaw, pitch)
-    player.prevRotationPitch = player.rotationPitch
-    player.prevRotationYaw = player.rotationYaw
+    val direction = new Vec3(
+      facing.getStepX + side.getStepX,
+      facing.getStepY + side.getStepY,
+      facing.getStepZ + side.getStepZ).normalize()
+    val yaw = Math.toDegrees(-Math.atan2(direction.x, direction.z)).toFloat
+    val pitch = Math.toDegrees(-Math.atan2(direction.y, Math.sqrt((direction.x * direction.x) + (direction.z * direction.z)))).toFloat * 0.99f
+    player.setPos(player.agent.xPosition, player.agent.yPosition, player.agent.zPosition)
+    player.setYRot(pitch % 360f)
+    player.setXRot(yaw % 360f)
+    player.xRotO = player.getXRot
+    player.yRotO = player.getYRot
   }
 
-  def setInventoryPlayerItems(player: Player): Unit = {
+  def setPlayerInventoryItems(player: Player): Unit = {
     // the offhand is simply the agent's tool item
     val agent = player.agent
-    def setCopyOrNull(inv: Array[ItemStack], agentInv: IInventory, slot: Int): Unit = {
-      val item = agentInv.getStackInSlot(slot)
-      inv(slot) = if (item != null) item.copy() else null
+    def setCopyOrNull(inv: NonNullList[ItemStack], agentInv: Container, slot: Int): Unit = {
+      val item = agentInv.getItem(slot)
+      inv.set(slot, if (item != null) item.copy() else ItemStack.EMPTY)
     }
 
-    // mainInventory is 36 items
+    for (i <- 0 until 4) {
+      setCopyOrNull(player.inventory.armor, agent.equipmentInventory, i)
+    }
+
+    // items is 36 items
     // the agent inventory is 100 items with some space for components
     // leaving us 88..we'll copy what we can
-    val size = player.inventory.mainInventory.length min agent.mainInventory.getSizeInventory
+    val size = player.inventory.items.size min agent.mainInventory.getContainerSize
     for (i <- 0 until size) {
-      setCopyOrNull(player.inventory.mainInventory, agent.mainInventory, i)
+      setCopyOrNull(player.inventory.items, agent.mainInventory, i)
     }
-    // no reason to sync to container, container already maps to agent inventory
-    // which we just copied from
-    // player.inventoryContainer.detectAndSendChanges()
+    player.inventoryMenu.broadcastChanges()
   }
 
-  def detectInventoryPlayerChanges(player: Player): Unit = {
-    player.inventoryContainer.detectAndSendChanges()
+  def detectPlayerInventoryChanges(player: Player): Unit = {
+    val agent = player.agent
+    player.inventoryMenu.broadcastChanges()
     // The follow code will set agent.inventories = FakePlayer's inv.stack
-    def setCopy(inv: IInventory, index: Int, item: ItemStack): Unit = {
-      val result = if (item != null) item.copy else null
-      val current = inv.getStackInSlot(index)
-      if (!ItemStack.areItemStacksEqual(result, current)) {
-        inv.setInventorySlotContents(index, result)
+    def setCopy(inv: Container, index: Int, item: ItemStack): Unit = {
+      val result = if (item != null) item.copy else ItemStack.EMPTY
+      val current = inv.getItem(index)
+      if (!ItemStack.matches(result, current)) {
+        inv.setItem(index, result)
       }
     }
-    val size = player.inventory.mainInventory.length min player.agent.mainInventory.getSizeInventory
+    for (i <- 0 until 4) {
+      setCopy(agent.equipmentInventory(), i, player.inventory.armor.get(i))
+    }
+    val size = player.inventory.items.size min agent.mainInventory.getContainerSize
     for (i <- 0 until size) {
-      setCopy(player.agent.mainInventory, i, player.inventory.mainInventory(i))
+      setCopy(agent.mainInventory, i, player.inventory.items.get(i))
     }
   }
 }
 
-class Player(val agent: internal.Agent) extends FakePlayer(agent.world.asInstanceOf[WorldServer], Player.profileFor(agent)) {
-  playerNetServerHandler = new NetHandlerPlayServer(mcServer, new FakeNetworkManager(), this)
+class Player(val agent: internal.Agent) extends FakePlayer(agent.getEnvironmentLevel.asInstanceOf[ServerLevel], Player.profileFor(agent)) {
+  // NeoForge 1.21: FakePlayer already sets up connection internally
+  val abilities = getAbilities
 
-  capabilities.allowFlying = true
-  capabilities.disableDamage = true
-  capabilities.isFlying = true
-  onGround = true
-  yOffset = 0.5f
-  eyeHeight = 0f
-  setSize(1, 1)
+  abilities.mayfly = true
+  abilities.invulnerable = true
+  abilities.flying = true
+  setOnGround(true)
+
+  override def getDefaultDimensions(pose: Pose) = new EntityDimensions(1, 1, 1, EntityAttachments.createDefault(1, 1), true)
+  refreshDimensions()
 
   {
-    val inventory = new Inventory(agent)
-    if (Mods.BattleGear2.isAvailable) {
-      ObfuscationReflectionHelper.setPrivateValue(classOf[EntityPlayer], this, inventory, "inventory", "field_71071_by", "bm")
-    }
-    else this.inventory = inventory
-    this.inventory.player = this
-
+    this.inventory = new AgentInventory(this, agent)
     // because the inventory was just overwritten, the container is now detached
-    this.inventoryContainer = new ContainerPlayer(this.inventory, !world.isRemote, this)
-    this.openContainer = this.inventoryContainer
+    this.inventoryMenu = new InventoryMenu(inventory, !level.isClientSide, this)
+    this.containerMenu = this.inventoryMenu
+
+    // NeoForge 1.21.1: LazyOptional-based inventory capability fields removed; AgentInventory is used directly
   }
 
-  var facing, side = ForgeDirection.SOUTH
+  var facing, side = Direction.SOUTH
 
-  var customItemInUseBecauseMinecraftIsBloodyStupidAndMakesRandomMethodsClientSided: ItemStack = _
-
-  def world = agent.world
-
-  override def getPlayerCoordinates = BlockPosition(agent).toChunkCoordinates
-
-  override def getDefaultEyeHeight = 0f
-
-  override def getDisplayName = agent.name
-
-  theItemInWorldManager.setBlockReachDistance(1)
+  override def getName = Component.literal(agent.name)
 
   // ----------------------------------------------------------------------- //
 
-  def closestEntity[Type <: Entity : ClassTag](side: ForgeDirection = facing) = {
+  def closestEntity[Type <: Entity](clazz: Class[Type], side: Direction = facing): Option[Entity] = {
     val bounds = BlockPosition(agent).offset(side).bounds
-    Option(world.findNearestEntityWithinAABB(classTag[Type].runtimeClass, bounds, this)).map(_.asInstanceOf[Type])
+    val candidates = level.getEntitiesOfClass(clazz, bounds, null)
+    if (candidates.isEmpty) return None
+    Some(candidates.asScala.minBy(e => distanceToSqr(e)))
   }
 
-  def entitiesOnSide[Type <: Entity : ClassTag](side: ForgeDirection) = {
-    entitiesInBlock[Type](BlockPosition(agent).offset(side))
+  def entitiesOnSide[Type <: Entity](clazz: Class[Type], side: Direction): util.List[Type] = {
+    entitiesInBlock(clazz, BlockPosition(agent).offset(side))
   }
 
-  def entitiesInBlock[Type <: Entity : ClassTag](blockPos: BlockPosition) = {
-    world.getEntitiesWithinAABB(classTag[Type].runtimeClass, blockPos.bounds).map(_.asInstanceOf[Type])
+  def entitiesInBlock[Type <: Entity](clazz: Class[Type], blockPos: BlockPosition): util.List[Type] = {
+    level.getEntitiesOfClass(clazz, blockPos.bounds, null)
   }
 
-  private def adjacentItems = {
-    world.getEntitiesWithinAABB(classOf[EntityItem], BlockPosition(agent).bounds.expand(2, 2, 2)).map(_.asInstanceOf[EntityItem])
+  private def adjacentItems: util.List[ItemEntity] = {
+    level.getEntitiesOfClass(classOf[ItemEntity], BlockPosition(agent).bounds.inflate(2, 2, 2), null)
   }
 
-  private def collectDroppedItems(itemsBefore: Iterable[EntityItem]) {
-    val itemsAfter = adjacentItems
-    val itemsDropped = itemsAfter -- itemsBefore
+  private def collectDroppedItems(itemsBefore: Iterable[ItemEntity]): Unit = {
+    val itemsDropped = adjacentItems.asScala --= itemsBefore
     if (itemsDropped.nonEmpty) {
       for (drop <- itemsDropped) {
-        drop.delayBeforeCanPickup = 0
-        drop.onCollideWithPlayer(this)
+        drop.setDefaultPickUpDelay()
+        drop.playerTouch(this)
       }
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def attackTargetEntityWithCurrentItem(entity: Entity) {
+  override def attack(entity: Entity): Unit = {
     callUsingItemInSlot(agent.equipmentInventory, 0, stack => entity match {
-      case player: EntityPlayer if !canAttackPlayer(player) => // Avoid player damage.
+      case player: PlayerEntity if !canHarmPlayer(player) => // Avoid player damage.
       case _ =>
         val event = new RobotAttackEntityEvent.Pre(agent, entity)
-        MinecraftForge.EVENT_BUS.post(event)
+        NeoForge.EVENT_BUS.post(event)
         if (!event.isCanceled) {
-          super.attackTargetEntityWithCurrentItem(entity)
-          MinecraftForge.EVENT_BUS.post(new RobotAttackEntityEvent.Post(agent, entity))
+          super.attack(entity)
+          NeoForge.EVENT_BUS.post(new RobotAttackEntityEvent.Post(agent, entity))
         }
     })
   }
 
-  override def interactWith(entity: Entity) = {
-    val cancel = try MinecraftForge.EVENT_BUS.post(new EntityInteractEvent(this, entity)) catch {
+  override def interactOn(entity: Entity, hand: InteractionHand): InteractionResult = {
+    val cancel = try {
+      NeoForge.EVENT_BUS.post(new PlayerInteractEvent.EntityInteract(this, hand, entity))
+      true
+    } catch {
       case t: Throwable =>
         if (!t.getStackTrace.exists(_.getClassName.startsWith("mods.battlegear2."))) {
           OpenComputers.log.warn("Some event handler screwed up!", t)
         }
         false
     }
-    !cancel && callUsingItemInSlot(agent.equipmentInventory, 0, stack => {
-      val result = isItemUseAllowed(stack) && (entity.interactFirst(this) || (entity match {
-        case living: EntityLivingBase if getHeldItem != null => getHeldItem.interactWithEntity(this, living)
+    if(!cancel && callUsingItemInSlot(agent.equipmentInventory, 0, stack => {
+      val result = isItemUseAllowed(stack) && (entity.interact(this, hand).consumesAction || (entity match {
+        case living: LivingEntity if !getItemInHand(InteractionHand.MAIN_HAND).isEmpty => getItemInHand(InteractionHand.MAIN_HAND).interactLivingEntity(this, living, hand).consumesAction
         case _ => false
       }))
-      if (getHeldItem != null && getHeldItem.stackSize <= 0) {
-        destroyCurrentEquippedItem()
+      if (!getItemInHand(InteractionHand.MAIN_HAND).isEmpty) {
+        if (getItemInHand(InteractionHand.MAIN_HAND).getCount <= 0) {
+          val orig = getItemInHand(InteractionHand.MAIN_HAND)
+          this.inventory.setItem(this.inventory.selected, ItemStack.EMPTY)
+        } else {
+          // because of various hacks for IC2, we expect the in-hand result to be moved to our offhand buffer
+          this.inventory.offhand.set(0, getItemInHand(InteractionHand.MAIN_HAND))
+          this.inventory.setItem(this.inventory.selected, ItemStack.EMPTY)
+        }
       }
       result
-    })
+    })) InteractionResult.sidedSuccess(level.isClientSide) else InteractionResult.PASS
   }
 
-  def activateBlockOrUseItem(x: Int, y: Int, z: Int, side: Int, hitX: Float, hitY: Float, hitZ: Float, duration: Double): ActivationType.Value = {
+  def activateBlockOrUseItem(pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float, duration: Double): ActivationType.Value = {
     callUsingItemInSlot(agent.equipmentInventory, 0, stack => {
-      if (shouldCancel(() => ForgeEventFactory.onPlayerInteract(this, Action.RIGHT_CLICK_BLOCK, x, y, z, side, world))) {
+      if (shouldCancel(() => fireRightClickBlock(pos, side))) {
         return ActivationType.None
       }
 
-      val item = if (stack != null) stack.getItem else null
-      if (!PortalGun.isPortalGun(stack)) {
-        if (item != null && item.onItemUseFirst(stack, this, world, x, y, z, side, hitX, hitY, hitZ)) {
-          return ActivationType.ItemUsed
-        }
+      val item = if (!stack.isEmpty) stack.getItem else null
+      val state = level.getBlockState(pos)
+      val traceEndPos = new Vec3(pos.getX + hitX, pos.getY + hitY, pos.getZ + hitZ)
+      val traceCtx = if (state.isAir()) BlockHitResult.miss(traceEndPos, side, pos) else new BlockHitResult(traceEndPos, side, pos, false)
+      if (item != null && item.onItemUseFirst(stack, new UseOnContext(level, this, InteractionHand.OFF_HAND, stack, traceCtx)).consumesAction) {
+        return ActivationType.ItemUsed
       }
 
-      val block = world.getBlock(x, y, z)
-      val canActivate = block != null && Settings.get.allowActivateBlocks
-      val shouldActivate = canActivate && (!isSneaking || (item == null || item.doesSneakBypassUse(world, x, y, z, this)))
+      val canActivate = !state.isAir() && Settings.get.allowActivateBlocks
+      val shouldActivate = canActivate && (!isCrouching || (item == null || item.doesSneakBypassUse(stack, level, pos, this)))
       val result =
-        if (shouldActivate && block.onBlockActivated(world, x, y, z, this, side, hitX, hitY, hitZ))
+        if (shouldActivate && state.useItemOn(stack, level, this, InteractionHand.OFF_HAND, new BlockHitResult(new Vec3(hitX, hitY, hitZ), side, pos, false)).consumesAction)
           ActivationType.BlockActivated
-        else if (isItemUseAllowed(stack) && tryPlaceBlockWhileHandlingFunnySpecialCases(stack, x, y, z, side, hitX, hitY, hitZ))
+        else if (duration <= Double.MinPositiveValue && isItemUseAllowed(stack) && tryPlaceBlockWhileHandlingFunnySpecialCases(stack, pos, side, hitX, hitY, hitZ))
           ActivationType.ItemPlaced
-        else if (tryUseItem(stack, duration))
+        else if (useEquippedItem(duration, Option(stack)))
           ActivationType.ItemUsed
         else
           ActivationType.None
@@ -260,186 +258,191 @@ class Player(val agent: internal.Agent) extends FakePlayer(agent.world.asInstanc
     })
   }
 
-  def useEquippedItem(duration: Double) = {
-    callUsingItemInSlot(agent.equipmentInventory, 0, stack => {
-      if (!shouldCancel(() => ForgeEventFactory.onPlayerInteract(this, Action.RIGHT_CLICK_AIR, 0, 0, 0, 0, world))) {
-        tryUseItem(stack, duration)
+  override def setItemSlot(slotIn: EquipmentSlot, stack: ItemStack): Unit = {
+    var superCall: () => Unit = () => super.setItemSlot(slotIn, stack)
+    if (slotIn == EquipmentSlot.MAINHAND) {
+      agent.equipmentInventory.setItem(0, stack)
+      superCall = () => {
+        val slot = inventory.selected
+        // So, if we're not in the main inventory, selected is set to -1
+        // for compatibility with mods that try accessing the inv directly
+        // using inventory.selected. See li.cil.oc.server.agent.Inventory
+        if(inventory.selected < 0) inventory.selected = ~inventory.selected
+        super.setItemSlot(slotIn, stack)
+        inventory.selected = slot
       }
-      else false
-    })
+    } else if(slotIn == EquipmentSlot.OFFHAND) {
+      inventory.offhand.set(0, stack)
+    }
+    superCall()
   }
 
-  private def tryUseItem(stack: ItemStack, duration: Double) = {
-    clearItemInUse()
-    stack != null && stack.stackSize > 0 && isItemUseAllowed(stack) && {
-      val oldSize = stack.stackSize
-      val oldDamage = if (stack != null) stack.getItemDamage else 0
-      val oldData = if (stack.hasTagCompound) stack.getTagCompound.copy() else null
-      val heldTicks = math.max(0, math.min(stack.getMaxItemUseDuration, (duration * 20).toInt))
-      // Change the offset at which items are used, to avoid hitting
-      // the robot itself (e.g. with bows, potions, mining laser, ...).
-      val offset = facing
-      posX += offset.offsetX * 0.6
-      posY += offset.offsetY * 0.6
-      posZ += offset.offsetZ * 0.6
-      val newStack = stack.useItemRightClick(world, this)
-      if (isUsingItem) {
-        val remaining = customItemInUseBecauseMinecraftIsBloodyStupidAndMakesRandomMethodsClientSided.getMaxItemUseDuration - heldTicks
-        customItemInUseBecauseMinecraftIsBloodyStupidAndMakesRandomMethodsClientSided.onPlayerStoppedUsing(world, this, remaining)
-        clearItemInUse()
+  override def getItemBySlot(slotIn: EquipmentSlot): ItemStack = {
+    if (slotIn == EquipmentSlot.MAINHAND)
+      agent.equipmentInventory.getItem(0)
+    else if(slotIn == EquipmentSlot.OFFHAND)
+      inventory.offhand.get(0)
+    else super.getItemBySlot(slotIn)
+  }
+
+  def fireRightClickBlock(pos: BlockPos, side: Direction): PlayerInteractEvent.RightClickBlock = {
+    val hitVec = new Vec3(0.5 + side.getStepX * 0.5, 0.5 + side.getStepY * 0.5, 0.5 + side.getStepZ * 0.5)
+    val event = new PlayerInteractEvent.RightClickBlock(this, InteractionHand.OFF_HAND, pos, new BlockHitResult(hitVec, side, pos, false))
+    NeoForge.EVENT_BUS.post(event)
+    event
+  }
+
+  def fireLeftClickBlock(pos: BlockPos, side: Direction): PlayerInteractEvent.LeftClickBlock = {
+    CommonHooks.onLeftClickBlock(this, pos, side, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK)
+  }
+
+  def fireRightClickAir(): PlayerInteractEvent.RightClickItem = {
+    val event = new PlayerInteractEvent.RightClickItem(this, InteractionHand.OFF_HAND)
+    NeoForge.EVENT_BUS.post(event)
+    event
+  }
+
+  private def trySetActiveHand(duration: Double): Boolean = {
+    releaseUsingItem()
+    val entity = this
+    val durationHandler = new {
+      @SubscribeEvent(priority = EventPriority.LOWEST)
+      def onItemUseStart(startUse: LivingEntityUseItemEvent.Start): Unit = {
+        if (startUse.getEntity == entity && !startUse.isCanceled) {
+          startUse.setDuration(duration.toInt)
+        }
       }
-      posX -= offset.offsetX * 0.6
-      posY -= offset.offsetY * 0.6
-      posZ -= offset.offsetZ * 0.6
-      agent.machine.pause(heldTicks / 20.0)
-      // These are functions to avoid null pointers if newStack is null.
-      def sizeOrDamageChanged = newStack.stackSize != oldSize || newStack.getItemDamage != oldDamage
-      def tagChanged = (oldData == null && newStack.hasTagCompound) || (oldData != null && !newStack.hasTagCompound) ||
-        (oldData != null && newStack.hasTagCompound && !oldData.equals(newStack.getTagCompound))
-      val stackChanged = newStack != stack || (newStack != null && (sizeOrDamageChanged || tagChanged || PortalGun.isStandardPortalGun(stack)))
-      if (stackChanged) {
-        agent.equipmentInventory.setInventorySlotContents(0, newStack)
-      }
-      stackChanged
+    }
+    NeoForge.EVENT_BUS.register(durationHandler)
+    try {
+      startUsingItem(InteractionHand.OFF_HAND)
+      isUsingItem
+    } catch {
+        case _: Exception => false
+    } finally {
+      NeoForge.EVENT_BUS.unregister(durationHandler)
     }
   }
 
-  def placeBlock(slot: Int, x: Int, y: Int, z: Int, side: Int, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
+  def useItemWithHand(duration: Double, stack: ItemStack): Boolean = {
+    if (!trySetActiveHand(duration)) {
+      if (duration > 0) {
+        return false
+      }
+    }
+
+    val oldStack = stack.copy
+    if (!isItemUseAllowed(stack)) {
+      return false
+    }
+
+    val maxDuration = stack.getUseDuration(this)
+    val heldTicks = Math.max(0, Math.min(maxDuration, (duration * 20).toInt))
+    agent.machine.pause(heldTicks / 20.0)
+
+    // setting the active hand will also set its initial duration
+    val useItemResult = stack.use(level, this, InteractionHand.OFF_HAND)
+    releaseUsingItem()
+
+    if (!useItemResult.getResult.consumesAction) {
+      return false
+    }
+
+    val newStack = useItemResult.getObject
+    val stackChanged: Boolean =
+      !ItemStack.matches(oldStack, newStack) ||
+      !ItemStack.matches(oldStack, stack)
+
+    if (stackChanged) {
+      inventory.offhand.set(0, newStack)
+    }
+    stackChanged
+  }
+
+  def useEquippedItem(duration: Double, stackOption: Option[ItemStack] = None): Boolean = {
+    if (stackOption.isEmpty) {
+      return callUsingItemInSlot(agent.equipmentInventory, 0, {
+        case item: ItemStack if item != null => useEquippedItem(duration, Option(item))
+        case _ => false
+      })
+    }
+
+    if (shouldCancel(() => fireRightClickAir())) {
+      return false
+    }
+
+    // Change the offset at which items are used, to avoid hitting
+    // the robot itself (e.g. with bows, potions, mining laser, ...).
+    setPos(getX + facing.getStepX / 2.0, getY, getZ + facing.getStepZ / 2.0)
+
+    try {
+      useItemWithHand(duration, stackOption.get)
+    }
+    finally {
+      setPos(getX - facing.getStepX / 2.0, getY, getZ - facing.getStepZ / 2.0)
+    }
+  }
+
+  def placeBlock(slot: Int, pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
     callUsingItemInSlot(agent.mainInventory, slot, stack => {
-      if (shouldCancel(() => ForgeEventFactory.onPlayerInteract(this, Action.RIGHT_CLICK_BLOCK, x, y, z, side, world))) {
+      if (shouldCancel(() => fireRightClickBlock(pos, side))) {
         return false
       }
 
-      tryPlaceBlockWhileHandlingFunnySpecialCases(stack, x, y, z, side, hitX, hitY, hitZ)
+      tryPlaceBlockWhileHandlingFunnySpecialCases(stack, pos, side, hitX, hitY, hitZ)
     }, repair = false)
   }
 
-  def clickBlock(x: Int, y: Int, z: Int, side: Int, immediate: Boolean = false): Double = {
-    callUsingItemInSlot(agent.equipmentInventory, 0, stack => {
-      if (shouldCancel(() => ForgeEventFactory.onPlayerInteract(this, Action.LEFT_CLICK_BLOCK, x, y, z, side, world))) {
-        return 0
+  def clickBlock(pos: BlockPos, side: Direction): Double = callUsingItemInSlot(agent.equipmentInventory, 0, stack => {
+    val state = level.getBlockState(pos)
+    val block = state.getBlock
+
+    if (!state.canHarvestBlock(level, pos, this)) return 0
+
+    val hardness = state.getDestroySpeed(level, pos)
+    val cobwebOverride = block == Blocks.COBWEB && Settings.get.screwCobwebs
+
+    val strength = getDigSpeed(state, pos)
+    val breakTime =
+      if (cobwebOverride) Settings.get.swingDelay
+      else hardness * 1.5 / strength
+
+    if (breakTime.isInfinity) return 0
+    if (breakTime < 0) return breakTime
+
+    val preEvent = new RobotBreakBlockEvent.Pre(agent, level, pos, breakTime * Settings.get.harvestRatio)
+    NeoForge.EVENT_BUS.post(preEvent)
+    if (preEvent.isCanceled) return 0
+    val adjustedBreakTime = Math.max(0.05, preEvent.getBreakTime)
+
+    if (!PlayerInteractionManagerHelper.onBlockClicked(this, pos, side)) {
+      if (level.isEmptyBlock(pos)) {
+        return 1.0 / 20.0
       }
+      return 0
+    }
 
-      if (MinecraftServer.getServer.isBlockProtected(world, x, y, z, this)) {
-        return 0
-      }
+    EventHandler.scheduleServer(() => new DamageOverTime(this, pos, side, (adjustedBreakTime * 20).toInt).tick())
 
-      val block = world.getBlock(x, y, z)
-      val metadata = world.getBlockMetadata(x, y, z)
-      val mayClickBlock = block != null
-      /**
-       * block.canCollideCheck seems to be false for air, liquids, fire, and "hidden" blocks of various kinds.
-       * block.getCollisionBoundingBox is null for selectable blocks too, like signs - so it's not an option.
-       */
-      val canClickBlock = mayClickBlock &&
-        !block.isAir(world, x, y, z) &&
-        block.canCollideCheck(metadata, false);
+    adjustedBreakTime
+  })
 
-      if (!canClickBlock) {
-        return 0
-      }
-
-      val breakEvent = new BlockEvent.BreakEvent(x, y, z, world, block, metadata, this)
-      MinecraftForge.EVENT_BUS.post(breakEvent)
-      if (breakEvent.isCanceled) {
-        return 0
-      }
-
-      block.onBlockClicked(world, x, y, z, this)
-      world.extinguishFire(this, x, y, z, side)
-
-      val hardness = block.getBlockHardness(world, x, y, z)
-      val isBlockUnbreakable = hardness < 0
-      val canDestroyBlock = !isBlockUnbreakable
-      if (!canDestroyBlock) {
-        return 0
-      }
-
-      if (world.getWorldInfo.getGameType.isAdventure && !isCurrentToolAdventureModeExempt(x, y, z)) {
-        return 0
-      }
-
-      val cobwebOverride = block == Blocks.web && Settings.get.screwCobwebs
-
-      if (!ForgeHooks.canHarvestBlock(block, this, metadata) && !cobwebOverride) {
-        return 0
-      }
-
-      val strength = getBreakSpeed(block, false, metadata, x, y, z)
-      val breakTime =
-        if (cobwebOverride) Settings.get.swingDelay
-        else hardness * 1.5 / strength
-
-      if (breakTime.isInfinity) return 0
-
-      val preEvent = new RobotBreakBlockEvent.Pre(agent, world, x, y, z, breakTime * Settings.get.harvestRatio)
-      MinecraftForge.EVENT_BUS.post(preEvent)
-      if (preEvent.isCanceled) return 0
-      val adjustedBreakTime = math.max(0.05, preEvent.getBreakTime)
-
-      // Special handling for Tinkers Construct - tools like the hammers do
-      // their break logic in onBlockStartBreak but return true to cancel
-      // further processing. We also need to adjust our offset for their ray-
-      // tracing implementation.
-      val needsSpecialPlacement = ModTinkersConstruct.isInfiTool(stack) || ModMagnanimousTools.isMagTool(stack)
-      if (needsSpecialPlacement) {
-        posY -= 1.62
-        prevPosY = posY
-      }
-      val cancel = stack != null && stack.getItem.onBlockStartBreak(stack, x, y, z, this)
-      if (cancel && needsSpecialPlacement) {
-        posY += 1.62
-        prevPosY = posY
-        return adjustedBreakTime
-      }
-      if (cancel) {
-        return 0
-      }
-
-      if (!immediate) {
-        EventHandler.scheduleServer(() => new DamageOverTime(this, x, y, z, side, (adjustedBreakTime * 20).toInt).tick())
-        return adjustedBreakTime
-      }
-
-      world.destroyBlockInWorldPartially(-1, x, y, z, -1)
-
-      world.playAuxSFXAtEntity(this, 2001, x, y, z, Block.getIdFromBlock(block) + (metadata << 12))
-
-      if (stack != null) {
-        stack.func_150999_a(world, block, x, y, z, this)
-      }
-
-      block.onBlockHarvested(world, x, y, z, metadata, this)
-      if (block.removedByPlayer(world, this, x, y, z, block.canHarvestBlock(this, metadata))) {
-        block.onBlockDestroyedByPlayer(world, x, y, z, metadata)
-        // Note: the block has been destroyed by `removeBlockByPlayer`. This
-        // check only serves to test whether the block can drop anything at all.
-        if (block.canHarvestBlock(this, metadata)) {
-          block.harvestBlock(world, this, x, y, z, metadata)
-          MinecraftForge.EVENT_BUS.post(new RobotBreakBlockEvent.Post(agent, breakEvent.getExpToDrop))
-        }
-        else if (stack != null) {
-          MinecraftForge.EVENT_BUS.post(new RobotBreakBlockEvent.Post(agent, 0))
-        }
-        return adjustedBreakTime
-      }
-      0
-    })
+  private def isItemUseAllowed(stack: ItemStack) = stack.isEmpty || {
+    (Settings.get.allowUseItemsWithDuration || stack.getUseDuration(this) <= 0) && !ItemStack.isSameItem(stack, new ItemStack(Items.LEAD))
   }
 
-  private def isItemUseAllowed(stack: ItemStack) = stack == null || {
-    (Settings.get.allowUseItemsWithDuration || stack.getMaxItemUseDuration <= 0) &&
-      (!PortalGun.isPortalGun(stack) || PortalGun.isStandardPortalGun(stack)) &&
-      !stack.isItemEqual(new ItemStack(Items.lead))
-  }
-
-  override def dropPlayerItemWithRandomChoice(stack: ItemStack, inPlace: Boolean) =
-    InventoryUtils.spawnStackInWorld(BlockPosition(agent), stack, if (inPlace) None else Option(facing))
+  override def drop(stack: ItemStack, dropAround: Boolean, traceItem: Boolean): ItemEntity =
+    InventoryUtils.spawnStackInWorld(BlockPosition(agent), stack, if (dropAround) None else Option(facing))
 
   private def shouldCancel(f: () => PlayerInteractEvent) = {
     try {
       val event = f()
-      event.isCanceled || event.useBlock == Event.Result.DENY || event.useItem == Event.Result.DENY
+      (event.isInstanceOf[ICancellableEvent] && event.asInstanceOf[ICancellableEvent].isCanceled) || (event match {
+        case rightClick: PlayerInteractEvent.RightClickBlock => rightClick.getUseBlock == TriState.FALSE || rightClick.getUseItem == TriState.FALSE
+        case leftClick: PlayerInteractEvent.LeftClickBlock => leftClick.getUseBlock == TriState.FALSE || leftClick.getUseItem == TriState.FALSE
+        case rightClick: PlayerInteractEvent.RightClickItem => rightClick.getCancellationResult == InteractionResult.FAIL
+        case _ => false
+      })
     }
     catch {
       case t: Throwable =>
@@ -450,206 +453,182 @@ class Player(val agent: internal.Agent) extends FakePlayer(agent.world.asInstanc
     }
   }
 
-  private def callUsingItemInSlot[T](inventory: IInventory, slot: Int, f: (ItemStack) => T, repair: Boolean = true) = {
+  private def callUsingItemInSlot[T](inventory: Container, slot: Int, f: ItemStack => T, repair: Boolean = true) = {
     val itemsBefore = adjacentItems
-    val stack = inventory.getStackInSlot(slot)
-    val oldStack = if (stack != null) stack.copy() else null
-    this.inventory.currentItem = if (inventory == agent.mainInventory) slot else ~slot
+    val stack = inventory.getItem(slot)
+    val oldStack = stack.copy()
+    this.inventory.selected = if (inventory == agent.mainInventory) slot else ~slot
+    this.inventory.offhand.set(0, inventory.getItem(slot))
     try {
       f(stack)
     }
     finally {
-      this.inventory.currentItem = 0
-      val newStack = inventory.getStackInSlot(slot)
+      this.inventory.selected = 0
+      inventory.setItem(slot, this.inventory.offhand.get(0))
+      this.inventory.offhand.set(0, ItemStack.EMPTY)
+      val newStack = inventory.getItem(slot)
       // this is only possible if f() modified the stack object in-place
       // looking at you, ic2
-      if (ItemStack.areItemStacksEqual(oldStack, newStack) &&
-         !ItemStack.areItemStacksEqual(oldStack, stack)) {
-        inventory.setInventorySlotContents(slot, stack)
+      if (ItemStack.matches(oldStack, newStack) &&
+         !ItemStack.matches(oldStack, stack)) {
+        inventory.setItem(slot, stack)
       }
-      if (newStack != null) {
-        if (newStack.stackSize <= 0) {
-          inventory.setInventorySlotContents(slot, null)
+      if (!newStack.isEmpty) {
+        if (newStack.getCount <= 0) {
+          inventory.setItem(slot, ItemStack.EMPTY)
         }
         if (repair) {
-          if (newStack.stackSize > 0) tryRepair(newStack, oldStack)
-          else ForgeEventFactory.onPlayerDestroyItem(this, newStack)
+          if (newStack.getCount > 0) tryRepair(newStack, oldStack)
+          else inventory.setItem(slot, ItemStack.EMPTY)
         }
       }
-      collectDroppedItems(itemsBefore)
+      collectDroppedItems(itemsBefore.asScala)
     }
   }
 
-  private def tryRepair(stack: ItemStack, oldStack: ItemStack) {
+  private def tryRepair(stack: ItemStack, oldStack: ItemStack): Unit = {
     // Only if the underlying type didn't change.
-    if (stack != null && oldStack != null && stack.getItem == oldStack.getItem) {
+    if (!stack.isEmpty && !oldStack.isEmpty && stack.getItem == oldStack.getItem) {
       val damageRate = new RobotUsedToolEvent.ComputeDamageRate(agent, oldStack, stack, Settings.get.itemDamageRate)
-      MinecraftForge.EVENT_BUS.post(damageRate)
+      NeoForge.EVENT_BUS.post(damageRate)
       if (damageRate.getDamageRate < 1) {
-        MinecraftForge.EVENT_BUS.post(new RobotUsedToolEvent.ApplyDamageRate(agent, oldStack, stack, damageRate.getDamageRate))
+        NeoForge.EVENT_BUS.post(new RobotUsedToolEvent.ApplyDamageRate(agent, oldStack, stack, damageRate.getDamageRate))
       }
     }
   }
 
-  private def tryPlaceBlockWhileHandlingFunnySpecialCases(stack: ItemStack, x: Int, y: Int, z: Int, side: Int, hitX: Float, hitY: Float, hitZ: Float) = {
-    stack != null && stack.stackSize > 0 && {
-      val event = new RobotPlaceBlockEvent.Pre(agent, stack, world, x, y, z)
-      MinecraftForge.EVENT_BUS.post(event)
+  private def tryPlaceBlockWhileHandlingFunnySpecialCases(stack: ItemStack, pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float) = {
+    !stack.isEmpty && stack.getCount > 0 && {
+      val event = new RobotPlaceBlockEvent.Pre(agent, stack, level, pos)
+      NeoForge.EVENT_BUS.post(event)
       if (event.isCanceled) false
       else {
-        val fakeEyeHeight = if (rotationPitch < 0 && isSomeKindOfPiston(stack)) 1.82 else 0
-        setPosition(posX, posY - fakeEyeHeight, posZ)
-        Player.setInventoryPlayerItems(this)
-        val didPlace = stack.tryPlaceItemIntoWorld(this, world, x, y, z, side, hitX, hitY, hitZ)
-        Player.detectInventoryPlayerChanges(this)
-        setPosition(posX, posY + fakeEyeHeight, posZ)
-        if (didPlace) {
-          MinecraftForge.EVENT_BUS.post(new RobotPlaceBlockEvent.Post(agent, stack, world, x, y, z))
+        val fakeEyeHeight = if (getXRot < 0 && isSomeKindOfPiston(stack)) 1.82 else 0
+        setPos(getX, getY - fakeEyeHeight, getZ)
+        Player.setPlayerInventoryItems(this)
+        val state = level.getBlockState(pos)
+        val traceEndPos = new Vec3(pos.getX + hitX, pos.getY + hitY, pos.getZ + hitZ)
+        val traceCtx = if (state.isAir()) BlockHitResult.miss(traceEndPos, side, pos) else new BlockHitResult(traceEndPos, side, pos, false)
+        val didPlace = stack.useOn(new UseOnContext(level, this, InteractionHand.OFF_HAND, stack, traceCtx))
+        Player.detectPlayerInventoryChanges(this)
+        setPos(getX, getY + fakeEyeHeight, getZ)
+        if (didPlace.consumesAction) {
+          NeoForge.EVENT_BUS.post(new RobotPlaceBlockEvent.Post(agent, stack, level, pos))
         }
-        didPlace
+        didPlace.consumesAction
       }
     }
   }
 
   private def isSomeKindOfPiston(stack: ItemStack) =
     stack.getItem match {
-      case itemBlock: ItemBlock =>
-        val block = itemBlock.field_150939_a
-        block != null && block.isInstanceOf[BlockPistonBase]
+      case itemBlock: BlockItem =>
+        val block = itemBlock.getBlock
+        block != null && block.isInstanceOf[PistonBaseBlock]
       case _ => false
     }
 
   // ----------------------------------------------------------------------- //
 
-  override def setItemInUse(stack: ItemStack, useDuration: Int) {
-    super.setItemInUse(stack, useDuration)
-    customItemInUseBecauseMinecraftIsBloodyStupidAndMakesRandomMethodsClientSided = stack
-  }
-
-  override def clearItemInUse() {
-    super.clearItemInUse()
-    customItemInUseBecauseMinecraftIsBloodyStupidAndMakesRandomMethodsClientSided = null
-  }
-
-  override def addExhaustion(amount: Float) {
+  override def causeFoodExhaustion(amount: Float): Unit = {
     if (Settings.get.robotExhaustionCost > 0) {
       agent.machine.node match {
         case connector: Connector => connector.changeBuffer(-Settings.get.robotExhaustionCost * amount)
         case _ => // This shouldn't happen... oh well.
       }
     }
-    MinecraftForge.EVENT_BUS.post(new RobotExhaustionEvent(agent, amount))
+    NeoForge.EVENT_BUS.post(new RobotExhaustionEvent(agent, amount))
   }
 
-  override def displayGUIMerchant(merchant: IMerchant, name: String) {
-    merchant.setCustomer(null)
-  }
+  override def closeContainer(): Unit = {}
 
-  override def closeScreen() {}
+  override def swing(hand: InteractionHand): Unit = {}
 
-  override def swingItem() {}
-
-  override def canCommandSenderUseCommand(level: Int, command: String): Boolean = {
-    ("seed" == command && !mcServer.isDedicatedServer) ||
-      "tell" == command ||
-      "help" == command ||
-      "me" == command || {
-      val config = mcServer.getConfigurationManager
-      config.func_152596_g(getGameProfile) && {
-        config.func_152603_m.func_152683_b(getGameProfile) match {
-          case opEntry: UserListOpsEntry => opEntry.func_152644_a >= level
-          case _ => mcServer.getOpPermissionLevel >= level
-        }
+  override protected def getPermissionLevel: Int = {
+    val config = server.getPlayerList
+    if (config.isOp(getGameProfile)) {
+      config.getOps.get(getGameProfile) match {
+        case opEntry: ServerOpListEntry => opEntry.getLevel
+        case _ => server.getOperatorUserPermissionLevel
       }
     }
+    else 0
   }
 
-  override def canAttackPlayer(player: EntityPlayer) = Settings.get.canAttackPlayers
+  override def canHarmPlayer(player: PlayerEntity): Boolean = Settings.get.canAttackPlayers
 
   override def canEat(value: Boolean) = false
 
-  override def isPotionApplicable(effect: PotionEffect) = false
+  override def canBeAffected(effect: MobEffectInstance) = false
 
-  override def attackEntityAsMob(entity: Entity) = false
+  override def doHurtTarget(entity: Entity) = false
 
-  override def attackEntityFrom(source: DamageSource, damage: Float) = false
+  override def hurt(source: DamageSource, damage: Float) = false
 
-  override def heal(amount: Float) {}
+  override def heal(amount: Float): Unit = {}
 
-  override def setHealth(value: Float) {}
+  override def setHealth(value: Float): Unit = {}
 
-  override def setDead() = isDead = true
+  override def remove(reason: RemovalReason): Unit = super.remove(RemovalReason.KILLED)
 
-  override def onLivingUpdate() {}
+  override def aiStep(): Unit = {}
 
-  override def onItemPickup(entity: Entity, count: Int) {}
+  override def take(entity: Entity, count: Int): Unit = {}
 
-  override def setCurrentItemOrArmor(slot: Int, stack: ItemStack): Unit = {
-    if (slot == 0 && agent.equipmentInventory.getSizeInventory > 0) {
-      agent.equipmentInventory.setInventorySlotContents(slot, stack)
-    }
-    // else: armor slots, which are unsupported in agents.
-  }
+  override def setLastHurtByMob(entity: LivingEntity): Unit = {}
 
-  override def setRevengeTarget(entity: EntityLivingBase) {}
+  override def setLastHurtMob(entity: Entity): Unit = {}
 
-  override def setLastAttacker(entity: Entity) {}
+  override def startRiding(entityIn: Entity, force: Boolean): Boolean = false
 
-  override def mountEntity(entity: Entity) {}
+  override def startSleepInBed(bedLocation: BlockPos) = Either.left[BedStatus, net.minecraft.util.Unit](BedStatus.OTHER_PROBLEM)
 
-  override def sleepInBedAt(x: Int, y: Int, z: Int) = EnumStatus.OTHER_PROBLEM
+  override def sendSystemMessage(message: Component): Unit = {}
 
-  override def addChatMessage(message: IChatComponent) {}
+  override def openCommandBlock(commandBlock: CommandBlockEntity): Unit = {}
 
-  override def displayGUIWorkbench(x: Int, y: Int, z: Int) {}
+  override def sendMerchantOffers(containerId: Int, offers: MerchantOffers, villagerLevel: Int, villagerXP: Int, showProgress: Boolean, canRestock: Boolean): Unit = {}
 
-  override def displayGUIEnchantment(x: Int, y: Int, z: Int, idk: String) {}
+  override def openMenu(guiOwner: MenuProvider) = util.OptionalInt.empty
 
-  override def displayGUIAnvil(x: Int, y: Int, z: Int) {}
+  override def openMinecartCommandBlock(thing: BaseCommandBlock): Unit = {}
 
-  override def displayGUIChest(inventory: IInventory) {}
-
-  override def displayGUIHopperMinecart(cart: EntityMinecartHopper) {}
-
-  override def displayGUIHorse(horse: EntityHorse, inventory: IInventory) {}
-
-  override def func_146104_a(tileEntity: TileEntityBeacon) {}
-
-  override def func_146098_a(tileEntity: TileEntityBrewingStand) {}
-
-  override def func_146102_a(tileEntity: TileEntityDispenser) {}
-
-  override def func_146101_a(tileEntity: TileEntityFurnace) {}
-
-  override def func_146093_a(tileEntity: TileEntityHopper) {}
+  override def openTextEdit(signTile: SignBlockEntity, isFront: Boolean): Unit = {}
 
   // ----------------------------------------------------------------------- //
 
-  class DamageOverTime(val player: Player, val x: Int, val y: Int, val z: Int, val side: Int, val ticksTotal: Int) {
-    val world = player.world
+  class DamageOverTime(val player: Player, val pos: BlockPos, val side: Direction, val ticksTotal: Int) {
+    val level: Level = player.level
     var ticks = 0
     var lastDamageSent = 0
 
     def tick(): Unit = {
       // Cancel if the agent stopped or our action is invalidated some other way.
-      if (world != player.world || !world.blockExists(x, y, z) || world.isAirBlock(x, y, z) || !player.agent.machine.isRunning) {
-        world.destroyBlockInWorldPartially(-1, x, y, z, -1)
+      if (level != player.level || !level.isLoaded(pos) || level.isEmptyBlock(pos) || !player.agent.machine.isRunning) {
+        player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, side, player.level.getMaxBuildHeight, 0)
         return
       }
 
-      val damage = 10 * ticks / math.max(ticksTotal, 1)
-      if (damage >= 10) {
-        player.clickBlock(x, y, z, side, immediate = true)
-      }
-      else {
+      val damage = 10 * ticks / Math.max(ticksTotal, 1)
+      if (damage < 10) {
         ticks += 1
         if (damage != lastDamageSent) {
           lastDamageSent = damage
-          world.destroyBlockInWorldPartially(-1, x, y, z, damage)
+          if (!PlayerInteractionManagerHelper.updateBlockRemoving(player))
+            return
         }
         EventHandler.scheduleServer(() => tick())
       }
+      else {
+        callUsingItemInSlot(player.agent.equipmentInventory(), 0, _ => {
+          this.player.setPos(this.player.getX - side.getStepX / 2.0, this.player.getY, this.player.getZ - side.getStepZ / 2.0)
+          val expGained: Int = PlayerInteractionManagerHelper.blockRemoving(player, pos)
+          this.player.setPos(this.player.getX + side.getStepX / 2.0, this.player.getY, this.player.getZ + side.getStepZ / 2.0)
+          if (expGained >= 0) {
+            NeoForge.EVENT_BUS.post(new RobotBreakBlockEvent.Post(agent, expGained))
+          }
+        })
+      }
     }
   }
-
 }

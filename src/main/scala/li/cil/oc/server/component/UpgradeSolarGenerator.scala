@@ -11,13 +11,15 @@ import li.cil.oc.api.driver.DeviceInfo
 import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.util.BlockPosition
-import net.minecraft.world.biome.BiomeGenDesert
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.core.Direction
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
+import net.minecraft.world.level.Level
+import net.minecraft.world.level.biome.Biome.Precipitation
 
-class UpgradeSolarGenerator(val host: EnvironmentHost) extends prefab.ManagedEnvironment with DeviceInfo {
+class UpgradeSolarGenerator(val host: EnvironmentHost) extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withConnector().
     create()
@@ -39,7 +41,7 @@ class UpgradeSolarGenerator(val host: EnvironmentHost) extends prefab.ManagedEnv
 
   override val canUpdate = true
 
-  override def update() {
+  override def update(): Unit = {
     super.update()
 
     ticksUntilCheck -= 1
@@ -53,10 +55,10 @@ class UpgradeSolarGenerator(val host: EnvironmentHost) extends prefab.ManagedEnv
   }
 
   private def isSunVisible = {
-    val blockPos = BlockPosition(host).offset(ForgeDirection.UP)
-    host.world.isDaytime &&
-      (!host.world.provider.hasNoSky) &&
-      host.world.canBlockSeeTheSky(blockPos.x, blockPos.y, blockPos.z) &&
-      (host.world.getWorldChunkManager.getBiomeGenAt(blockPos.x, blockPos.z).isInstanceOf[BiomeGenDesert] || (!host.world.isRaining && !host.world.isThundering))
+    val blockPos = BlockPosition(host).offset(Direction.UP)
+    host.getEnvironmentLevel.isDay &&
+      (host.getEnvironmentLevel.dimension != Level.NETHER) &&
+      host.getEnvironmentLevel.canSeeSkyFromBelowWater(blockPos.toBlockPos) &&
+      (host.getEnvironmentLevel.getBiome(blockPos.toBlockPos).value.getPrecipitationAt(blockPos.toBlockPos) == Precipitation.NONE || (!host.getEnvironmentLevel.isRaining && !host.getEnvironmentLevel.isThundering))
   }
 }

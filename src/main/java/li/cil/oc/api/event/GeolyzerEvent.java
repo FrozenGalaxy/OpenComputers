@@ -1,8 +1,9 @@
 package li.cil.oc.api.event;
 
-import cpw.mods.fml.common.eventhandler.Cancelable;
-import cpw.mods.fml.common.eventhandler.Event;
 import li.cil.oc.api.network.EnvironmentHost;
+import net.minecraft.core.BlockPos;
+import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.ICancellableEvent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,8 +14,7 @@ import java.util.Map;
  * When cancelling this event, the respective method will bail and report
  * that the operation failed.
  */
-@Cancelable
-public abstract class GeolyzerEvent extends Event {
+public abstract class GeolyzerEvent extends Event implements ICancellableEvent {
     /**
      * The container of the geolyzer component. This can either be the
      * geolyzer block, or something with the geolyzer upgrade (a robot).
@@ -39,7 +39,7 @@ public abstract class GeolyzerEvent extends Event {
      * The bounds are guaranteed to not define a volume larger than 64.
      * Resulting data should be written to the {@link #data} array such that
      * <code>index = x + z*w + y*w*d</code>, with <code>w = maxX - minX</code>
-     * and <code>d = maxZ - minZ</code> (<tt>h</tt> meaning height, <tt>d</tt>
+     * and <code>d = maxZ - minZ</code> ({@code h} meaning height, {@code d}
      * meaning depth).
      */
     public static class Scan extends GeolyzerEvent {
@@ -102,18 +102,16 @@ public abstract class GeolyzerEvent extends Event {
          * <br>
          * Note: get the world via the host if you need it.
          */
-        public final int x, y, z;
+        public final BlockPos pos;
 
         /**
          * The retrieved data for the block being scanned.
          */
         public final Map<String, Object> data = new HashMap<String, Object>();
 
-        public Analyze(EnvironmentHost host, Map<?, ?> options, int x, int y, int z) {
+        public Analyze(EnvironmentHost host, Map<?, ?> options, BlockPos pos) {
             super(host, options);
-            this.x = x;
-            this.y = y;
-            this.z = z;
+            this.pos = pos;
         }
     }
 }

@@ -12,7 +12,6 @@ import javax.crypto.KeyAgreement
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-
 import com.google.common.hash.Hashing
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
@@ -24,13 +23,16 @@ import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.io.output.ByteArrayOutputStream
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
 
-abstract class DataCard extends prefab.ManagedEnvironment with DeviceInfo {
+abstract class DataCard extends prefab.AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Neighbors).
     withComponent("data", Visibility.Neighbors).
     withConnector().
@@ -324,15 +326,15 @@ object DataCard {
 
     // ----------------------------------------------------------------------- //
 
-    override def load(nbt: NBTTagCompound): Unit = {
+    override def loadData(holder: DataComponentHolder, nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
       val keyType = nbt.getString("Type")
       val data = nbt.getByteArray("Data")
       value = ECUserdata.deserializeKey(keyType, data)
     }
 
-    override def save(nbt: NBTTagCompound): Unit = {
-      nbt.setString("Type", keyType)
-      nbt.setByteArray("Data", value.getEncoded)
+    override def saveData(holder: MutableDataComponentHolder, nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+      nbt.putString("Type", keyType)
+      nbt.putByteArray("Data", value.getEncoded)
     }
   }
 

@@ -1,3 +1,7 @@
 package li.cil.oc.common.item
 
-class UpgradeInventoryController(val parent: Delegator) extends traits.Delegate with traits.ItemTier
+import net.neoforged.neoforge.common.extensions.IItemExtension
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+
+class UpgradeInventoryController(props: Properties) extends Item(props) with traits.SimpleItem with traits.ItemTier with IItemExtension

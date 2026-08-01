@@ -1,4 +1,5 @@
 Copyright (c) 2013-2015 Florian "Sangar" Nücke
+Copyright (c) 2026 akki697222
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +22,7 @@ THE SOFTWARE.
 -------------------------------------------------------------------------------
 
 All images / textures and localization strings (resources) are put in the
-public domain, unless explicitly excluded below. More specicially, see CC0 1.0
+public domain, unless explicitly excluded below. More specifically, see CC0 1.0
 Universal:
 
         http://creativecommons.org/publicdomain/zero/1.0/
@@ -29,6 +30,7 @@ Universal:
 Contributions:
   PixelToast - Capacitor textures.
   asie - Disk drive inject/eject and floppy disk access sound samples.
+  crococrystal - Tier 4 Component/Block textures.
 
 Thanks a lot!
 
@@ -44,3 +46,5 @@ viznut, and was further expanded by asie. For more information, please see:
 Assets from other sources:
   HDD access samples based on this sample from freesound.org:
     https://www.freesound.org/people/artykris/sounds/117401/
+  OpenScreens display block portions:
+    copyright (c) 2019 its_meow, MIT License, see LICENSES/OpenScreens.txt.

@@ -1,17 +1,6 @@
 package li.cil.oc.common.block
 
-import net.minecraft.block.material.Material
+import net.minecraft.world.level.block.state.BlockBehaviour.{Properties => Properties}
 
-class FakeEndstone extends SimpleBlock(Material.rock) {
-  setHardness(3)
-  setResistance(15)
-
-  override protected def customTextures = Array(
-    Some("minecraft:end_stone"),
-    Some("minecraft:end_stone"),
-    Some("minecraft:end_stone"),
-    Some("minecraft:end_stone"),
-    Some("minecraft:end_stone"),
-    Some("minecraft:end_stone")
-  )
+class FakeEndstone(props: Properties) extends SimpleBlock(props) {
 }

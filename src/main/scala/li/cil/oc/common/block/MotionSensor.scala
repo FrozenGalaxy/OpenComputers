@@ -1,21 +1,16 @@
 package li.cil.oc.common.block
 
-import li.cil.oc.common.tileentity
-import net.minecraft.world.World
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.blockentity.BlockEntityTypes
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.entity.{BlockEntity, BlockEntityType}
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.{BlockGetter => IBlockReader}
+import net.minecraft.world.level.{Level => World}
+import net.minecraft.world.level.block.state.BlockState
 
-class MotionSensor extends SimpleBlock {
-  override protected def customTextures = Array(
-    Some("MotionSensorTop"),
-    Some("MotionSensorTop"),
-    Some("MotionSensorSide"),
-    Some("MotionSensorSide"),
-    Some("MotionSensorSide"),
-    Some("MotionSensorSide")
-  )
+class MotionSensor(props: Properties) extends SimpleBlock(props) with traits.Tickable {
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.MotionSensor(pos, state)
 
-  // ----------------------------------------------------------------------- //
-
-  override def hasTileEntity(metadata: Int) = true
-
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.MotionSensor()
+  override def getBlockEntityType: BlockEntityType[_ <: BlockEntity] = BlockEntityTypes.MOTION_SENSOR.get()
 }

@@ -2,16 +2,36 @@ package li.cil.oc.util
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.StandardCharsets
-import scala.collection.mutable.BitSet
-
 import li.cil.oc.OpenComputers
 
+import scala.collection.mutable
+
 object FontUtils {
-  private val defined_double_wide: BitSet = BitSet()
+  private val defined_double_wide: mutable.BitSet = mutable.BitSet()
+  private val defined_zero_width: mutable.BitSet = mutable.BitSet()
 
   // theoretical Unicode maximum
   val codepoint_limit: Int = 0x110000
-  def wcwidth(charCode: Int): Int = if (defined_double_wide(charCode)) 2 else 1
+  def wcwidth(charCode: Int): Int = {
+    if (defined_zero_width(charCode)) 0
+    else if (defined_double_wide(charCode)) 2
+    else 1
+  }
+
+  def wtrunc(value: String, count: Long): String = {
+    if (count <= 0) return ""
+
+    var width = 0
+    var end = 0
+    while (end < value.length) {
+      val next = value.offsetByCodePoints(end, 1)
+      val nextWidth = width + wcwidth(value.codePointAt(end))
+      if (nextWidth >= count) return value.substring(0, end)
+      width = nextWidth
+      end = next
+    }
+    value
+  }
 
   {
     /**
@@ -224,8 +244,11 @@ object FontUtils {
       OpenComputers.log.info("Initializing font glyph width cache...")
       val time = System.currentTimeMillis()
       for (i <- 0 until codepoint_limit) {
-        if (c_wcwidth(i) == 2)
-          defined_double_wide += i
+        c_wcwidth(i) match {
+          case 0 => defined_zero_width += i
+          case 2 => defined_double_wide += i
+          case _ =>
+        }
       }
       OpenComputers.log.info("Initialized font glyph width cache in " + (System.currentTimeMillis() - time) + " milliseconds.")
     }

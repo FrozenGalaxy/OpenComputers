@@ -2,19 +2,28 @@ package li.cil.oc.common.item
 
 import li.cil.oc.Localization
 import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.ExtendedWorld._
-import net.minecraft.block.Block
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
+import li.cil.oc.util.ExtendedLevel._
+import net.minecraft.world.level.block.Block
+import net.minecraft.client.Minecraft
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.minecraft.core.Direction
+import net.minecraft.world.entity.player.Player
+import net.minecraft.Util
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class TexturePicker(val parent: Delegator) extends traits.Delegate {
-  override def onItemUse(stack: ItemStack, player: EntityPlayer, position: BlockPosition, side: Int, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
-    player.getEntityWorld.getBlock(position) match {
+class TexturePicker(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
+  override def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
+    player.level.getBlock(position) match {
       case block: Block =>
-        if (player.getEntityWorld.isRemote) {
-          val icon = block.getIcon(player.getEntityWorld, position.x, position.y, position.z, side)
-          if (icon != null) {
-            player.addChatMessage(Localization.Chat.TextureName(icon.getIconName))
+        if (player.level.isClientSide) {
+          val pos = position.toBlockPos
+          val model = Minecraft.getInstance.getBlockRenderer.getBlockModel(player.level.getBlockState(pos))
+          val be = player.level.getBlockEntity(pos)
+          val particle = if (model != null) model.getParticleIcon(be.getModelData) else null
+          if (particle != null && particle.contents.name != null) {
+            player.sendSystemMessage(Localization.Chat.TextureName(particle.contents.name.toString))
           }
         }
         true

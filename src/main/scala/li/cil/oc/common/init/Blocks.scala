@@ -1,93 +1,88 @@
 package li.cil.oc.common.init
 
-import cpw.mods.fml.common.registry.GameRegistry
 import li.cil.oc.Constants
+import li.cil.oc.CreativeTab
 import li.cil.oc.Settings
 import li.cil.oc.common.Tier
 import li.cil.oc.common.block._
-import li.cil.oc.common.recipe.Recipes
-import li.cil.oc.common.tileentity
+import li.cil.oc.util.{Rarity => OCRarity}
+import net.minecraft.world.item.Rarity
+import net.minecraft.world.item.Item
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.material.MapColor
+import net.neoforged.bus.api.IEventBus
+import net.neoforged.neoforge.registries.DeferredRegister
+import net.minecraft.core.registries.Registries
 
 object Blocks {
-  def init() {
-    GameRegistry.registerTileEntity(classOf[tileentity.AccessPoint], Settings.namespace + "access_point")
-    GameRegistry.registerTileEntity(classOf[tileentity.Adapter], Settings.namespace + "adapter")
-    GameRegistry.registerTileEntityWithAlternatives(classOf[tileentity.Assembler], Settings.namespace + "assembler", Settings.namespace + "robotAssembler")
-    GameRegistry.registerTileEntity(classOf[tileentity.Cable], Settings.namespace + "cable")
-    GameRegistry.registerTileEntity(classOf[tileentity.Capacitor], Settings.namespace + "capacitor")
-    GameRegistry.registerTileEntity(classOf[tileentity.CarpetedCapacitor], Settings.namespace + "carpetedCapacitor")
-    GameRegistry.registerTileEntity(classOf[tileentity.Case], Settings.namespace + "case")
-    GameRegistry.registerTileEntity(classOf[tileentity.Charger], Settings.namespace + "charger")
-    GameRegistry.registerTileEntity(classOf[tileentity.DiskDrive], Settings.namespace + "disk_drive")
-    GameRegistry.registerTileEntity(classOf[tileentity.Disassembler], Settings.namespace + "disassembler")
-    GameRegistry.registerTileEntity(classOf[tileentity.Keyboard], Settings.namespace + "keyboard")
-    GameRegistry.registerTileEntity(classOf[tileentity.Hologram], Settings.namespace + "hologram")
-    GameRegistry.registerTileEntity(classOf[tileentity.Geolyzer], Settings.namespace + "geolyzer")
-    GameRegistry.registerTileEntity(classOf[tileentity.Microcontroller], Settings.namespace + "microcontroller")
-    GameRegistry.registerTileEntity(classOf[tileentity.MotionSensor], Settings.namespace + "motion_sensor")
-    GameRegistry.registerTileEntity(classOf[tileentity.NetSplitter], Settings.namespace + "netSplitter")
-    GameRegistry.registerTileEntity(classOf[tileentity.PowerConverter], Settings.namespace + "power_converter")
-    GameRegistry.registerTileEntity(classOf[tileentity.PowerDistributor], Settings.namespace + "power_distributor")
-    GameRegistry.registerTileEntity(classOf[tileentity.Print], Settings.namespace + "print")
-    GameRegistry.registerTileEntity(classOf[tileentity.Printer], Settings.namespace + "printer")
-    GameRegistry.registerTileEntity(classOf[tileentity.Raid], Settings.namespace + "raid")
-    GameRegistry.registerTileEntity(classOf[tileentity.Redstone], Settings.namespace + "redstone")
-    GameRegistry.registerTileEntity(classOf[tileentity.Relay], Settings.namespace + "relay")
-    GameRegistry.registerTileEntity(classOf[tileentity.RobotProxy], Settings.namespace + "robot")
-    GameRegistry.registerTileEntity(classOf[tileentity.Switch], Settings.namespace + "switch")
-    GameRegistry.registerTileEntity(classOf[tileentity.Screen], Settings.namespace + "screen")
-    GameRegistry.registerTileEntityWithAlternatives(classOf[tileentity.Rack], Settings.namespace + "rack", Settings.namespace + "serverRack")
-    GameRegistry.registerTileEntity(classOf[tileentity.Transposer], Settings.namespace + "transposer")
-    GameRegistry.registerTileEntity(classOf[tileentity.Waypoint], Settings.namespace + "waypoint")
+  val BLOCKS: DeferredRegister[Block] = DeferredRegister.create(Registries.BLOCK, Settings.resourceDomain)
 
-    Items.registerBlock(new AccessPoint(), Constants.BlockName.AccessPoint)
-    Recipes.addBlock(new Adapter(), Constants.BlockName.Adapter, "oc:adapter")
-    Recipes.addBlock(new Assembler(), Constants.BlockName.Assembler, "oc:assembler")
-    Recipes.addBlock(new Cable(), Constants.BlockName.Cable, "oc:cable")
-    Recipes.addBlock(new Capacitor(), Constants.BlockName.Capacitor, "oc:capacitor")
-    Recipes.addBlock(new Case(Tier.One), Constants.BlockName.CaseTier1, "oc:case1")
-    Recipes.addBlock(new Case(Tier.Three), Constants.BlockName.CaseTier3, "oc:case3")
-    Recipes.addBlock(new Case(Tier.Two), Constants.BlockName.CaseTier2, "oc:case2")
-    Recipes.addBlock(new Charger(), Constants.BlockName.Charger, "oc:charger")
-    Recipes.addBlock(new Disassembler(), Constants.BlockName.Disassembler, "oc:disassembler")
-    Recipes.addBlock(new DiskDrive(), Constants.BlockName.DiskDrive, "oc:diskDrive")
-    Recipes.addBlock(new Geolyzer(), Constants.BlockName.Geolyzer, "oc:geolyzer")
-    Recipes.addBlock(new Hologram(Tier.One), Constants.BlockName.HologramTier1, "oc:hologram1")
-    Recipes.addBlock(new Hologram(Tier.Two), Constants.BlockName.HologramTier2, "oc:hologram2")
-    Recipes.addBlock(new Keyboard(), Constants.BlockName.Keyboard, "oc:keyboard")
-    Recipes.addBlock(new MotionSensor(), Constants.BlockName.MotionSensor, "oc:motionSensor")
-    Recipes.addBlock(new PowerConverter(), Constants.BlockName.PowerConverter, "oc:powerConverter")
-    Recipes.addBlock(new PowerDistributor(), Constants.BlockName.PowerDistributor, "oc:powerDistributor")
-    Recipes.addBlock(new Raid(), Constants.BlockName.Raid, "oc:raid")
-    Recipes.addBlock(new Redstone(), Constants.BlockName.Redstone, "oc:redstone")
-    Recipes.addBlock(new Relay(), Constants.BlockName.Relay, "oc:relay")
-    Recipes.addBlock(new Screen(Tier.One), Constants.BlockName.ScreenTier1, "oc:screen1")
-    Recipes.addBlock(new Screen(Tier.Three), Constants.BlockName.ScreenTier3, "oc:screen3")
-    Recipes.addBlock(new Screen(Tier.Two), Constants.BlockName.ScreenTier2, "oc:screen2")
-    Recipes.addBlock(new Rack(), Constants.BlockName.Rack, "oc:rack", "oc:serverRack")
-    Items.registerBlock(new Switch(), Constants.BlockName.Switch)
+  def init(bus: IEventBus): Unit = {
+    def defaultProps = Properties.of().mapColor(MapColor.METAL).strength(2, 5)
+    def defaultItemProps = new Item.Properties()
 
-    Items.registerBlock(new Case(Tier.Four), Constants.BlockName.CaseCreative)
-    Items.registerBlock(new Microcontroller(), Constants.BlockName.Microcontroller)
-    Items.registerBlock(new RobotAfterimage(), Constants.BlockName.RobotAfterimage)
-    Items.registerBlock(new RobotProxy(), Constants.BlockName.Robot)
+    BLOCKS.register(Constants.BlockName.Adapter,           () => Items.registerBlock(new Adapter(defaultProps), Constants.BlockName.Adapter, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Assembler,         () => Items.registerBlock(new Assembler(defaultProps), Constants.BlockName.Assembler, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Cable,             () => Items.registerBlock(new Cable(defaultProps), Constants.BlockName.Cable, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Capacitor,         () => Items.registerBlock(new Capacitor(defaultProps), Constants.BlockName.Capacitor, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.CaseTier1,         () => Items.registerBlock(new Case(defaultProps, Tier.One), Constants.BlockName.CaseTier1, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.CaseTier2,         () => Items.registerBlock(new Case(defaultProps, Tier.Two), Constants.BlockName.CaseTier2, defaultItemProps.rarity(Rarity.UNCOMMON)))
+    BLOCKS.register(Constants.BlockName.CaseTier3,         () => Items.registerBlock(new Case(defaultProps, Tier.Three), Constants.BlockName.CaseTier3, defaultItemProps.rarity(Rarity.RARE)))
+    BLOCKS.register(Constants.BlockName.CaseTier4,         () => Items.registerBlock(new Case(defaultProps, Tier.Four), Constants.BlockName.CaseTier4, defaultItemProps.rarity(OCRarity.LEGENDARY)))
+    BLOCKS.register(Constants.BlockName.ChameliumBlock,    () => Items.registerBlock(new ChameliumBlock(Properties.of().mapColor(MapColor.STONE).strength(2, 5)), Constants.BlockName.ChameliumBlock, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Charger,           () => Items.registerBlock(new Charger(defaultProps), Constants.BlockName.Charger, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Disassembler,      () => Items.registerBlock(new Disassembler(defaultProps), Constants.BlockName.Disassembler, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.DiskDrive,         () => Items.registerBlock(new DiskDrive(defaultProps), Constants.BlockName.DiskDrive, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Geolyzer,          () => Items.registerBlock(new Geolyzer(defaultProps), Constants.BlockName.Geolyzer, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.HologramTier1,     () => Items.registerBlock(new Hologram(defaultProps, Tier.One), Constants.BlockName.HologramTier1, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.HologramTier2,     () => Items.registerBlock(new Hologram(defaultProps, Tier.Two), Constants.BlockName.HologramTier2, defaultItemProps.rarity(Rarity.UNCOMMON)))
+    BLOCKS.register(Constants.BlockName.HologramTier3,     () => Items.registerBlock(new Hologram(defaultProps, Tier.Three), Constants.BlockName.HologramTier3, defaultItemProps.rarity(Rarity.RARE)))
+    BLOCKS.register(Constants.BlockName.HoloScreenTier1,   () => Items.registerBlock(new HoloScreen(defaultProps.noOcclusion, Tier.One), Constants.BlockName.HoloScreenTier1, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.HoloScreenTier2,   () => Items.registerBlock(new HoloScreen(defaultProps.noOcclusion, Tier.Two), Constants.BlockName.HoloScreenTier2, defaultItemProps.rarity(Rarity.UNCOMMON)))
+    BLOCKS.register(Constants.BlockName.HoloScreenTier3,   () => Items.registerBlock(new HoloScreen(defaultProps.noOcclusion, Tier.Three), Constants.BlockName.HoloScreenTier3, defaultItemProps.rarity(Rarity.RARE)))
+    BLOCKS.register(Constants.BlockName.HoloScreenTier4,   () => Items.registerBlock(new HoloScreen(defaultProps.noOcclusion, Tier.Four), Constants.BlockName.HoloScreenTier4, defaultItemProps.rarity(OCRarity.LEGENDARY)))
+    BLOCKS.register(Constants.BlockName.Keyboard,          () => Items.registerBlock(new Keyboard(Properties.of().mapColor(MapColor.STONE).strength(2, 5).noOcclusion), Constants.BlockName.Keyboard, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.MotionSensor,      () => Items.registerBlock(new MotionSensor(defaultProps), Constants.BlockName.MotionSensor, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.PowerConverter,    () => Items.registerBlock(new PowerConverter(defaultProps), Constants.BlockName.PowerConverter, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.PowerDistributor,  () => Items.registerBlock(new PowerDistributor(defaultProps), Constants.BlockName.PowerDistributor, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Printer,           () => Items.registerBlock(new Printer(defaultProps), Constants.BlockName.Printer, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Raid,              () => Items.registerBlock(new Raid(defaultProps), Constants.BlockName.Raid, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Redstone,          () => Items.registerBlock(new Redstone(defaultProps), Constants.BlockName.Redstone, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Relay,             () => Items.registerBlock(new Relay(defaultProps), Constants.BlockName.Relay, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.ScreenTier1,       () => Items.registerBlock(new Screen(defaultProps, Tier.One), Constants.BlockName.ScreenTier1, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.ScreenTier2,       () => Items.registerBlock(new Screen(defaultProps, Tier.Two), Constants.BlockName.ScreenTier2, defaultItemProps.rarity(Rarity.UNCOMMON)))
+    BLOCKS.register(Constants.BlockName.ScreenTier3,       () => Items.registerBlock(new Screen(defaultProps, Tier.Three), Constants.BlockName.ScreenTier3, defaultItemProps.rarity(Rarity.RARE)))
+    BLOCKS.register(Constants.BlockName.ScreenTier4,       () => Items.registerBlock(new Screen(defaultProps, Tier.Four), Constants.BlockName.ScreenTier4, defaultItemProps.rarity(OCRarity.LEGENDARY)))
+    BLOCKS.register(Constants.BlockName.FlatScreenBackTier1, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.One, true), Constants.BlockName.FlatScreenBackTier1, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.FlatScreenBackTier2, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.Two, true), Constants.BlockName.FlatScreenBackTier2, defaultItemProps.rarity(Rarity.UNCOMMON)))
+    BLOCKS.register(Constants.BlockName.FlatScreenBackTier3, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.Three, true), Constants.BlockName.FlatScreenBackTier3, defaultItemProps.rarity(Rarity.RARE)))
+    BLOCKS.register(Constants.BlockName.FlatScreenBackTier4, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.Four, true), Constants.BlockName.FlatScreenBackTier4, defaultItemProps.rarity(OCRarity.LEGENDARY)))
+    BLOCKS.register(Constants.BlockName.FlatScreenFrontTier1, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.One, false), Constants.BlockName.FlatScreenFrontTier1, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.FlatScreenFrontTier2, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.Two, false), Constants.BlockName.FlatScreenFrontTier2, defaultItemProps.rarity(Rarity.UNCOMMON)))
+    BLOCKS.register(Constants.BlockName.FlatScreenFrontTier3, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.Three, false), Constants.BlockName.FlatScreenFrontTier3, defaultItemProps.rarity(Rarity.RARE)))
+    BLOCKS.register(Constants.BlockName.FlatScreenFrontTier4, () => Items.registerBlock(new FlatScreen(defaultProps.noOcclusion, Tier.Four, false), Constants.BlockName.FlatScreenFrontTier4, defaultItemProps.rarity(OCRarity.LEGENDARY)))
+    BLOCKS.register(Constants.BlockName.Rack,              () => Items.registerBlock(new Rack(defaultProps), Constants.BlockName.Rack, defaultItemProps))
+    BLOCKS.register(Constants.BlockName.Waypoint,          () => Items.registerBlock(new Waypoint(defaultProps), Constants.BlockName.Waypoint, defaultItemProps))
 
-    // v1.5.4
-    Items.registerBlock(new Print(), "print")
-    Recipes.addBlock(new Printer(), "printer", "oc:printer")
-    Recipes.addBlock(new ChameliumBlock(), "chameliumBlock", "oc:chameliumBlock")
-    Recipes.addBlock(new Waypoint(), Constants.BlockName.Waypoint, "oc:waypoint")
+    BLOCKS.register(Constants.BlockName.CaseCreative,      () => Items.registerBlock(new Case(defaultProps, Tier.Five), Constants.BlockName.CaseCreative, defaultItemProps.rarity(Rarity.EPIC)))
+    BLOCKS.register(Constants.BlockName.Microcontroller,   () => Items.registerBlock(new Microcontroller(defaultProps), Constants.BlockName.Microcontroller, new Item.Properties()))
+    BLOCKS.register(Constants.BlockName.Print,             () => Items.registerBlock(new Print(Properties.of().mapColor(MapColor.METAL).strength(1, 5).noOcclusion.dynamicShape), Constants.BlockName.Print, new Item.Properties()))
+    BLOCKS.register(Constants.BlockName.RobotAfterimage,   () => Items.registerBlockOnly(new RobotAfterimage(Properties.of().mapColor(MapColor.NONE).noCollission.instabreak.noOcclusion.dynamicShape), Constants.BlockName.RobotAfterimage))
+    BLOCKS.register(Constants.BlockName.Robot,             () => Items.registerBlock(new RobotProxy(defaultProps.noOcclusion.dynamicShape), Constants.BlockName.Robot, new Item.Properties()))
 
     // v1.5.10
-    Recipes.addBlock(new FakeEndstone(), Constants.BlockName.Endstone, "oc:stoneEndstone")
+    BLOCKS.register(Constants.BlockName.Endstone,          () => Items.registerBlock(new FakeEndstone(Properties.of().mapColor(MapColor.STONE).strength(3, 15)), Constants.BlockName.Endstone, defaultItemProps))
 
     // v1.5.14
-    Recipes.addBlock(new NetSplitter(), Constants.BlockName.NetSplitter, "oc:netSplitter")
+    BLOCKS.register(Constants.BlockName.NetSplitter,       () => Items.registerBlock(new NetSplitter(defaultProps), Constants.BlockName.NetSplitter, defaultItemProps))
 
     // v1.5.16
-    Recipes.addBlock(new Transposer(), Constants.BlockName.Transposer, "oc:transposer")
+    BLOCKS.register(Constants.BlockName.Transposer,        () => Items.registerBlock(new Transposer(defaultProps), Constants.BlockName.Transposer, defaultItemProps))
 
     // v1.7.2
-    Recipes.addBlock(new CarpetedCapacitor(), Constants.BlockName.CarpetedCapacitor, "oc:carpetedCapacitor")
+    BLOCKS.register(Constants.BlockName.CarpetedCapacitor, () => Items.registerBlock(new CarpetedCapacitor(defaultProps), Constants.BlockName.CarpetedCapacitor, defaultItemProps))
+
+    BLOCKS.register(bus)
   }
 }

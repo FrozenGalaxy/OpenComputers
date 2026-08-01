@@ -1,34 +1,34 @@
 package li.cil.oc.server.component
 
 import java.util
-
-import cpw.mods.fml.common.eventhandler.Event
 import li.cil.oc.Constants
-import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
-import li.cil.oc.api.driver.DeviceInfo.DeviceClass
 import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.driver.DeviceInfo
+import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
+import li.cil.oc.api.driver.DeviceInfo.DeviceClass
 import li.cil.oc.api.event.SignChangeEvent
-import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.internal
+import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.network.Message
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.ExtendedWorld._
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.tileentity.TileEntitySign
-import net.minecraft.world.WorldServer
-import net.minecraftforge.common.MinecraftForge
-import net.minecraftforge.common.util.FakePlayerFactory
-import net.minecraftforge.common.util.ForgeDirection
-import net.minecraftforge.event.world.BlockEvent
+import li.cil.oc.util.ExtendedLevel._
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.core.Direction
+import net.neoforged.neoforge.common.NeoForge
+import net.neoforged.neoforge.common.util.FakePlayerFactory
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.block.entity.SignBlockEntity
+import net.minecraft.world.entity.player.Player
+import net.minecraft.network.chat.Component
+import net.neoforged.neoforge.event.level.BlockEvent
 
-abstract class UpgradeSign extends prefab.ManagedEnvironment with DeviceInfo {
+abstract class UpgradeSign extends AbstractManagedEnvironment with DeviceInfo {
   private final lazy val deviceInfo = Map(
     DeviceAttribute.Class -> DeviceClass.Generic,
     DeviceAttribute.Description -> "Sign upgrade",
@@ -40,72 +40,75 @@ abstract class UpgradeSign extends prefab.ManagedEnvironment with DeviceInfo {
 
   def host: EnvironmentHost
 
-  protected def getValue(tileEntity: Option[TileEntitySign]): Array[AnyRef] = {
+  private def getAllMessages(sign: SignBlockEntity): Seq[Component] = {
+    (0 until 4).map(i => sign.getFrontText.getMessage(i, false))
+  }
+
+  protected def getValue(tileEntity: Option[SignBlockEntity]): Array[AnyRef] = {
     tileEntity match {
-      case Some(sign) => result(sign.signText.mkString("\n"))
-      case _ => result(Unit, "no sign")
+      case Some(sign) => result(getAllMessages(sign).map(_.getString).mkString("\n"))
+      case _ => result((), "no sign")
     }
   }
 
-  protected def setValue(tileEntity: Option[TileEntitySign], text: String): Array[AnyRef] = {
+  protected def setValue(tileEntity: Option[SignBlockEntity], text: String): Array[AnyRef] = {
     tileEntity match {
       case Some(sign) =>
         val player = host match {
           case robot: internal.Robot => robot.player
-          case _ => FakePlayerFactory.get(host.world.asInstanceOf[WorldServer], Settings.get.fakePlayerProfile)
+          case _ => FakePlayerFactory.get(host.getEnvironmentLevel.asInstanceOf[ServerLevel], Settings.get.fakePlayerProfile)
         }
 
-        val lines = text.lines.padTo(4, "").map(line => if (line.length > 15) line.substring(0, 15) else line).toArray
+        val lines = text.linesIterator.padTo(4, "").map(line => if (line.length > 15) line.substring(0, 15) else line).toArray
 
         if (!canChangeSign(player, sign, lines)) {
-          return result(Unit, "not allowed")
+          return result((), "not allowed")
         }
 
-        lines.copyToArray(sign.signText)
-        host.world.markBlockForUpdate(sign.xCoord, sign.yCoord, sign.zCoord)
+        lines.map(line => Component.literal(line)).copyToArray(getAllMessages(sign).toArray)
+        host.getEnvironmentLevel.notifyBlockUpdate(sign.getBlockPos)
 
-        MinecraftForge.EVENT_BUS.post(new SignChangeEvent.Post(sign, lines))
+        NeoForge.EVENT_BUS.post(new SignChangeEvent.Post(sign, lines))
 
-        result(sign.signText.mkString("\n"))
-      case _ => result(Unit, "no sign")
+        result(getAllMessages(sign).mkString("\n"))
+      case _ => result((), "no sign")
     }
   }
 
-  protected def findSign(side: ForgeDirection) = {
+  protected def findSign(side: Direction) = {
     val hostPos = BlockPosition(host)
-    host.world.getTileEntity(hostPos) match {
-      case sign: TileEntitySign => Option(sign)
-      case _ => host.world.getTileEntity(hostPos.offset(side)) match {
-        case sign: TileEntitySign => Option(sign)
+    host.getEnvironmentLevel.getBlockEntity(hostPos) match {
+      case sign: SignBlockEntity => Option(sign)
+      case _ => host.getEnvironmentLevel.getBlockEntity(hostPos.offset(side)) match {
+        case sign: SignBlockEntity => Option(sign)
         case _ => None
       }
     }
   }
 
-  private def canChangeSign(player: EntityPlayer, tileEntity: TileEntitySign, lines: Array[String]): Boolean = {
-    if (!host.world.canMineBlock(player, tileEntity.xCoord, tileEntity.yCoord, tileEntity.zCoord)) {
+  private def canChangeSign(player: Player, tileEntity: SignBlockEntity, lines: Array[String]): Boolean = {
+    if (!host.getEnvironmentLevel.mayInteract(player, tileEntity.getBlockPos)) {
       return false
     }
-
-    val event = new BlockEvent.BreakEvent(tileEntity.xCoord, tileEntity.yCoord, tileEntity.zCoord, host.world, tileEntity.getBlockType, tileEntity.getBlockMetadata, player)
-    MinecraftForge.EVENT_BUS.post(event)
-    if (event.isCanceled || event.getResult == Event.Result.DENY) {
+    val event = new BlockEvent.BreakEvent(host.getEnvironmentLevel, tileEntity.getBlockPos, tileEntity.getLevel.getBlockState(tileEntity.getBlockPos), player)
+    NeoForge.EVENT_BUS.post(event)
+    if (event.isCanceled) {
       return false
     }
 
     val signEvent = new SignChangeEvent.Pre(tileEntity, lines)
-    MinecraftForge.EVENT_BUS.post(signEvent)
-    !(signEvent.isCanceled || signEvent.getResult == Event.Result.DENY)
+    NeoForge.EVENT_BUS.post(signEvent)
+    !signEvent.isCanceled
   }
 
   override def onMessage(message: Message): Unit = {
     super.onMessage(message)
     if (message.name == "tablet.use") message.source.host match {
       case machine: api.machine.Machine => (machine.host, message.data) match {
-        case (tablet: internal.Tablet, Array(nbt: NBTTagCompound, stack: ItemStack, player: EntityPlayer, blockPos: BlockPosition, side: ForgeDirection, hitX: java.lang.Float, hitY: java.lang.Float, hitZ: java.lang.Float)) =>
-          host.world.getTileEntity(blockPos) match {
-            case sign: TileEntitySign =>
-              nbt.setString("signText", sign.signText.mkString("\n"))
+        case (tablet: internal.Tablet, Array(nbt: CompoundTag, stack: ItemStack, player: Player, blockPos: BlockPosition, side: Direction, hitX: java.lang.Float, hitY: java.lang.Float, hitZ: java.lang.Float)) =>
+          host.getEnvironmentLevel.getBlockEntity(blockPos) match {
+            case sign: SignBlockEntity =>
+              nbt.putString("signText", getAllMessages(sign).map(_.getString).mkString("\n"))
             case _ =>
           }
         case _ => // Ignore.

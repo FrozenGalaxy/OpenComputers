@@ -1,7 +1,6 @@
 package li.cil.oc.server.component
 
 import java.util
-
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
@@ -9,37 +8,48 @@ import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.driver.DeviceInfo
+import li.cil.oc.api.fs.FileSystem
 import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network._
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.common.ToolDurabilityProviders
-import li.cil.oc.common.tileentity
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.server.PacketSender
 import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.ExtendedArguments._
 import li.cil.oc.util.ExtendedNBT._
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import li.cil.oc.util.StackOption
+import li.cil.oc.util.StackOption._
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.core.{Direction, HolderLookup}
+import net.minecraft.resources.ResourceLocation
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-class Robot(val agent: tileentity.Robot) extends prefab.ManagedEnvironment with Agent with DeviceInfo {
+class Robot(val agent: blockentity.Robot) extends AbstractManagedEnvironment with Agent with DeviceInfo {
   override val node = api.Network.newNode(this, Visibility.Network).
     withComponent("robot").
     withConnector(Settings.get.bufferRobot).
     create()
 
   val romRobot = Option(api.FileSystem.asManagedEnvironment(api.FileSystem.
-    fromClass(OpenComputers.getClass, Settings.resourceDomain, "lua/component/robot"), "robot"))
+    fromResource(ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, "lua/component/robot")), "robot"))
 
   private final lazy val deviceInfo = Map(
     DeviceAttribute.Class -> DeviceClass.System,
     DeviceAttribute.Description -> "Robot",
     DeviceAttribute.Vendor -> Constants.DeviceInfo.DefaultVendor,
     DeviceAttribute.Product -> "Caterpillar",
-    DeviceAttribute.Capacity -> agent.getSizeInventory.toString
+    DeviceAttribute.Capacity -> agent.getContainerSize.toString
   )
 
   override def getDeviceInfo: util.Map[String, String] = deviceInfo
@@ -69,13 +79,13 @@ class Robot(val agent: tileentity.Robot) extends prefab.ManagedEnvironment with 
 
   @Callback(doc = "function():number -- Get the durability of the currently equipped tool.")
   def durability(context: Context, args: Arguments): Array[AnyRef] = {
-    Option(agent.equipmentInventory.getStackInSlot(0)) match {
-      case Some(item) =>
+    StackOption(agent.equipmentInventory.getItem(0)) match {
+      case SomeStack(item) =>
         ToolDurabilityProviders.getDurability(item) match {
           case Some(durability) => result(durability)
-          case _ => result(Unit, "tool cannot be damaged")
+          case _ => result((), "tool cannot be damaged")
         }
-      case _ => result(Unit, "no tool equipped")
+      case _ => result((), "no tool equipped")
     }
   }
 
@@ -87,18 +97,18 @@ class Robot(val agent: tileentity.Robot) extends prefab.ManagedEnvironment with 
     if (agent.isAnimatingMove) {
       // This shouldn't really happen due to delays being enforced, but just to
       // be on the safe side...
-      result(Unit, "already moving")
+      result((), "already moving")
     }
     else {
       val (something, what) = blockContent(direction)
       if (something) {
         context.pause(0.4)
-        PacketSender.sendParticleEffect(BlockPosition(agent), "crit", 8, 0.25, Some(direction))
-        result(Unit, what)
+        PacketSender.sendParticleEffect(BlockPosition(agent), ParticleTypes.CRIT, 8, 0.25, Some(direction))
+        result((), what)
       }
       else {
         if (!node.tryChangeBuffer(-Settings.get.robotMoveCost)) {
-          result(Unit, "not enough energy")
+          result((), "not enough energy")
         }
         else if (agent.move(direction)) {
           context.pause(Settings.get.moveDelay)
@@ -107,8 +117,8 @@ class Robot(val agent: tileentity.Robot) extends prefab.ManagedEnvironment with 
         else {
           node.changeBuffer(Settings.get.robotMoveCost)
           context.pause(0.4)
-          PacketSender.sendParticleEffect(BlockPosition(agent), "crit", 8, 0.25, Some(direction))
-          result(Unit, "impossible move")
+          PacketSender.sendParticleEffect(BlockPosition(agent), ParticleTypes.CRIT, 8, 0.25, Some(direction))
+          result((), "impossible move")
         }
       }
     }
@@ -118,20 +128,20 @@ class Robot(val agent: tileentity.Robot) extends prefab.ManagedEnvironment with 
   def turn(context: Context, args: Arguments): Array[AnyRef] = {
     val clockwise = args.checkBoolean(0)
     if (node.tryChangeBuffer(-Settings.get.robotTurnCost)) {
-      if (clockwise) agent.rotate(ForgeDirection.UP)
-      else agent.rotate(ForgeDirection.DOWN)
+      if (clockwise) agent.rotate(Direction.UP)
+      else agent.rotate(Direction.DOWN)
       agent.animateTurn(clockwise, Settings.get.turnDelay)
       context.pause(Settings.get.turnDelay)
       result(true)
     }
     else {
-      result(Unit, "not enough energy")
+      result((), "not enough energy")
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     super.onConnect(node)
     if (node == this.node) {
       romRobot.foreach(fs => {
@@ -141,7 +151,7 @@ class Robot(val agent: tileentity.Robot) extends prefab.ManagedEnvironment with 
     }
   }
 
-  override def onMessage(message: Message) {
+  override def onMessage(message: Message): Unit = {
     super.onMessage(message)
     if (message.name == "network.message" && message.source != agent.node) message.data match {
       case Array(packet: Packet) => agent.proxy.node.sendToReachable(message.name, packet)
@@ -151,13 +161,24 @@ class Robot(val agent: tileentity.Robot) extends prefab.ManagedEnvironment with 
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    romRobot.foreach(_.load(nbt.getCompoundTag("romRobot")))
+  private final val RomRobotTag = "romRobot"
+
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+
+    for(rom <- romRobot;
+        tag <- holder.getComponent(OCComponents.ROBOT_ROM_FILESYSTEM_DATA)) {
+      rom.asInstanceOf[FileSystem].loadData(tag)
+    }
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    romRobot.foreach(fs => nbt.setNewCompoundTag("romRobot", fs.save))
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+
+    for(rom <- romRobot) {
+      val tag = new CompoundTag()
+      rom.asInstanceOf[FileSystem].saveData(tag)
+      holder.setComponent(OCComponents.ROBOT_ROM_FILESYSTEM_DATA, tag)
+    }
   }
 }

@@ -10,10 +10,10 @@ import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
-import li.cil.oc.common.tileentity.traits.BundledRedstoneAware
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.common.blockentity.traits.BundledRedstoneAware
+import net.minecraft.core.Direction
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
 
 trait RedstoneBundled extends RedstoneVanilla {
   private final lazy val deviceInfo = Map(
@@ -33,7 +33,7 @@ trait RedstoneBundled extends RedstoneVanilla {
 
   override def redstone: EnvironmentHost with BundledRedstoneAware
 
-  private def getBundleKey(args: Arguments): (Option[ForgeDirection], Option[Int]) = {
+  private def getBundleKey(args: Arguments): (Option[Direction], Option[Int]) = {
     args.count match {
       case 2 => (Option(checkSide(args, 0)), Option(checkColor(args, 1)))
       case 1 => (Option(checkSide(args, 0)), None)
@@ -101,22 +101,23 @@ trait RedstoneBundled extends RedstoneVanilla {
 
   @Callback(doc = "function([side:number[, color:number,]] value:number or table):number or table --  Fewer params to assign set of outputs. Returns previous values")
   def setBundledOutput(context: Context, args: Arguments): Array[AnyRef] = {
-    var ret: AnyRef = null
+    var ret: Array[AnyRef] = null
     if (getBundleAssignment(args) match {
-      case (side: ForgeDirection, color: Int, value: Int) =>
-        ret = new java.lang.Integer(redstone.getBundledOutput(side, color))
+      case (side: Direction, color: Int, value: Int) =>
+        ret = result(redstone.getBundledOutput(side, color))
         redstone.setBundledOutput(side, color, value)
-      case (side: ForgeDirection, value: util.Map[_, _], _) =>
-        ret = redstone.getBundledOutput(side)
+      case (side: Direction, value: util.Map[_, _], _) =>
+        ret = result(redstone.getBundledOutput(side))
         redstone.setBundledOutput(side, value)
       case (value: util.Map[_, _], _, _) =>
-        ret = redstone.getBundledOutput
+        ret = result(redstone.getBundledOutput)
         redstone.setBundledOutput(value)
     }) {
       if (Settings.get.redstoneDelay > 0)
         context.pause(Settings.get.redstoneDelay)
+      ret = result(null)
     }
-    result(ret)
+    ret
   }
 
   // ----------------------------------------------------------------------- //

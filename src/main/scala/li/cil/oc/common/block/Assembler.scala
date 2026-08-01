@@ -1,45 +1,47 @@
 package li.cil.oc.common.block
 
+import com.mojang.serialization.MapCodec
 import li.cil.oc.Settings
-import li.cil.oc.client.Textures
-import li.cil.oc.common.GuiType
-import li.cil.oc.common.tileentity
-import li.cil.oc.integration.coloredlights.ModColoredLights
-import net.minecraft.client.renderer.texture.IIconRegister
-import net.minecraft.world.IBlockAccess
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.common.block.Assembler.CODEC
+import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.blockentity.BlockEntityTypes
+import net.minecraft.world.level.block.state.BlockBehaviour.{Properties, simpleCodec}
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.server.level.{ServerPlayer => ServerPlayerEntity}
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.entity.{BlockEntity, BlockEntityType}
+import net.minecraft.world.phys.shapes.{CollisionContext => ISelectionContext}
+import net.minecraft.world.phys.shapes.VoxelShape
+import net.minecraft.world.phys.shapes.{Shapes => VoxelShapes}
+import net.minecraft.world.level.{BlockGetter => IBlockReader}
+import net.minecraft.world.level.{Level => World}
 
-class Assembler extends SimpleBlock with traits.SpecialBlock with traits.PowerAcceptor with traits.StateAware with traits.GUI {
-  ModColoredLights.setLightLevel(this, 0, 3, 5)
-
-  override protected def customTextures = Array(
-    None,
-    Some("AssemblerTop"),
-    Some("AssemblerSide"),
-    Some("AssemblerSide"),
-    Some("AssemblerSide"),
-    Some("AssemblerSide")
-  )
-
-  override def registerBlockIcons(iconRegister: IIconRegister) = {
-    super.registerBlockIcons(iconRegister)
-    Textures.Assembler.iconSideAssembling = iconRegister.registerIcon(Settings.resourceDomain + ":AssemblerSideAssembling")
-    Textures.Assembler.iconSideOn = iconRegister.registerIcon(Settings.resourceDomain + ":AssemblerSideOn")
-    Textures.Assembler.iconTopOn = iconRegister.registerIcon(Settings.resourceDomain + ":AssemblerTopOn")
-  }
-
-  override def isBlockSolid(world: IBlockAccess, x: Int, y: Int, z: Int, side: ForgeDirection) = side == ForgeDirection.DOWN || side == ForgeDirection.UP
-
-  override def isSideSolid(world: IBlockAccess, x: Int, y: Int, z: Int, side: ForgeDirection) = side == ForgeDirection.DOWN || side == ForgeDirection.UP
-
-  // ----------------------------------------------------------------------- //
-
+class Assembler(props: Properties) extends SimpleBlock(props) with traits.PowerAcceptor with traits.StateAware with traits.GUI with traits.Tickable {
   override def energyThroughput = Settings.get.assemblerRate
 
-  override def guiType = GuiType.Assembler
+  override def codec(): MapCodec[Assembler] = CODEC
 
-  override def hasTileEntity(metadata: Int) = true
+  val blockShape = {
+    val bottom = Block.box(0, 0, 0, 16, 7, 16)
+    val mid = Block.box(2, 7, 2, 14, 9, 14)
+    val top = Block.box(0, 9, 0, 16, 16, 16)
+    VoxelShapes.or(top, bottom, mid)
+  }
 
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Assembler()
+  override def getShape(state: BlockState, world: IBlockReader, pos: BlockPos, ctx: ISelectionContext): VoxelShape = blockShape
+
+  override def openGui(player: ServerPlayerEntity, world: World, pos: BlockPos): Unit = world.getBlockEntity(pos) match {
+    case te: blockentity.Assembler => MenuTypes.openAssemblerGui(player, te)
+    case _ =>
+  }
+
+  override def newBlockEntity(pos: BlockPos, state: BlockState): BlockEntity = new blockentity.Assembler(pos, state)
+
+  override def getBlockEntityType: BlockEntityType[_ <: BlockEntity] = BlockEntityTypes.ASSEMBLER.get()
+}
+
+object Assembler {
+  final val CODEC = simpleCodec(new Assembler(_))
 }

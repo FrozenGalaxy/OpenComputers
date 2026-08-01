@@ -1,97 +1,49 @@
 package li.cil.oc.common.item.traits
 
-import appeng.api.config.AccessRestriction
-import cpw.mods.fml.common.Optional
-import ic2.api.item.IElectricItemManager
 import li.cil.oc.Settings
-import li.cil.oc.api
-import li.cil.oc.common.asm.Injectable
-import li.cil.oc.integration.Mods
-import li.cil.oc.integration.ic2.ElectricItemManager
-import li.cil.oc.integration.util.Power
-import net.minecraft.item.Item
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
+import net.neoforged.neoforge.energy.IEnergyStorage
 
-@Injectable.InterfaceList(Array(
-  new Injectable.Interface(value = "appeng.api.implementations.items.IAEItemPowerStorage", modid = Mods.IDs.AppliedEnergistics2),
-  new Injectable.Interface(value = "cofh.api.energy.IEnergyContainerItem", modid = Mods.IDs.CoFHEnergy),
-  new Injectable.Interface(value = "ic2.api.item.ISpecialElectricItem", modid = Mods.IDs.IndustrialCraft2),
-  new Injectable.Interface(value = "mekanism.api.energy.IEnergizedItem", modid = Mods.IDs.Mekanism)
-))
-trait Chargeable extends api.driver.item.Chargeable {
+trait Chargeable extends li.cil.oc.api.driver.item.Chargeable {
   def maxCharge(stack: ItemStack): Double
-
   def getCharge(stack: ItemStack): Double
-
   def setCharge(stack: ItemStack, amount: Double): Unit
+  def canExtract(stack: ItemStack): Boolean = false
+}
 
-  // Applied Energistics 2
+object Chargeable {
+  // NeoForge 1.21.1: KEY (ResourceLocation) is no longer needed.
+  // Capability registration is done via RegisterCapabilitiesEvent in EventHandler.
 
-  def getAECurrentPower(stack: ItemStack): Double =
-    Power.toAE(getCharge(stack))
+  def convertForgeEnergyToOpenComputers(fe: Int): Double = fe / Settings.get.ratioForgeEnergy
+  def convertOpenComputersToForgeEnergy(oc: Double): Int = (oc * Settings.get.ratioForgeEnergy).toInt
 
-  def getAEMaxPower(stack: ItemStack): Double =
-    Power.toAE(maxCharge(stack))
+  def applyCharge(amount: Double, current: Double, maximum: Double, save: Double => Unit): Double = {
+    val target = current + amount
+    val result = (target max 0) min maximum
+    val used = result - current
+    val unused = amount - used
+    if (used > Double.MinPositiveValue || used < -Double.MinPositiveValue) {
+      save(used)
+    }
+    unused
+  }
 
-  def injectAEPower(stack: ItemStack, value: Double): Double =
-    Power.toAE(charge(stack, Power.fromAE(value), false))
+  class Provider(val stack: ItemStack, val item: Chargeable) extends IEnergyStorage {
 
-  def extractAEPower(stack: ItemStack, value: Double): Double =
-    value - Power.toAE(charge(stack, Power.fromAE(-value), false))
+    override def receiveEnergy(maxReceive: Int, simulate: Boolean): Int =
+      maxReceive - convertOpenComputersToForgeEnergy(item.charge(stack, convertForgeEnergyToOpenComputers(maxReceive), simulate))
 
-  @Optional.Method(modid = Mods.IDs.AppliedEnergistics2)
-  def getPowerFlow(stack: ItemStack): AccessRestriction = AccessRestriction.WRITE
+    override def extractEnergy(maxExtract: Int, simulate: Boolean): Int = {
+      if (canExtract) -receiveEnergy(-maxExtract, simulate) else 0
+    }
 
-  // IndustrialCraft 2
+    override def getEnergyStored: Int = convertOpenComputersToForgeEnergy(item.getCharge(stack))
 
-  @Optional.Method(modid = Mods.IDs.IndustrialCraft2)
-  def getManager(stack: ItemStack): IElectricItemManager = ElectricItemManager
+    override def getMaxEnergyStored: Int = convertOpenComputersToForgeEnergy(item.maxCharge(stack))
 
-  def getMaxCharge(stack: ItemStack): Double =
-    Power.toEU(maxCharge(stack))
+    override def canExtract: Boolean = item.canExtract(stack)
 
-  def getTransferLimit(stack: ItemStack): Double =
-    Power.toEU(Settings.get.chargeRateTablet)
-
-  def getTier(stack: ItemStack): Int = 1
-
-  def canProvideEnergy(stack: ItemStack): Boolean = false
-
-  def getEmptyItem(stack: ItemStack): Item = stack.getItem
-
-  def getChargedItem(stack: ItemStack): Item = stack.getItem
-
-  // Mekanism
-
-  def getEnergy(stack: ItemStack): Double =
-    Power.toJoules(getCharge(stack))
-
-  def setEnergy(stack: ItemStack, amount: Double): Unit =
-    setCharge(stack, Power.fromJoules(amount))
-
-  def getMaxEnergy(stack: ItemStack): Double =
-    Power.toJoules(maxCharge(stack))
-
-  def canSend(stack: ItemStack): Boolean = false
-
-  def canReceive(stack: ItemStack): Boolean = true
-
-  def isMetadataSpecific(stack: ItemStack): Boolean = false
-
-  def getMaxTransfer(stack: ItemStack): Double =
-    Power.toJoules(Settings.get.chargeRateTablet)
-
-  // Redstone Flux
-
-  def getEnergyStored(stack: ItemStack): Int =
-    Power.toRF(getCharge(stack))
-
-  def getMaxEnergyStored(stack: ItemStack): Int =
-    Power.toRF(maxCharge(stack))
-
-  def receiveEnergy(stack: ItemStack, maxReceive: Int, simulate: Boolean): Int =
-    maxReceive - Power.toRF(charge(stack, Power.fromRF(maxReceive), simulate))
-
-  def extractEnergy(stack: ItemStack, maxExtract: Int, simulate: Boolean): Int =
-    maxExtract - Power.toRF(charge(stack, Power.fromRF(-maxExtract), simulate))
+    override def canReceive: Boolean = item.canCharge(stack)
+  }
 }

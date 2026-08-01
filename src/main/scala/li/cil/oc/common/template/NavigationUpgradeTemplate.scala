@@ -3,7 +3,8 @@ package li.cil.oc.common.template
 import li.cil.oc.Constants
 import li.cil.oc.api
 import li.cil.oc.common.item.data.NavigationUpgradeData
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 
 import scala.language.postfixOps
 
@@ -13,12 +14,12 @@ object NavigationUpgradeTemplate {
   def disassemble(stack: ItemStack, ingredients: Array[ItemStack]) = {
     val info = new NavigationUpgradeData(stack)
     ingredients.map {
-      case part if part.getItem == net.minecraft.init.Items.filled_map => info.map
+      case part if part.getItem == Items.FILLED_MAP => info.map
       case part => part
     }
   }
 
-  def register() {
+  def register(): Unit = {
     // Disassembler
     api.IMC.registerDisassemblerTemplate(
       "Navigation Upgrade",

@@ -1,73 +1,66 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.math.Axis
 import li.cil.oc.client.Textures
-import li.cil.oc.common.tileentity.Assembler
+import li.cil.oc.client.renderer.RenderTypes
+import li.cil.oc.common.blockentity.Assembler
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 
-object AssemblerRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+object AssemblerRenderer extends BlockEntityRendererProvider[Assembler] {
+  override def create(ctx: BlockEntityRendererProvider.Context): AssemblerRenderer =
+    new AssemblerRenderer()
+}
 
-    val assembler = tileEntity.asInstanceOf[Assembler]
+class AssemblerRenderer extends BlockEntityRenderer[Assembler] {
 
-    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+  override def render(assembler: Assembler, dt: Float, stack: PoseStack, buffer: MultiBufferSource, light: Int, overlay: Int): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering")
 
-    RenderState.disableLighting()
-    RenderState.makeItBlend()
-    RenderState.setBlendAlpha(1)
+    RenderSystem.setShaderColor(1, 1, 1, 1)
 
-    GL11.glPushMatrix()
-    GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
+    stack.pushPose()
 
-    bindTexture(TextureMap.locationBlocksTexture)
-    val t = Tessellator.instance
-    t.startDrawingQuads()
+    stack.translate(0.5, 0.5, 0.5)
+
+    val vBuffer = buffer.getBuffer(RenderTypes.BLOCK_OVERLAY)
+    val matrix = stack.last.pose
 
     {
-      val icon = Textures.Assembler.iconTopOn
-      t.addVertexWithUV(-0.5, 0.55, 0.5, icon.getMinU, icon.getMaxV)
-      t.addVertexWithUV(0.5, 0.55, 0.5, icon.getMaxU, icon.getMaxV)
-      t.addVertexWithUV(0.5, 0.55, -0.5, icon.getMaxU, icon.getMinV)
-      t.addVertexWithUV(-0.5, 0.55, -0.5, icon.getMinU, icon.getMinV)
+      val icon = Textures.getSprite(Textures.Block.AssemblerTopOn)
+      vBuffer.addVertex(matrix, -0.5f, 0.55f, 0.5f).setUv(icon.getU0, icon.getV1)
+      vBuffer.addVertex(matrix, 0.5f, 0.55f, 0.5f).setUv(icon.getU1, icon.getV1)
+      vBuffer.addVertex(matrix, 0.5f, 0.55f, -0.5f).setUv(icon.getU1, icon.getV0)
+      vBuffer.addVertex(matrix, -0.5f, 0.55f, -0.5f).setUv(icon.getU0, icon.getV0)
     }
 
-    t.draw()
-
-    val indent = 6 / 16f + 0.005
-    for (i <- 0 until 4) {
-      t.startDrawingQuads()
-
+    val indent = 6 / 16f + 0.005f
+    for (_ <- 0 until 4) {
       if (assembler.isAssembling) {
-        val icon = Textures.Assembler.iconSideAssembling
-        t.addVertexWithUV(indent, 0.5, -indent, icon.getInterpolatedU((0.5 - indent) * 16), icon.getMaxV)
-        t.addVertexWithUV(indent, 0.5, indent, icon.getInterpolatedU((0.5 + indent) * 16), icon.getMaxV)
-        t.addVertexWithUV(indent, -0.5, indent, icon.getInterpolatedU((0.5 + indent) * 16), icon.getMinV)
-        t.addVertexWithUV(indent, -0.5, -indent, icon.getInterpolatedU((0.5 - indent) * 16), icon.getMinV)
+        val icon = Textures.getSprite(Textures.Block.AssemblerSideAssembling)
+        vBuffer.addVertex(matrix, indent, 0.5f, -indent).setUv(icon.getU(0.5f - indent), icon.getV1)
+        vBuffer.addVertex(matrix, indent, 0.5f, indent).setUv(icon.getU(0.5f + indent), icon.getV1)
+        vBuffer.addVertex(matrix, indent, -0.5f, indent).setUv(icon.getU(0.5f + indent), icon.getV0)
+        vBuffer.addVertex(matrix, indent, -0.5f, -indent).setUv(icon.getU(0.5f - indent), icon.getV0)
       }
 
       {
-        val icon = Textures.Assembler.iconSideOn
-        t.addVertexWithUV(0.5005, 0.5, -0.5, icon.getMinU, icon.getMaxV)
-        t.addVertexWithUV(0.5005, 0.5, 0.5, icon.getMaxU, icon.getMaxV)
-        t.addVertexWithUV(0.5005, -0.5, 0.5, icon.getMaxU, icon.getMinV)
-        t.addVertexWithUV(0.5005, -0.5, -0.5, icon.getMinU, icon.getMinV)
+        val icon = Textures.getSprite(Textures.Block.AssemblerSideOn)
+        vBuffer.addVertex(matrix, 0.5005f, 0.5f, -0.5f).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 0.5005f, 0.5f, 0.5f).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 0.5005f, -0.5f, 0.5f).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 0.5005f, -0.5f, -0.5f).setUv(icon.getU0, icon.getV0)
       }
 
-      t.draw()
-
-      GL11.glRotatef(90, 0, 1, 0)
+      stack.mulPose(Axis.YP.rotationDegrees(90))
     }
 
-    RenderState.enableLighting()
+    stack.popPose()
 
-    GL11.glPopMatrix()
-    GL11.glPopAttrib()
-
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
 }

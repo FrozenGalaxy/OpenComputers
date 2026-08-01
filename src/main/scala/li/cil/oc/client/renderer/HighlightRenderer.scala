@@ -1,24 +1,16 @@
 package li.cil.oc.client.renderer
 
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
-import li.cil.oc.Constants
-import li.cil.oc.Settings
-import li.cil.oc.api
+import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import li.cil.oc.client.Textures
-import li.cil.oc.common
+import li.cil.oc.util.ExtendedLevel._
 import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.ExtendedAABB._
-import li.cil.oc.util.ExtendedBlock._
-import li.cil.oc.util.ExtendedWorld._
-import li.cil.oc.util.RenderState
+import li.cil.oc.{Constants, Settings, api}
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.OpenGlHelper
-import net.minecraft.client.renderer.RenderGlobal
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.util.MovingObjectPosition.MovingObjectType
-import net.minecraftforge.client.event.DrawBlockHighlightEvent
-import net.minecraftforge.common.util.ForgeDirection
-import org.lwjgl.opengl.GL11
+import net.minecraft.core.Direction
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.phys.shapes.CollisionContext
+import net.neoforged.neoforge.client.event.RenderHighlightEvent
+import net.neoforged.bus.api.SubscribeEvent
 
 import scala.util.Random
 
@@ -27,105 +19,72 @@ object HighlightRenderer {
 
   lazy val tablet = api.Items.get(Constants.ItemName.Tablet)
 
+  val TexHologram = RenderTypes.createTexturedQuad("hologram_effect", Textures.Model.HologramEffect, DefaultVertexFormat.POSITION_TEX_COLOR, true)
+
   @SubscribeEvent
-  def onDrawBlockHighlight(e: DrawBlockHighlightEvent): Unit = {
-    val hitInfo = e.target
-    if (hitInfo.typeOfHit == MovingObjectType.BLOCK && api.Items.get(e.currentItem) == tablet) {
-      val world = e.player.getEntityWorld
-      val blockPos = BlockPosition(hitInfo.blockX, hitInfo.blockY, hitInfo.blockZ, world)
+  def onDrawBlockHighlight(e: RenderHighlightEvent.Block): Unit = if (e.getTarget != null && e.getTarget.getBlockPos != null) {
+    val hitInfo = e.getTarget
+    val world = Minecraft.getInstance.level
+    val blockPos = BlockPosition(hitInfo.getBlockPos, world)
+    val stack = e.getPoseStack
+    if (api.Items.get(Minecraft.getInstance.player.getItemInHand(InteractionHand.MAIN_HAND)) == tablet) {
       val isAir = world.isAirBlock(blockPos)
       if (!isAir) {
-        val block = world.getBlock(blockPos)
-        block.setBlockBoundsBasedOnState(blockPos)
-        val bounds = block.getSelectedBoundingBoxFromPool(blockPos).getOffsetBoundingBox(-blockPos.x, -blockPos.y, -blockPos.z)
-        val sideHit = ForgeDirection.getOrientation(hitInfo.sideHit)
-        val playerPos = e.player.getPosition(e.partialTicks)
-        val renderPos = blockPos.offset(-playerPos.xCoord, -playerPos.yCoord, -playerPos.zCoord)
+        val shape = world.getBlockState(hitInfo.getBlockPos).getShape(world, hitInfo.getBlockPos, CollisionContext.of(e.getCamera.getEntity))
+        val (minX, minY, minZ) = (shape.min(Direction.Axis.X).toFloat, shape.min(Direction.Axis.Y).toFloat, shape.min(Direction.Axis.Z).toFloat)
+        val (maxX, maxY, maxZ) = (shape.max(Direction.Axis.X).toFloat, shape.max(Direction.Axis.Y).toFloat, shape.max(Direction.Axis.Z).toFloat)
+        val sideHit = hitInfo.getDirection
+        val view = e.getCamera.getPosition
 
-        GL11.glPushMatrix()
-        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
-        RenderState.makeItBlend()
-        Minecraft.getMinecraft.renderEngine.bindTexture(Textures.blockHologram)
+        stack.pushPose()
 
-        OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE, 1, 0)
-        GL11.glColor4f(0.0F, 1.0F, 0.0F, 0.4F)
-
-        GL11.glTranslated(renderPos.xCoord, renderPos.yCoord, renderPos.zCoord)
-        GL11.glScaled(1.002, 1.002, 1.002)
+        stack.translate(blockPos.x - view.x, blockPos.y - view.y, blockPos.z - view.z)
+        stack.scale(1.002f, 1.002f, 1.002f)
 
         if (Settings.get.hologramFlickerFrequency > 0 && random.nextDouble() < Settings.get.hologramFlickerFrequency) {
-          val (sx, sy, sz) = (1 - math.abs(sideHit.offsetX), 1 - math.abs(sideHit.offsetY), 1 - math.abs(sideHit.offsetZ))
-          GL11.glScaled(1 + random.nextGaussian() * 0.01, 1 + random.nextGaussian() * 0.001, 1 + random.nextGaussian() * 0.01)
-          GL11.glTranslated(random.nextGaussian() * 0.01 * sx, random.nextGaussian() * 0.01 * sy, random.nextGaussian() * 0.01 * sz)
+          val (sx, sy, sz) = (1 - math.abs(sideHit.getStepX), 1 - math.abs(sideHit.getStepY), 1 - math.abs(sideHit.getStepZ))
+          stack.scale(Math.max(1f + (random.nextGaussian() * 0.01).toFloat, 0.001f),
+            Math.max(1f + (random.nextGaussian() * 0.001).toFloat, 0.001f),
+            Math.max(1f + (random.nextGaussian() * 0.01).toFloat, 0.001f))
+          stack.translate((random.nextGaussian() * 0.01 * sx).toFloat, (random.nextGaussian() * 0.01 * sy).toFloat, (random.nextGaussian() * 0.01 * sz).toFloat)
         }
 
-        val t = Tessellator.instance
-        t.startDrawingQuads()
+        val r = e.getMultiBufferSource.getBuffer(TexHologram)
         sideHit match {
-          case ForgeDirection.UP =>
-            t.addVertexWithUV(bounds.maxX, bounds.maxY + 0.002, bounds.maxZ, bounds.maxZ * 16, bounds.maxX * 16)
-            t.addVertexWithUV(bounds.maxX, bounds.maxY + 0.002, bounds.minZ, bounds.minZ * 16, bounds.maxX * 16)
-            t.addVertexWithUV(bounds.minX, bounds.maxY + 0.002, bounds.minZ, bounds.minZ * 16, bounds.minX * 16)
-            t.addVertexWithUV(bounds.minX, bounds.maxY + 0.002, bounds.maxZ, bounds.maxZ * 16, bounds.minX * 16)
-          case ForgeDirection.DOWN =>
-            t.addVertexWithUV(bounds.maxX, bounds.minY - 0.002, bounds.minZ, bounds.minZ * 16, bounds.maxX * 16)
-            t.addVertexWithUV(bounds.maxX, bounds.minY - 0.002, bounds.maxZ, bounds.maxZ * 16, bounds.maxX * 16)
-            t.addVertexWithUV(bounds.minX, bounds.minY - 0.002, bounds.maxZ, bounds.maxZ * 16, bounds.minX * 16)
-            t.addVertexWithUV(bounds.minX, bounds.minY - 0.002, bounds.minZ, bounds.minZ * 16, bounds.minX * 16)
-          case ForgeDirection.EAST =>
-            t.addVertexWithUV(bounds.maxX + 0.002, bounds.maxY, bounds.minZ, bounds.minZ * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.maxX + 0.002, bounds.maxY, bounds.maxZ, bounds.maxZ * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.maxX + 0.002, bounds.minY, bounds.maxZ, bounds.maxZ * 16, bounds.minY * 16)
-            t.addVertexWithUV(bounds.maxX + 0.002, bounds.minY, bounds.minZ, bounds.minZ * 16, bounds.minY * 16)
-          case ForgeDirection.WEST =>
-            t.addVertexWithUV(bounds.minX - 0.002, bounds.maxY, bounds.maxZ, bounds.maxZ * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.minX - 0.002, bounds.maxY, bounds.minZ, bounds.minZ * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.minX - 0.002, bounds.minY, bounds.minZ, bounds.minZ * 16, bounds.minY * 16)
-            t.addVertexWithUV(bounds.minX - 0.002, bounds.minY, bounds.maxZ, bounds.maxZ * 16, bounds.minY * 16)
-          case ForgeDirection.SOUTH =>
-            t.addVertexWithUV(bounds.maxX, bounds.maxY, bounds.maxZ + 0.002, bounds.maxX * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.minX, bounds.maxY, bounds.maxZ + 0.002, bounds.minX * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.minX, bounds.minY, bounds.maxZ + 0.002, bounds.minX * 16, bounds.minY * 16)
-            t.addVertexWithUV(bounds.maxX, bounds.minY, bounds.maxZ + 0.002, bounds.maxX * 16, bounds.minY * 16)
+          case Direction.UP =>
+            r.addVertex(stack.last.pose, maxX, maxY + 0.002f, maxZ).setUv(maxZ * 16, maxX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX, maxY + 0.002f, minZ).setUv(minZ * 16, maxX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX, maxY + 0.002f, minZ).setUv(minZ * 16, minX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX, maxY + 0.002f, maxZ).setUv(maxZ * 16, minX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+          case Direction.DOWN =>
+            r.addVertex(stack.last.pose, maxX, minY - 0.002f, minZ).setUv(minZ * 16, maxX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX, minY - 0.002f, maxZ).setUv(maxZ * 16, maxX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX, minY - 0.002f, maxZ).setUv(maxZ * 16, minX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX, minY - 0.002f, minZ).setUv(minZ * 16, minX * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+          case Direction.EAST =>
+            r.addVertex(stack.last.pose, maxX + 0.002f, maxY, minZ).setUv(minZ * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX + 0.002f, maxY, maxZ).setUv(maxZ * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX + 0.002f, minY, maxZ).setUv(maxZ * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX + 0.002f, minY, minZ).setUv(minZ * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+          case Direction.WEST =>
+            r.addVertex(stack.last.pose, minX - 0.002f, maxY, maxZ).setUv(maxZ * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX - 0.002f, maxY, minZ).setUv(minZ * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX - 0.002f, minY, minZ).setUv(minZ * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX - 0.002f, minY, maxZ).setUv(maxZ * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+          case Direction.SOUTH =>
+            r.addVertex(stack.last.pose, maxX, maxY, maxZ + 0.002f).setUv(maxX * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX, maxY, maxZ + 0.002f).setUv(minX * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX, minY, maxZ + 0.002f).setUv(minX * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX, minY, maxZ + 0.002f).setUv(maxX * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
           case _ =>
-            t.addVertexWithUV(bounds.minX, bounds.maxY, bounds.minZ - 0.002, bounds.minX * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.maxX, bounds.maxY, bounds.minZ - 0.002, bounds.maxX * 16, bounds.maxY * 16)
-            t.addVertexWithUV(bounds.maxX, bounds.minY, bounds.minZ - 0.002, bounds.maxX * 16, bounds.minY * 16)
-            t.addVertexWithUV(bounds.minX, bounds.minY, bounds.minZ - 0.002, bounds.minX * 16, bounds.minY * 16)
+            r.addVertex(stack.last.pose, minX, maxY, minZ - 0.002f).setUv(minX * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX, maxY, minZ - 0.002f).setUv(maxX * 16, maxY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, maxX, minY, minZ - 0.002f).setUv(maxX * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
+            r.addVertex(stack.last.pose, minX, minY, minZ - 0.002f).setUv(minX * 16, minY * 16).setColor(0.0F, 1.0F, 0.0F, 0.4F)
         }
-        t.draw()
 
-        GL11.glPopAttrib()
-        GL11.glPopMatrix()
+        stack.popPose()
       }
-    }
-
-    if (hitInfo.typeOfHit == MovingObjectType.BLOCK) e.player.getEntityWorld.getTileEntity(hitInfo.blockX, hitInfo.blockY, hitInfo.blockZ) match {
-      case print: common.tileentity.Print =>
-        val pos = e.player.getPosition(e.partialTicks)
-        val expansion = 0.002f
-
-        // See RenderGlobal.drawSelectionBox.
-        GL11.glEnable(GL11.GL_BLEND)
-        OpenGlHelper.glBlendFunc(770, 771, 1, 0)
-        GL11.glColor4f(0, 0, 0, 0.4f)
-        GL11.glLineWidth(2)
-        GL11.glDisable(GL11.GL_TEXTURE_2D)
-        GL11.glDepthMask(false)
-
-        for (shape <- if (print.state) print.data.stateOn else print.data.stateOff) {
-          val bounds = shape.bounds.rotateTowards(print.facing)
-          RenderGlobal.drawOutlinedBoundingBox(bounds.copy().expand(expansion, expansion, expansion)
-            .offset(e.target.blockX, e.target.blockY, e.target.blockZ)
-            .offset(-pos.xCoord, -pos.yCoord, -pos.zCoord), -1)
-        }
-
-        GL11.glDepthMask(true)
-        GL11.glEnable(GL11.GL_TEXTURE_2D)
-        GL11.glDisable(GL11.GL_BLEND)
-
-        e.setCanceled(true)
-      case _ =>
     }
   }
 }

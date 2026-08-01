@@ -3,6 +3,7 @@ package li.cil.oc.server.component
 import li.cil.oc.Settings
 import li.cil.oc.api.event.RobotPlaceInAirEvent
 import li.cil.oc.api.internal
+import li.cil.oc.api.internal.MultiTank
 import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
@@ -11,55 +12,59 @@ import li.cil.oc.server.agent.ActivationType
 import li.cil.oc.server.agent.Player
 import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.ExtendedArguments._
-import li.cil.oc.util.ExtendedWorld._
+import li.cil.oc.util.ExtendedLevel._
 import li.cil.oc.util.InventoryUtils
-import net.minecraft.entity.Entity
-import net.minecraft.entity.EntityLivingBase
-import net.minecraft.entity.item.EntityMinecart
-import net.minecraft.util.MovingObjectPosition
-import net.minecraft.util.MovingObjectPosition.MovingObjectType
-import net.minecraft.util.Vec3
-import net.minecraftforge.common.MinecraftForge
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.core.Direction
+import net.minecraft.core.BlockPos
+import net.minecraft.tags.BlockTags
+import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.{Container, InteractionHand}
+import net.minecraft.world.entity.{Entity, LivingEntity, Pose}
+import net.minecraft.world.phys.{BlockHitResult, EntityHitResult, HitResult, Vec3}
+import net.minecraft.world.level.ClipContext
+import net.neoforged.neoforge.common.NeoForge
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
+import net.minecraft.world.entity.player
+import net.minecraft.world.entity.vehicle.Minecart
+import net.minecraft.world.level.block.state.BlockState
 
-trait Agent extends traits.WorldControl with traits.InventoryControl with traits.InventoryWorldControl with traits.TankAware with traits.TankControl with traits.TankWorldControl {
+trait Agent extends traits.LevelControl with traits.ContainerControl with traits.ContainerLevelControl with traits.TankAware with traits.TankControl with traits.TankLevelControl {
   def agent: internal.Agent
 
   override def position = BlockPosition(agent)
 
-  override def fakePlayer = agent.player
+  override def fakePlayer: player.Player = agent.player
 
-  protected def rotatedPlayer(facing: ForgeDirection = agent.facing, side: ForgeDirection = agent.facing) = {
+  protected def rotatedPlayer(facing: Direction = agent.facing, side: Direction = agent.facing): Player = {
     val player = agent.player.asInstanceOf[Player]
     Player.updatePositionAndRotation(player, facing, side)
     // no need to set inventory, calling agent.Player already did that
-    //Player.setInventoryPlayerItems(player)
+    //Player.setPlayerInventoryItems(player)
     player
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def inventory = agent.mainInventory
+  override def inventory: Container = agent.mainInventory
 
-  override def selectedSlot = agent.selectedSlot
+  override def selectedSlot: Int = agent.selectedSlot
 
   override def selectedSlot_=(value: Int): Unit = agent.setSelectedSlot(value)
 
   // ----------------------------------------------------------------------- //
 
-  override def tank = agent.tank
+  override def tank: MultiTank = agent.tank
 
-  def selectedTank = agent.selectedTank
+  def selectedTank: Int = agent.selectedTank
 
-  override def selectedTank_=(value: Int) = agent.setSelectedTank(value)
+  override def selectedTank_=(value: Int): Unit = agent.setSelectedTank(value)
 
   // ----------------------------------------------------------------------- //
 
-  def canPlaceInAir = {
+  def canPlaceInAir: Boolean = {
     val event = new RobotPlaceInAirEvent(agent)
-    MinecraftForge.EVENT_BUS.post(event)
+    NeoForge.EVENT_BUS.post(event)
     event.isAllowed
   }
 
@@ -82,7 +87,7 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
       }
       else {
         // Always try the direction we're looking first.
-        Iterable(facing) ++ ForgeDirection.VALID_DIRECTIONS.filter(side => side != facing && side != facing.getOpposite).toIterable
+        Iterable(facing) ++ Direction.values.filter(side => side != facing && side != facing.getOpposite).toIterable
       }
     val sneaky = args.isBoolean(2) && args.checkBoolean(2)
 
@@ -91,12 +96,12 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
     }
     def attack(player: Player, entity: Entity) = {
       beginConsumeDrops(entity)
-      player.attackTargetEntityWithCurrentItem(entity)
+      player.attack(entity)
       // Mine carts have to be hit quickly in succession to break, so we click
       // until it breaks. But avoid an infinite loop... you never know.
       entity match {
-        case _: EntityMinecart => for (_ <- 0 until 10 if !entity.isDead) {
-          player.attackTargetEntityWithCurrentItem(entity)
+        case _: Minecart => for (_ <- 0 until 10 if entity.isAlive) {
+          player.attack(entity)
         }
         case _ =>
       }
@@ -104,8 +109,8 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
       triggerDelay()
       (true, "entity")
     }
-    def click(player: Player, x: Int, y: Int, z: Int, side: Int) = {
-      val breakTime = player.clickBlock(x, y, z, side)
+    def click(player: Player, pos: BlockPos, side: Direction) = {
+      val breakTime = player.clickBlock(pos, side)
       val broke = breakTime > 0
       if (broke) {
         triggerDelay(breakTime)
@@ -116,21 +121,22 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
     var reason: Option[String] = None
     for (side <- sides) {
       val player = rotatedPlayer(facing, side)
-      player.setSneaking(sneaky)
+      player.setPose(if (sneaky) Pose.CROUCHING else Pose.STANDING)
 
       val (success, what) = {
         val hit = pick(player, Settings.get.swingRange)
         (Option(hit) match {
-          case Some(info) => info.typeOfHit
-          case _ => MovingObjectType.MISS
+          case Some(info) => info.getType
+          case _ => HitResult.Type.MISS
         }) match {
-          case MovingObjectType.ENTITY =>
-            attack(player, hit.entityHit)
-          case MovingObjectType.BLOCK =>
-            click(player, hit.blockX, hit.blockY, hit.blockZ, hit.sideHit)
+          case HitResult.Type.ENTITY =>
+            attack(player, hit.asInstanceOf[EntityHitResult].getEntity)
+          case HitResult.Type.BLOCK =>
+            val blockHit = hit.asInstanceOf[BlockHitResult]
+            click(player, blockHit.getBlockPos, blockHit.getDirection)
           case _ =>
             // Retry with full block bounds, disregarding swing range.
-            player.closestEntity[EntityLivingBase]() match {
+            player.closestEntity(classOf[LivingEntity]) match {
               case Some(entity) =>
                 attack(player, entity)
               case _ =>
@@ -143,7 +149,7 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
         }
       }
 
-      player.setSneaking(false)
+      player.setPose(Pose.STANDING)
       if (success) {
         return result(true, what)
       }
@@ -155,9 +161,9 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
     if (hasBlock) {
       val blockPos = position.offset(facing)
       val player = rotatedPlayer(facing, facing)
-      player.setSneaking(sneaky)
-      val (ok, why) = click(player, blockPos.x, blockPos.y, blockPos.z, facing.ordinal())
-      player.setSneaking(false)
+      player.setPose(if (sneaky) Pose.CROUCHING else Pose.STANDING)
+      val (ok, why) = click(player, blockPos.toBlockPos, facing)
+      player.setPose(Pose.STANDING)
       return result(ok, why)
     }
 
@@ -173,14 +179,14 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
       }
       else {
         // Always try the direction we're looking first.
-        Iterable(facing) ++ ForgeDirection.VALID_DIRECTIONS.filter(side => side != facing && side != facing.getOpposite).toIterable
+        Iterable(facing) ++ Direction.values.filter(side => side != facing && side != facing.getOpposite).toIterable
       }
     val sneaky = args.isBoolean(2) && args.checkBoolean(2)
     val duration =
       if (args.isDouble(3)) args.checkDouble(3)
       else 0.0
 
-    def triggerDelay() {
+    def triggerDelay(): Unit = {
       onWorldInteraction(context, Settings.get.useDelay)
     }
     def activationResult(activationType: ActivationType.Value) =
@@ -198,30 +204,31 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
       }
     def interact(player: Player, entity: Entity) = {
       beginConsumeDrops(entity)
-      val result = player.interactWith(entity)
+      val result = player.interactOn(entity, InteractionHand.MAIN_HAND)
       endConsumeDrops(player, entity)
       result
     }
 
     for (side <- sides) {
       val player = rotatedPlayer(facing, side)
-      player.setSneaking(sneaky)
+      player.setPose(if (sneaky) Pose.CROUCHING else Pose.STANDING)
 
       val (success, what) = Option(pick(player, Settings.get.useAndPlaceRange)) match {
-        case Some(hit) if hit.typeOfHit == MovingObjectType.ENTITY && interact(player, hit.entityHit) =>
+        case Some(hit) if hit.getType == HitResult.Type.ENTITY && interact(player, hit.asInstanceOf[EntityHitResult].getEntity).consumesAction =>
           triggerDelay()
           (true, "item_interacted")
-        case Some(hit) if hit.typeOfHit == MovingObjectType.BLOCK =>
-          val (bx, by, bz, hx, hy, hz) = clickParamsFromHit(hit)
-          activationResult(player.activateBlockOrUseItem(bx, by, bz, hit.sideHit, hx, hy, hz, duration))
+        case Some(hit) if hit.getType == HitResult.Type.BLOCK =>
+          val blockHit = hit.asInstanceOf[BlockHitResult]
+          val (blockPos, hx, hy, hz) = clickParamsFromHit(blockHit)
+          activationResult(player.activateBlockOrUseItem(blockPos, blockHit.getDirection, hx, hy, hz, duration))
         case _ =>
           (if (canPlaceInAir) {
-            val (bx, by, bz, hx, hy, hz) = clickParamsForPlace(facing)
-            if (player.placeBlock(0, bx, by, bz, facing.ordinal, hx, hy, hz))
+            val (blockPos, hx, hy, hz) = clickParamsForPlace(facing)
+            if (player.placeBlock(0, blockPos, facing, hx, hy, hz))
               ActivationType.ItemPlaced
             else {
-              val (bx, by, bz, hx, hy, hz) = clickParamsForItemUse(facing, side)
-              player.activateBlockOrUseItem(bx, by, bz, side.getOpposite.ordinal, hx, hy, hz, duration)
+              val (blockPos, hx, hy, hz) = clickParamsForItemUse(facing, side)
+              player.activateBlockOrUseItem(blockPos, side.getOpposite, hx, hy, hz, duration)
             }
           } else ActivationType.None) match {
             case ActivationType.None =>
@@ -234,7 +241,7 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
           }
       }
 
-      player.setSneaking(false)
+      player.setPose(Pose.STANDING)
       if (success) {
         return result(true, what)
       }
@@ -252,27 +259,42 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
       }
       else {
         // Always try the direction we're looking first.
-        Iterable(facing) ++ ForgeDirection.VALID_DIRECTIONS.filter(side => side != facing && side != facing.getOpposite).toIterable
+        Iterable(facing) ++ Direction.values.filter(side => side != facing && side != facing.getOpposite).toIterable
       }
     val sneaky = args.isBoolean(2) && args.checkBoolean(2)
-    val stack = agent.mainInventory.getStackInSlot(agent.selectedSlot)
-    if (stack == null || stack.stackSize == 0) {
-      return result(Unit, "nothing selected")
+    val stack = agent.mainInventory.getItem(agent.selectedSlot)
+    if (stack.isEmpty) {
+      return result((), "nothing selected")
     }
 
     for (side <- sides) {
       val player = rotatedPlayer(facing, side)
-      player.setSneaking(sneaky)
+      player.setPose(if (sneaky) Pose.CROUCHING else Pose.STANDING)
       val success = Option(pick(player, Settings.get.useAndPlaceRange)) match {
-        case Some(hit) if hit.typeOfHit == MovingObjectType.BLOCK =>
-          val (bx, by, bz, hx, hy, hz) = clickParamsFromHit(hit)
-          player.placeBlock(agent.selectedSlot, bx, by, bz, hit.sideHit, hx, hy, hz)
-        case None if canPlaceInAir && player.closestEntity[Entity]().isEmpty =>
-          val (bx, by, bz, hx, hy, hz) = clickParamsForPlace(facing)
-          player.placeBlock(agent.selectedSlot, bx, by, bz, facing.ordinal, hx, hy, hz)
+        case Some(hit) if hit.getType == HitResult.Type.BLOCK =>
+          val blockHit = hit.asInstanceOf[BlockHitResult]
+          val (blockPos, hx, hy, hz) = clickParamsFromHit(blockHit)
+          player.placeBlock(agent.selectedSlot, blockPos, blockHit.getDirection, hx, hy, hz)
+        case None if canPlaceInAir && player.closestEntity(classOf[Entity]).isEmpty =>
+          val (blockPos, hx, hy, hz) = clickParamsForPlace(facing)
+          // blockPos here is the position of the agent
+          // When a robot uses angel placement, the BlockItem code offsets the pos to Direction
+          // but for a drone, the block at its position is air, which is replaceable, and thus
+          // BlockItem does not offset the position. We can do it here to correct that, and the code
+          // here is still correct for the robot's use case
+          val adjustedPos: BlockPos = blockPos.relative(facing)
+          // adjustedPos is the position we want to place the block
+          // but onItemUse will try to adjust the placement if the target position is not replaceable
+          // we don't want that
+          val state: BlockState = world.getBlockState(adjustedPos)
+          if (state.is(BlockTags.REPLACEABLE)) {
+            player.placeBlock(agent.selectedSlot, adjustedPos, facing, hx, hy, hz)
+          } else {
+            false
+          }
         case _ => false
       }
-      player.setSneaking(false)
+      player.setPose(Pose.STANDING)
       if (success) {
         onWorldInteraction(context, Settings.get.placeDelay)
         return result(true)
@@ -284,71 +306,70 @@ trait Agent extends traits.WorldControl with traits.InventoryControl with traits
 
   // ----------------------------------------------------------------------- //
 
-  protected def beginConsumeDrops(entity: Entity) {
-    entity.captureDrops = true
+  protected def beginConsumeDrops(entity: Entity): Unit = {
+    entity.captureDrops(new java.util.ArrayList[ItemEntity]())
   }
 
 
-  protected def endConsumeDrops(player: Player, entity: Entity) {
-    entity.captureDrops = false
+  protected def endConsumeDrops(player: Player, entity: Entity): Unit = {
+    val captured = entity.captureDrops(null)
     // this inventory size check is a HACK to preserve old behavior that a agent can suck items out
     // of the capturedDrops. Ideally, we'd only pick up items off the ground. We could clear the
-    // capturedDrops when Player.attackTargetEntityWithCurrentItem() is called
+    // capturedDrops when Player.attack() is called
     // But this felt slightly less hacky, slightly
-    if (player.inventory.getSizeInventory > 0) {
-      for (drop <- entity.capturedDrops) {
-        if (!drop.isDead) {
-          val stack = drop.getEntityItem
+    if (player.inventory.getContainerSize > 0) {
+      for (drop <- captured) {
+        if (drop.isAlive) {
+          val stack = drop.getItem
           InventoryUtils.addToPlayerInventory(stack, player, spawnInWorld = false)
         }
       }
     }
-    entity.capturedDrops.clear()
   }
 
   // ----------------------------------------------------------------------- //
 
-  protected def checkSideForFace(args: Arguments, n: Int, facing: ForgeDirection) = agent.toGlobal(args.checkSideForFace(n, agent.toLocal(facing)))
+  protected def checkSideForFace(args: Arguments, n: Int, facing: Direction): Direction = agent.toGlobal(args.checkSideForFace(n, agent.toLocal(facing)))
 
-  protected def pick(player: Player, range: Double) = {
-    val origin = Vec3.createVectorHelper(
-      player.posX + player.facing.offsetX * 0.5,
-      player.posY + player.facing.offsetY * 0.5,
-      player.posZ + player.facing.offsetZ * 0.5)
-    val blockCenter = origin.addVector(
-      player.facing.offsetX * 0.51,
-      player.facing.offsetY * 0.51,
-      player.facing.offsetZ * 0.51)
-    val target = blockCenter.addVector(
-      player.side.offsetX * range,
-      player.side.offsetY * range,
-      player.side.offsetZ * range)
-    val hit = world.rayTraceBlocks(origin, target)
-    player.closestEntity[Entity]() match {
-      case Some(entity@(_: EntityLivingBase | _: EntityMinecart | _: entity.Drone)) if hit == null || Vec3.createVectorHelper(player.posX, player.posY, player.posZ).distanceTo(hit.hitVec) > player.getDistanceToEntity(entity) => new MovingObjectPosition(entity)
+  protected def pick(player: Player, range: Double): HitResult = {
+    val origin = new Vec3(
+      player.getX + player.facing.getStepX * 0.5,
+      player.getY + player.facing.getStepY * 0.5,
+      player.getZ + player.facing.getStepZ * 0.5)
+    val blockCenter = origin.add(
+      player.facing.getStepX * 0.51,
+      player.facing.getStepY * 0.51,
+      player.facing.getStepZ * 0.51)
+    val target = blockCenter.add(
+      player.side.getStepX * range,
+      player.side.getStepY * range,
+      player.side.getStepZ * range)
+    val hit = world.clip(new ClipContext(origin, target, ClipContext.Block.COLLIDER, ClipContext.Fluid.ANY, player))
+    player.closestEntity(classOf[Entity]) match {
+      case Some(entity@(_: LivingEntity | _: Minecart | _: entity.Drone)) if hit.getType == HitResult.Type.MISS || player.distanceToSqr(hit.getLocation) > player.distanceToSqr(entity) => new EntityHitResult(entity)
       case _ => hit
     }
   }
 
-  protected def clickParamsFromHit(hit: MovingObjectPosition) = {
-    (hit.blockX, hit.blockY, hit.blockZ,
-      (hit.hitVec.xCoord - hit.blockX).toFloat,
-      (hit.hitVec.yCoord - hit.blockY).toFloat,
-      (hit.hitVec.zCoord - hit.blockZ).toFloat)
+  protected def clickParamsFromHit(hit: BlockHitResult): (BlockPos, Float, Float, Float) = {
+    (hit.getBlockPos,
+      (hit.getLocation.x - hit.getBlockPos.getX).toFloat,
+      (hit.getLocation.y - hit.getBlockPos.getY).toFloat,
+      (hit.getLocation.z - hit.getBlockPos.getZ).toFloat)
   }
 
-  protected def clickParamsForItemUse(facing: ForgeDirection, side: ForgeDirection) = {
+  protected def clickParamsForItemUse(facing: Direction, side: Direction): (BlockPos, Float, Float, Float) = {
     val blockPos = position.offset(facing).offset(side)
-    (blockPos.x, blockPos.y, blockPos.z,
-      0.5f - side.offsetX * 0.5f,
-      0.5f - side.offsetY * 0.5f,
-      0.5f - side.offsetZ * 0.5f)
+    (blockPos.toBlockPos,
+      0.5f - side.getStepX * 0.5f,
+      0.5f - side.getStepY * 0.5f,
+      0.5f - side.getStepZ * 0.5f)
   }
 
-  protected def clickParamsForPlace(facing: ForgeDirection) = {
-    (position.x, position.y, position.z,
-      0.5f + facing.offsetX * 0.5f,
-      0.5f + facing.offsetY * 0.5f,
-      0.5f + facing.offsetZ * 0.5f)
+  protected def clickParamsForPlace(facing: Direction): (BlockPos, Float, Float, Float) = {
+    (position.toBlockPos,
+      0.5f + facing.getStepX * 0.5f,
+      0.5f + facing.getStepY * 0.5f,
+      0.5f + facing.getStepZ * 0.5f)
   }
 }

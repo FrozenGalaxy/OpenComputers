@@ -2,13 +2,17 @@ package li.cil.oc.server.fs
 
 import java.io
 import java.io.FileNotFoundException
-
 import li.cil.oc.api.fs.Mode
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.nbt.NBTTagList
-import net.minecraftforge.common.util.Constants.NBT
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
 
 import scala.collection.mutable
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
+import net.minecraft.nbt.Tag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
 trait VirtualFileSystem extends OutputStreamFileSystem {
   protected val root = new VirtualDirectory
@@ -126,14 +130,22 @@ trait VirtualFileSystem extends OutputStreamFileSystem {
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) = {
-    if (!this.isInstanceOf[Buffered]) root.load(nbt)
-    super.load(nbt) // Last to ensure streams can be re-opened.
+  override def loadData(nbt: CompoundTag): Unit = {
+    if(nbt.contains("root", Tag.TAG_COMPOUND)) {
+      root.loadData(nbt.getCompound("root"))
+    }
+
+    if(!this.isInstanceOf[Buffered]) root.loadData(nbt)
+    super.loadData(nbt) // Last to ensure streams can be re-opened.
   }
 
-  override def save(nbt: NBTTagCompound) = {
-    super.save(nbt) // First to allow flushing.
-    if (!this.isInstanceOf[Buffered]) root.save(nbt)
+  override def saveData(nbt: CompoundTag): Unit = {
+    super.saveData(nbt) // First to allow flushing.
+    if(!this.isInstanceOf[Buffered]) {
+      val fsNbt = new CompoundTag()
+      root.saveData(fsNbt)
+      nbt.put("root", fsNbt)
+    }
   }
 
   // ----------------------------------------------------------------------- //
@@ -149,13 +161,13 @@ trait VirtualFileSystem extends OutputStreamFileSystem {
 
     var lastModified = System.currentTimeMillis()
 
-    def load(nbt: NBTTagCompound) {
-      if (nbt.hasKey("lastModified"))
+    def loadData(nbt: CompoundTag): Unit = {
+      if (nbt.contains("lastModified"))
         lastModified = nbt.getLong("lastModified")
     }
 
-    def save(nbt: NBTTagCompound) {
-      nbt.setLong("lastModified", lastModified)
+    def saveData(nbt: CompoundTag): Unit = {
+      nbt.putLong("lastModified", lastModified)
     }
 
     def get(path: Iterable[String]): Option[VirtualObject] =
@@ -182,21 +194,21 @@ trait VirtualFileSystem extends OutputStreamFileSystem {
       else {
         if (mode == Mode.Write) {
           data.clear()
-          lastModified = System.currentTimeMillis()
+          this.lastModified = System.currentTimeMillis()
         }
         handle = Some(new VirtualOutputHandle(this, owner, id, path))
         handle
       }
 
-    override def load(nbt: NBTTagCompound) {
-      super.load(nbt)
+    override def loadData(nbt: CompoundTag): Unit = {
+      super.loadData(nbt)
       data.clear()
       data ++= nbt.getByteArray("data")
     }
 
-    override def save(nbt: NBTTagCompound) {
-      super.save(nbt)
-      nbt.setByteArray("data", data.toArray)
+    override def saveData(nbt: CompoundTag): Unit = {
+      super.saveData(nbt)
+      nbt.putByteArray("data", data.toArray)
     }
 
     override def canDelete = handle.isEmpty
@@ -219,7 +231,7 @@ trait VirtualFileSystem extends OutputStreamFileSystem {
       if (children.contains(name)) false
       else {
         children += name -> new VirtualDirectory
-        lastModified = System.currentTimeMillis()
+        this.lastModified = System.currentTimeMillis()
         true
       }
 
@@ -227,7 +239,7 @@ trait VirtualFileSystem extends OutputStreamFileSystem {
       children.get(name) match {
         case Some(child) if child.canDelete =>
           children -= name
-          lastModified = System.currentTimeMillis()
+          this.lastModified = System.currentTimeMillis()
           true
         case _ => false
       }
@@ -239,34 +251,38 @@ trait VirtualFileSystem extends OutputStreamFileSystem {
         case None =>
           val child = new VirtualFile
           children += name -> child
-          lastModified = System.currentTimeMillis()
+          this.lastModified = System.currentTimeMillis()
           Some(child)
         case _ => None // Directory.
       }
 
-    override def load(nbt: NBTTagCompound) {
-      super.load(nbt)
-      val childrenNbt = nbt.getTagList("children", NBT.TAG_COMPOUND)
-      (0 until childrenNbt.tagCount).map(childrenNbt.getCompoundTagAt).foreach(childNbt => {
+    private final val ChildrenTag = "children"
+    private final val IsDirectoryTag = "isDirectory"
+    private final val NameTag = "name"
+
+    override def loadData(nbt: CompoundTag): Unit = {
+      super.loadData(nbt)
+      val childrenNbt = nbt.getList(ChildrenTag, Tag.TAG_COMPOUND)
+      (0 until childrenNbt.size).map(childrenNbt.getCompound).foreach(childNbt => {
         val child =
-          if (childNbt.getBoolean("isDirectory")) new VirtualDirectory
+          if (childNbt.getBoolean(IsDirectoryTag)) new VirtualDirectory
           else new VirtualFile
-        child.load(childNbt)
-        children += childNbt.getString("name") -> child
+        child.loadData(childNbt)
+        children += childNbt.getString(NameTag) -> child
       })
     }
 
-    override def save(nbt: NBTTagCompound) {
-      super.save(nbt)
-      val childrenNbt = new NBTTagList()
+    override def saveData(nbt: CompoundTag): Unit = {
+      super.saveData(nbt)
+      val childrenNbt = new ListTag()
       for ((childName, child) <- children) {
-        val childNbt = new NBTTagCompound()
-        childNbt.setBoolean("isDirectory", child.isDirectory)
-        childNbt.setString("name", childName)
-        child.save(childNbt)
-        childrenNbt.appendTag(childNbt)
+        val childNbt = new CompoundTag()
+        childNbt.putBoolean(IsDirectoryTag, child.isDirectory)
+        childNbt.putString(NameTag, childName)
+        child.saveData(childNbt)
+        childrenNbt.add(childNbt)
       }
-      nbt.setTag("children", childrenNbt)
+      nbt.put(ChildrenTag, childrenNbt)
     }
 
     override def get(path: Iterable[String]) =

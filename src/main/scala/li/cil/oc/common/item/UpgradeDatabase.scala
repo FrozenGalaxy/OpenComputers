@@ -2,30 +2,48 @@ package li.cil.oc.common.item
 
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
-import li.cil.oc.common.GuiType
-import li.cil.oc.util.Rarity
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
+import li.cil.oc.common.container.DatabaseInventory
+import li.cil.oc.common.menu.MenuTypes
+import net.minecraft.core.component.DataComponents
+import li.cil.oc.util.ExtendedItemStack._
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.Level
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.InteractionResultHolder
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResult
+import net.minecraft.world.item.component.CustomData
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class UpgradeDatabase(val parent: Delegator, val tier: Int) extends traits.Delegate with traits.ItemTier {
-  override val unlocalizedName = super.unlocalizedName + tier
+class UpgradeDatabase(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
 
-  override protected def tooltipName = Option(super.unlocalizedName)
+  override protected def tooltipName = Option(unlocalizedName)
 
   override protected def tooltipData = Seq(Settings.get.databaseEntriesPerTier(tier))
 
-  override def rarity(stack: ItemStack) = Rarity.byTier(tier)
+  override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
+    if (!player.isCrouching) {
+      if (!level.isClientSide) player match {
+        case srvPlr: ServerPlayer => MenuTypes.openDatabaseGui(srvPlr, new DatabaseInventory {
+            override def container = stack
 
-  override def onItemRightClick(stack: ItemStack, world: World, player: EntityPlayer) = {
-    if (!player.isSneaking) {
-      player.openGui(OpenComputers, GuiType.Database.id, world, 0, 0, 0)
-      player.swingItem()
+            override def stillValid(player: Player) = player == srvPlr
+          })
+        case _ =>
+      }
+      player.swing(InteractionHand.MAIN_HAND)
     }
-    else if (stack.hasTagCompound && stack.getTagCompound.hasKey(Settings.namespace + "items")) {
-      stack.setTagCompound(null)
-      player.swingItem()
+    else {
+      CustomData.update(DataComponents.CUSTOM_DATA, stack, data => {
+        data.remove(Settings.namespace + "items")
+      })
+      player.swing(InteractionHand.MAIN_HAND)
     }
-    stack
+    new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
   }
 }

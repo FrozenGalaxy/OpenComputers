@@ -9,14 +9,14 @@ import li.cil.oc.common.Slot
 import li.cil.oc.common.Tier
 import li.cil.oc.server.component
 import li.cil.oc.server.component.UpgradeTrading
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
 
 object DriverUpgradeTrading extends Item with HostAware {
   override def worksWith(stack: ItemStack) = isOneOf(stack,
     api.Items.get(Constants.ItemName.TradingUpgrade))
 
   override def createEnvironment(stack: ItemStack, host: EnvironmentHost) =
-    if (host.world.isRemote) null
+    if (host.getEnvironmentLevel.isClientSide) null
     else new UpgradeTrading(host)
 
   override def slot(stack: ItemStack) = Slot.Upgrade

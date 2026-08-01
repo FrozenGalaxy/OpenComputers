@@ -1,10 +1,10 @@
 package li.cil.oc.server.fs
 
 import java.io
-
 import li.cil.oc.Settings
 import li.cil.oc.api.fs.Mode
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.core.HolderLookup
+import net.minecraft.nbt.CompoundTag
 
 trait Capacity extends OutputStreamFileSystem {
   private var used = computeSize("/")
@@ -58,17 +58,17 @@ trait Capacity extends OutputStreamFileSystem {
 
   // ----------------------------------------------------------------------- //
 
-  override def close() {
+  override def close(): Unit = {
     super.close()
     used = computeSize("/")
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
+  override def loadData(nbt: CompoundTag): Unit = {
     try {
       ignoreCapacity = true
-      super.load(nbt)
+      super.loadData(nbt)
     } finally {
       ignoreCapacity = false
     }
@@ -76,11 +76,11 @@ trait Capacity extends OutputStreamFileSystem {
     used = computeSize("/")
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
+  override def saveData(nbt: CompoundTag): Unit = {
+    super.saveData(nbt)
 
     // For the tooltip.
-    nbt.setLong("capacity.used", used)
+    nbt.putLong("capacity.used", used)
   }
 
   // ----------------------------------------------------------------------- //
@@ -89,7 +89,7 @@ trait Capacity extends OutputStreamFileSystem {
     val delta =
       if (exists(path))
         if (mode == Mode.Write)
-          -size(path) // Overwrite, file gets cleared.
+          -size(path).toInt // Overwrite, file gets cleared.
         else
           0 // Append, no immediate changes.
       else
@@ -128,7 +128,7 @@ trait Capacity extends OutputStreamFileSystem {
 
     override def seek(to: Long) = inner.seek(to)
 
-    override def write(b: Array[Byte]) {
+    override def write(b: Array[Byte]): Unit = {
       if (owner.capacity - owner.used < b.length && !ignoreCapacity)
         throw new io.IOException("not enough space")
       inner.write(b)

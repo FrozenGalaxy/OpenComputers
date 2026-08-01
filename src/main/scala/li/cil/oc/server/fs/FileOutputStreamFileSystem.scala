@@ -3,7 +3,8 @@ package li.cil.oc.server.fs
 import java.io
 import java.io.RandomAccessFile
 import li.cil.oc.api.fs.Mode
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.core.HolderLookup
+import net.minecraft.nbt.CompoundTag
 
 import java.nio.file.{Files, StandardCopyOption}
 
@@ -42,8 +43,8 @@ trait FileOutputStreamFileSystem extends FileInputStreamFileSystem with OutputSt
 
   // ----------------------------------------------------------------------- //
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
+  override def saveData(nbt: CompoundTag): Unit = {
+    super.saveData(nbt)
     root.mkdirs()
     root.setLastModified(System.currentTimeMillis())
   }
@@ -59,7 +60,7 @@ trait FileOutputStreamFileSystem extends FileInputStreamFileSystem with OutputSt
 
     override def length() = file.length()
 
-    override def close() {
+    override def close(): Unit = {
       super.close()
       file.close()
     }

@@ -8,10 +8,12 @@ import li.cil.oc.common.Slot
 import li.cil.oc.common.Tier
 import li.cil.oc.common.item.data.RobotData
 import li.cil.oc.util.ItemUtils
-import net.minecraft.inventory.IInventory
-import net.minecraft.item.ItemStack
+import net.minecraft.network.chat.Component
+import net.minecraft.world.Container
+import net.minecraft.world.item.ItemStack
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.JavaConverters.asJavaIterable
+import scala.collection.convert.ImplicitConversionsToJava._
 
 object RobotTemplate extends Template {
   override protected def hostClass = classOf[internal.Robot]
@@ -24,17 +26,17 @@ object RobotTemplate extends Template {
 
   def selectCreative(stack: ItemStack) = api.Items.get(stack) == api.Items.get(Constants.BlockName.CaseCreative)
 
-  def validate(inventory: IInventory): Array[AnyRef] = validateComputer(inventory)
+  def validate(inventory: Container): Array[AnyRef] = validateComputer(inventory)
 
-  def assemble(inventory: IInventory) = {
-    val items = (1 until inventory.getSizeInventory).map(inventory.getStackInSlot)
+  def assemble(inventory: Container) = {
+    val items = (1 until inventory.getContainerSize).map(inventory.getItem)
     val data = new RobotData()
     data.tier = caseTier(inventory)
-    data.name = RobotData.randomName
+    data.name = Component.literal(RobotData.randomName)
     data.robotEnergy = Settings.get.bufferRobot.toInt
     data.totalEnergy = data.robotEnergy
-    data.containers = items.take(3).filter(_ != null).toArray
-    data.components = items.drop(3).filter(_ != null).toArray
+    data.containers = items.take(3).filter(!_.isEmpty).toArray
+    data.components = items.drop(3).filter(!_.isEmpty).toArray
     val stack = data.createItemStack()
     val energy = Settings.get.robotBaseCost + complexity(inventory) * Settings.get.robotComplexityCost
 
@@ -50,7 +52,7 @@ object RobotTemplate extends Template {
     Array(api.Items.get(itemName).createItemStack(1)) ++ info.containers ++ info.components
   }
 
-  def register() {
+  def register(): Unit = {
     // Tier 1
     api.IMC.registerAssemblerTemplate(
       "Robot (Tier 1)",
@@ -187,5 +189,5 @@ object RobotTemplate extends Template {
       "li.cil.oc.common.template.RobotTemplate.disassemble")
   }
 
-  override protected def caseTier(inventory: IInventory) = ItemUtils.caseTier(inventory.getStackInSlot(0))
+  override protected def caseTier(inventory: Container) = ItemUtils.caseTier(inventory.getItem(0))
 }

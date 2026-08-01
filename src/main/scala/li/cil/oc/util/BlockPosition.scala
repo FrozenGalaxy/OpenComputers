@@ -1,41 +1,38 @@
 package li.cil.oc.util
 
-import appeng.api.util.DimensionalCoord
 import com.google.common.hash.Hashing
-import cpw.mods.fml.common.Optional
 import li.cil.oc.api.network.EnvironmentHost
-import li.cil.oc.integration.Mods
-import net.minecraft.entity.Entity
-import net.minecraft.util.AxisAlignedBB
-import net.minecraft.util.ChunkCoordinates
-import net.minecraft.util.Vec3
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.world.level.Level
+import net.minecraft.core.Direction
+import net.minecraft.world.phys.AABB
+import net.minecraft.core.BlockPos
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.phys.Vec3
 
-class BlockPosition(val x: Int, val y: Int, val z: Int, val world: Option[World]) {
-  def this(x: Double, y: Double, z: Double, world: Option[World] = None) = this(
+class BlockPosition(val x: Int, val y: Int, val z: Int, val world: Option[Level]) {
+  def this(x: Double, y: Double, z: Double, world: Option[Level] = None) = this(
     math.floor(x).toInt,
     math.floor(y).toInt,
     math.floor(z).toInt,
     world
   )
 
-  def offset(direction: ForgeDirection, n: Int) = new BlockPosition(
-    x + direction.offsetX * n,
-    y + direction.offsetY * n,
-    z + direction.offsetZ * n,
+  def offset(direction: Direction, n: Int) = new BlockPosition(
+    x + direction.getStepX * n,
+    y + direction.getStepY * n,
+    z + direction.getStepZ * n,
     world
   )
 
-  def offset(direction: ForgeDirection): BlockPosition = offset(direction, 1)
+  def offset(direction: Direction): BlockPosition = offset(direction, 1)
 
-  def offset(x: Double, y: Double, z: Double) = Vec3.createVectorHelper(this.x + x, this.y + y, this.z + z)
+  def offset(x: Double, y: Double, z: Double) = new Vec3(this.x + x, this.y + y, this.z + z)
 
-  def bounds = AxisAlignedBB.getBoundingBox(x, y, z, x + 1, y + 1, z + 1)
+  def bounds = new AABB(x, y, z, x + 1, y + 1, z + 1)
 
-  def toChunkCoordinates = new ChunkCoordinates(x, y, z)
+  def toBlockPos = new BlockPos(x, y, z)
 
-  def toVec3 = Vec3.createVectorHelper(x + 0.5, y + 0.5, z + 0.5)
+  def toVec3 = new Vec3(x + 0.5, y + 0.5, z + 0.5)
 
   override def equals(obj: scala.Any) = obj match {
     case position: BlockPosition => position.x == x && position.y == y && position.z == z && position.world == world
@@ -53,25 +50,30 @@ class BlockPosition(val x: Int, val y: Int, val z: Int, val world: Option[World]
       hash().
       asInt()
   }
+
+  def unapply(): Option[(Int, Int, Int)] = Some((x, y, z))
 }
 
 object BlockPosition {
-  def apply(x: Int, y: Int, z: Int, world: World) = new BlockPosition(x, y, z, Option(world))
+  def apply(x: Int, y: Int, z: Int, world: Level) = new BlockPosition(x, y, z, Option(world))
 
   def apply(x: Int, y: Int, z: Int) = new BlockPosition(x, y, z, None)
 
-  def apply(x: Double, y: Double, z: Double, world: World) = new BlockPosition(x, y, z, Option(world))
+  def apply(x: Double, y: Double, z: Double, world: Level) = new BlockPosition(x, y, z, Option(world))
 
   def apply(x: Double, y: Double, z: Double) = new BlockPosition(x, y, z, None)
 
-  def apply(v: Vec3) = new BlockPosition(v.xCoord, v.yCoord, v.zCoord, None)
+  def apply(v: Vec3) = new BlockPosition(v.x, v.y, v.z, None)
 
-  def apply(v: Vec3, world: World) = new BlockPosition(v.xCoord, v.yCoord, v.zCoord, Option(world))
+  def apply(v: Vec3, world: Level) = new BlockPosition(v.x, v.y, v.z, Option(world))
 
-  def apply(host: EnvironmentHost): BlockPosition = BlockPosition(host.xPosition, host.yPosition, host.zPosition, host.world)
+  def apply(host: EnvironmentHost): BlockPosition = BlockPosition(host.xPosition, host.yPosition, host.zPosition, host.getEnvironmentLevel)
 
-  def apply(entity: Entity): BlockPosition = BlockPosition(entity.posX, entity.posY, entity.posZ, entity.worldObj)
+  def apply(entity: Entity): BlockPosition = BlockPosition(entity.getX, entity.getY, entity.getZ, entity.level)
 
-  @Optional.Method(modid = Mods.IDs.AppliedEnergistics2)
-  def apply(coord: DimensionalCoord): BlockPosition = BlockPosition(coord.x, coord.y, coord.z, coord.getWorld)
+  def apply(pos: BlockPos, world: Level): BlockPosition = BlockPosition(pos.getX, pos.getY, pos.getZ, world)
+
+  def apply(pos: BlockPos): BlockPosition = BlockPosition(pos.getX, pos.getY, pos.getZ)
+  
+  def unapply(blockPos: BlockPos): Option[(Int, Int, Int)] = Some((blockPos.getX, blockPos.getY, blockPos.getZ))
 }

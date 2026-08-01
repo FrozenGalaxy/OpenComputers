@@ -2,14 +2,14 @@ package li.cil.oc.server.fs
 
 import java.io.FileNotFoundException
 import java.io.IOException
-
 import li.cil.oc.api
 import li.cil.oc.api.fs.Mode
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.nbt.NBTTagList
-import net.minecraftforge.common.util.Constants.NBT
+import net.minecraft.core.HolderLookup
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
 
 import scala.collection.mutable
+import net.minecraft.nbt.Tag
 
 trait OutputStreamFileSystem extends InputStreamFileSystem {
   private val handles = mutable.Map.empty[Int, OutputHandle]
@@ -46,13 +46,17 @@ trait OutputStreamFileSystem extends InputStreamFileSystem {
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
+  private final val OutputTag = "output"
+  private final val HandleTag = "handle"
+  private final val PathTag = "path"
 
-    val handlesNbt = nbt.getTagList("output", NBT.TAG_COMPOUND)
-    (0 until handlesNbt.tagCount).map(handlesNbt.getCompoundTagAt).foreach(handleNbt => {
-      val handle = handleNbt.getInteger("handle")
-      val path = handleNbt.getString("path")
+  override def loadData(nbt: CompoundTag): Unit = {
+    super.loadData(nbt)
+
+    val handlesNbt = nbt.getList(OutputTag, Tag.TAG_COMPOUND)
+    (0 until handlesNbt.size).map(handlesNbt.getCompound).foreach(handleNbt => {
+      val handle = handleNbt.getInt(HandleTag)
+      val path = handleNbt.getString(PathTag)
       openOutputHandle(handle, path, Mode.Append) match {
         case Some(fileHandle) => handles += handle -> fileHandle
         case _ => // The source file seems to have changed since last time.
@@ -60,18 +64,18 @@ trait OutputStreamFileSystem extends InputStreamFileSystem {
     })
   }
 
-  override def save(nbt: NBTTagCompound) = this.synchronized {
-    super.save(nbt)
+  override def saveData(nbt: CompoundTag): Unit = this.synchronized {
+    super.saveData(nbt)
 
-    val handlesNbt = new NBTTagList()
+    val handlesNbt = new ListTag()
     for (file <- handles.values) {
       assert(!file.isClosed)
-      val handleNbt = new NBTTagCompound()
-      handleNbt.setInteger("handle", file.handle)
-      handleNbt.setString("path", file.path)
-      handlesNbt.appendTag(handleNbt)
+      val handleNbt = new CompoundTag()
+      handleNbt.putInt(HandleTag, file.handle)
+      handleNbt.putString(PathTag, file.path)
+      handlesNbt.add(handleNbt)
     }
-    nbt.setTag("output", handlesNbt)
+    nbt.put(OutputTag, handlesNbt)
   }
 
   // ----------------------------------------------------------------------- //

@@ -7,14 +7,17 @@ import li.cil.oc.api
 import li.cil.oc.common.Slot
 import li.cil.oc.common.Tier
 import li.cil.oc.common.item
-import li.cil.oc.common.item.Delegator
 import li.cil.oc.server.component
 import li.cil.oc.server.machine.luac.NativeLuaArchitecture
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.util.ItemUtils
+import net.minecraft.core.component.DataComponents
+import li.cil.oc.util.ExtendedItemStack._
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.world.item.component.CustomData
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 
 object DriverCPU extends DriverCPU
 
@@ -22,7 +25,8 @@ abstract class DriverCPU extends Item with api.driver.item.MutableProcessor with
   override def worksWith(stack: ItemStack) = isOneOf(stack,
     api.Items.get(Constants.ItemName.CPUTier1),
     api.Items.get(Constants.ItemName.CPUTier2),
-    api.Items.get(Constants.ItemName.CPUTier3))
+    api.Items.get(Constants.ItemName.CPUTier3),
+    api.Items.get(Constants.ItemName.CPUTier4))
 
   override def createEnvironment(stack: ItemStack, host: api.network.EnvironmentHost): api.network.ManagedEnvironment = new component.CPU(tier(stack))
 
@@ -31,18 +35,19 @@ abstract class DriverCPU extends Item with api.driver.item.MutableProcessor with
   override def tier(stack: ItemStack) = cpuTier(stack)
 
   def cpuTier(stack: ItemStack): Int =
-    Delegator.subItem(stack) match {
-      case Some(cpu: item.CPU) => cpu.cpuTier
+    stack.getItem match {
+      case cpu: item.CPU => cpu.cpuTier
       case _ => Tier.One
     }
 
   override def supportedComponents(stack: ItemStack) = Settings.get.cpuComponentSupport(cpuTier(stack))
 
-  override def allArchitectures = api.Machine.architectures.toList
+  override def allArchitectures = api.Machine.architectures
 
   override def architecture(stack: ItemStack): Class[_ <: api.machine.Architecture] = {
-    if (stack.hasTagCompound) {
-      val archClass = stack.getTagCompound.getString(Settings.namespace + "archClass") match {
+    val tag = ItemUtils.getTag(stack)
+    if(tag != null) {
+      val archClass = tag.getString(Settings.namespace + "archClass") match {
         case clazz if clazz == classOf[NativeLuaArchitecture].getName =>
           // Migrate old saved CPUs to new versions (since the class they refer still
           // exists, but is abstract, which would lead to issues).
@@ -52,8 +57,10 @@ abstract class DriverCPU extends Item with api.driver.item.MutableProcessor with
       if (!archClass.isEmpty) try return Class.forName(archClass).asSubclass(classOf[api.machine.Architecture]) catch {
         case t: Throwable =>
           OpenComputers.log.warn("Failed getting class for CPU architecture. Resetting CPU to use the default.", t)
-          stack.getTagCompound.removeTag(Settings.namespace + "archClass")
-          stack.getTagCompound.removeTag(Settings.namespace + "archName")
+          CustomData.update(DataComponents.CUSTOM_DATA, stack, tag => {
+            tag.remove(Settings.namespace + "archClass")
+            tag.remove(Settings.namespace + "archName")
+          })
       }
     }
     api.Machine.architectures.headOption.orNull
@@ -61,10 +68,12 @@ abstract class DriverCPU extends Item with api.driver.item.MutableProcessor with
 
   override def setArchitecture(stack: ItemStack, architecture: Class[_ <: api.machine.Architecture]): Unit = {
     if (!worksWith(stack)) throw new IllegalArgumentException("Unsupported processor type.")
-    if (!stack.hasTagCompound) stack.setTagCompound(new NBTTagCompound())
-    stack.getTagCompound.setString(Settings.namespace + "archClass", architecture.getName)
-    stack.getTagCompound.setString(Settings.namespace + "archName", api.Machine.getArchitectureName(architecture))
+
+    CustomData.update(DataComponents.CUSTOM_DATA, stack, data => {
+      data.putString(Settings.namespace + "archClass", architecture.getName)
+      data.putString(Settings.namespace + "archName", api.Machine.getArchitectureName(architecture))
+    })
   }
 
-  override def getCallBudget(stack: ItemStack): Double = Settings.get.callBudgets(tier(stack) max Tier.One min Tier.Three)
+  override def getCallBudget(stack: ItemStack): Double = Settings.get.callBudgets(tier(stack) max Tier.One min Tier.Four)
 }

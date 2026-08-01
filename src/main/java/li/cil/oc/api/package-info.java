@@ -14,8 +14,8 @@
  * <br>
  * Note that for tile entities you implement yourself, you will not have to
  * provide a driver, as long as you implement the necessary interface:
- * {@link li.cil.oc.api.network.Environment} and call {@link li.cil.oc.api.Network#joinOrCreateNetwork(net.minecraft.tileentity.TileEntity)}
- * in the first <tt>updateEntity()</tt> call. For items that should be installed
+ * {@link li.cil.oc.api.network.Environment} and call {@link li.cil.oc.api.Network#joinOrCreateNetwork(BlockEntity)}
+ * in the first {@code tick()} call. For items that should be installed
  * in a computer you will always have to provide a driver.
  * </dd>
  * <dt>The {@link li.cil.oc.api.FileSystem} API</dt>
@@ -28,14 +28,13 @@
  * <dd>
  * This API provides interfaces that allow interacting with the internal network
  * and creating nodes, components and power connectors for said network. If you
- * implement <tt>Environment</tt> in your tile entity or provide a
- * {@link li.cil.oc.api.network.ManagedEnvironment} via a driver you'll want to
- * create a node. This API provides factory methods for creating it.
+ * implement {@link li.cil.oc.api.network.Environment Environment} in your
+ * tile entity or provide a {@link li.cil.oc.api.network.ManagedEnvironment}
+ * via a driver you'll want to create a node. This API provides factory methods
+ * for creating it.
  * </dd>
  * </dl>
  */
-@cpw.mods.fml.common.API(
-        owner = API.ID_OWNER,
-        provides = "OpenComputersAPI|Core",
-        apiVersion = API.VERSION)
 package li.cil.oc.api;
+
+import net.minecraft.world.level.block.entity.BlockEntity;

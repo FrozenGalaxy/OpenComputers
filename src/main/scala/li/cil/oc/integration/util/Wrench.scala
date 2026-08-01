@@ -1,11 +1,11 @@
 package li.cil.oc.integration.util
 
 import java.lang.reflect.Method
-
 import li.cil.oc.common.IMC
-import li.cil.oc.util.BlockPosition
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
+import net.minecraft.core.BlockPos
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.player.Player
 
 import scala.collection.mutable
 
@@ -17,11 +17,11 @@ object Wrench {
 
   def addCheck(checker: Method): Unit = checks += checker
 
-  def isWrench(stack: ItemStack): Boolean = stack != null && checks.exists(IMC.tryInvokeStatic(_, stack)(false))
+  def isWrench(stack: ItemStack): Boolean = !stack.isEmpty && checks.exists(IMC.tryInvokeStatic(_, stack)(false))
 
-  def holdsApplicableWrench(player: EntityPlayer, position: BlockPosition): Boolean =
-    player.getHeldItem != null && usages.exists(IMC.tryInvokeStatic(_, player, Int.box(position.x), Int.box(position.y), Int.box(position.z), Boolean.box(false))(false))
+  def holdsApplicableWrench(player: Player, position: BlockPos): Boolean =
+    !player.getItemInHand(InteractionHand.MAIN_HAND).isEmpty && usages.exists(IMC.tryInvokeStatic(_, player, position, java.lang.Boolean.FALSE)(false))
 
-  def wrenchUsed(player: EntityPlayer, position: BlockPosition): Unit =
-    if (player.getHeldItem != null) usages.foreach(IMC.tryInvokeStaticVoid(_, player, Int.box(position.x), Int.box(position.y), Int.box(position.z), Boolean.box(true)))
+  def wrenchUsed(player: Player, position: BlockPos): Unit =
+    if (!player.getItemInHand(InteractionHand.MAIN_HAND).isEmpty) usages.foreach(IMC.tryInvokeStaticVoid(_, player, position, java.lang.Boolean.TRUE))
 }

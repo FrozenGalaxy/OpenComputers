@@ -3,32 +3,35 @@ package li.cil.oc.integration.opencomputers
 import li.cil.oc.Constants
 import li.cil.oc.Settings
 import li.cil.oc.api
-import li.cil.oc.api.network.Component
-import li.cil.oc.api.network.EnvironmentHost
-import li.cil.oc.api.network.Visibility
+import li.cil.oc.api.network.{Component, EnvironmentHost, ManagedEnvironment, Visibility}
 import li.cil.oc.common.Slot
 import li.cil.oc.common.item.Tablet
 import li.cil.oc.common.item.data.TabletData
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraftforge.common.util.Constants.NBT
+import li.cil.oc.util.ItemUtils
+import net.minecraft.core.component.DataComponents
+import li.cil.oc.util.ExtendedItemStack._
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.{CompoundTag, Tag}
+import net.minecraft.world.item.component.CustomData
+
+import java.util.function.Consumer
 
 object DriverTablet extends Item {
-  override def worksWith(stack: ItemStack) = isOneOf(stack,
+  override def worksWith(stack: ItemStack): Boolean = isOneOf(stack,
     api.Items.get(Constants.ItemName.Tablet))
 
-  override def createEnvironment(stack: ItemStack, host: EnvironmentHost) =
-    if (host.world != null && host.world.isRemote) null
+  override def createEnvironment(stack: ItemStack, host: EnvironmentHost): ManagedEnvironment =
+    if (host.getEnvironmentLevel != null && host.getEnvironmentLevel.isClientSide) null
     else {
-      Tablet.Server.cache.invalidate(Tablet.getId(stack))
+      Tablet.Server.cache.invalidate(Tablet.getOrCreateId(stack))
       val data = new TabletData(stack)
-      data.items.collect {
-        case Some(fs) if DriverFileSystem.worksWith(fs) => fs
-      }.headOption.map(DriverFileSystem.createEnvironment(_, host)) match {
+      data.items.collectFirst {
+        case fs if !fs.isEmpty && DriverFileSystem.worksWith(fs) => fs
+      }.map(DriverFileSystem.createEnvironment(_, host)) match {
         case Some(environment) => environment.node match {
           case component: Component =>
             component.setVisibility(Visibility.Network)
-            environment.save(dataTag(stack))
+            environment.saveData(stack)
             environment
           case _ => null
         }
@@ -38,27 +41,27 @@ object DriverTablet extends Item {
 
   override def slot(stack: ItemStack) = Slot.Tablet
 
-  override def dataTag(stack: ItemStack) = {
+  def mapToDataTag(stack: ItemStack, tag: CompoundTag): CompoundTag = {
     val data = new TabletData(stack)
     val index = data.items.indexWhere {
-      case Some(fs) => DriverFileSystem.worksWith(fs)
+      case fs if !fs.isEmpty => DriverFileSystem.worksWith(fs)
       case _ => false
     }
-    if (index >= 0 && stack.hasTagCompound && stack.getTagCompound.hasKey(Settings.namespace + "items")) {
-      val baseTag = stack.getTagCompound.getTagList(Settings.namespace + "items", NBT.TAG_COMPOUND).getCompoundTagAt(index)
-      if (!baseTag.hasKey("item")) {
-        baseTag.setTag("item", new NBTTagCompound())
+    if (index >= 0 && tag != null && tag.contains(Settings.namespace + "items")) {
+      val baseTag = tag.getList(Settings.namespace + "items", Tag.TAG_COMPOUND).getCompound(index)
+      if (!baseTag.contains("item")) {
+        baseTag.put("item", new CompoundTag())
       }
-      val itemTag = baseTag.getCompoundTag("item")
-      if (!itemTag.hasKey("tag")) {
-        itemTag.setTag("tag", new NBTTagCompound())
+      val itemTag = baseTag.getCompound("item")
+      if (!itemTag.contains("tag")) {
+        itemTag.put("tag", new CompoundTag())
       }
-      val stackTag = itemTag.getCompoundTag("tag")
-      if (!stackTag.hasKey(Settings.namespace + "data")) {
-        stackTag.setTag(Settings.namespace + "data", new NBTTagCompound())
+      val stackTag = itemTag.getCompound("tag")
+      if (!stackTag.contains(Settings.namespace + "data")) {
+        stackTag.put(Settings.namespace + "data", new CompoundTag())
       }
-      stackTag.getCompoundTag(Settings.namespace + "data")
+      stackTag.getCompound(Settings.namespace + "data")
     }
-    else new NBTTagCompound()
+    else new CompoundTag()
   }
 }

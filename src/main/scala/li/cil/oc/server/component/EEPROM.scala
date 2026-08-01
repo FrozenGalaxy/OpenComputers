@@ -1,7 +1,6 @@
 package li.cil.oc.server.component
 
 import java.util
-
 import com.google.common.hash.Hashing
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
@@ -13,12 +12,18 @@ import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network._
-import li.cil.oc.api.prefab
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsJava._
+import java.nio.ByteBuffer
+import scala.collection.convert.ImplicitConversionsToJava._
 
-class EEPROM extends prefab.ManagedEnvironment with DeviceInfo {
+class EEPROM extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Neighbors).
     withComponent("eeprom", Visibility.Neighbors).
     withConnector().
@@ -55,10 +60,10 @@ class EEPROM extends prefab.ManagedEnvironment with DeviceInfo {
   @Callback(doc = """function(data:string) -- Overwrite the currently stored byte array.""")
   def set(context: Context, args: Arguments): Array[AnyRef] = {
     if (readonly) {
-      return result(Unit, "storage is readonly")
+      return result((), "storage is readonly")
     }
     if (!node.tryChangeBuffer(-Settings.get.eepromWriteCost)) {
-      return result(Unit, "not enough energy")
+      return result((), "not enough energy")
     }
     val newData = args.optByteArray(0, Array.empty[Byte])
     if (newData.length > Settings.get.eepromSize) throw new IllegalArgumentException("not enough space")
@@ -73,7 +78,7 @@ class EEPROM extends prefab.ManagedEnvironment with DeviceInfo {
   @Callback(doc = """function(data:string):string -- Set the label of the EEPROM.""")
   def setLabel(context: Context, args: Arguments): Array[AnyRef] = {
     if (readonly) {
-      return result(Unit, "storage is readonly")
+      return result((), "storage is readonly")
     }
     label = args.optString(0, "EEPROM").trim.take(24)
     if (label.isEmpty) label = "EEPROM"
@@ -92,7 +97,7 @@ class EEPROM extends prefab.ManagedEnvironment with DeviceInfo {
       readonly = true
       result(true)
     }
-    else result(Unit, "incorrect checksum")
+    else result((), "incorrect checksum")
   }
 
   @Callback(direct = true, doc = """function():number -- Get the storage capacity of this EEPROM.""")
@@ -104,7 +109,7 @@ class EEPROM extends prefab.ManagedEnvironment with DeviceInfo {
   @Callback(doc = """function(data:string) -- Overwrite the currently stored byte array.""")
   def setData(context: Context, args: Arguments): Array[AnyRef] = {
     if (!node.tryChangeBuffer(-Settings.get.eepromWriteCost)) {
-      return result(Unit, "not enough energy")
+      return result((), "not enough energy")
     }
     val newData = args.optByteArray(0, Array.empty[Byte])
     if (newData.length > Settings.get.eepromDataSize) throw new IllegalArgumentException("not enough space")
@@ -115,21 +120,27 @@ class EEPROM extends prefab.ManagedEnvironment with DeviceInfo {
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    codeData = nbt.getByteArray(Settings.namespace + "eeprom")
-    if (nbt.hasKey(Settings.namespace + "label")) {
-      label = nbt.getString(Settings.namespace + "label")
-    }
-    readonly = nbt.getBoolean(Settings.namespace + "readonly")
-    volatileData = nbt.getByteArray(Settings.namespace + "userdata")
+  private def asArray(buffer: ByteBuffer): Array[Byte] = if(buffer.hasArray) {
+    buffer.array
+  } else {
+    val array = Array.fill[Byte](buffer.remaining()) { 0 }
+    buffer.get(array)
+    array
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setByteArray(Settings.namespace + "eeprom", codeData)
-    nbt.setString(Settings.namespace + "label", label)
-    nbt.setBoolean(Settings.namespace + "readonly", readonly)
-    nbt.setByteArray(Settings.namespace + "userdata", volatileData)
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+    for(code <- holder.getComponent(OCComponents.EEPROM_CODE)) codeData = asArray(code)
+    for(data <- holder.getComponent(OCComponents.EEPROM_DATA)) volatileData = asArray(data)
+    for(label <- holder.getComponent(OCComponents.LABEL)) this.label = label
+    this.readonly = holder.getComponent(OCComponents.READONLY) getOrElse false
+  }
+
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    holder.setComponent(OCComponents.EEPROM_CODE, ByteBuffer.wrap(codeData))
+    holder.setComponent(OCComponents.EEPROM_DATA, ByteBuffer.wrap(volatileData))
+    holder.setComponent(OCComponents.LABEL, label)
+    holder.setComponent(OCComponents.READONLY, Option.when(readonly) { true })
   }
 }

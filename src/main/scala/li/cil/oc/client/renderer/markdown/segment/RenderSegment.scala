@@ -1,10 +1,13 @@
 package li.cil.oc.client.renderer.markdown.segment
 
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.systems.RenderSystem
+import org.joml.Vector4f
 import li.cil.oc.api.manual.ImageRenderer
 import li.cil.oc.api.manual.InteractiveImageRenderer
 import li.cil.oc.client.renderer.markdown.Document
 import li.cil.oc.client.renderer.markdown.MarkupFormat
-import net.minecraft.client.gui.FontRenderer
+import net.minecraft.client.gui.{Font, GuiGraphics}
 import org.lwjgl.opengl.GL11
 
 private[markdown] class RenderSegment(val parent: Segment, val title: String, val imageRenderer: ImageRenderer) extends InteractiveSegment {
@@ -27,11 +30,11 @@ private[markdown] class RenderSegment(val parent: Segment, val title: String, va
 
   def imageHeight(maxWidth: Int) = math.ceil(imageRenderer.getHeight * scale(maxWidth)).toInt + 4
 
-  override def nextY(indent: Int, maxWidth: Int, renderer: FontRenderer): Int = imageHeight(maxWidth) + (if (indent > 0) Document.lineHeight(renderer) else 0)
+  override def nextY(indent: Int, maxWidth: Int, renderer: Font): Int = imageHeight(maxWidth) + (if (indent > 0) Document.lineHeight(renderer) else 0)
 
-  override def nextX(indent: Int, maxWidth: Int, renderer: FontRenderer): Int = 0
+  override def nextX(indent: Int, maxWidth: Int, renderer: Font): Int = 0
 
-  override def render(x: Int, y: Int, indent: Int, maxWidth: Int, renderer: FontRenderer, mouseX: Int, mouseY: Int): Option[InteractiveSegment] = {
+  override def render(graphics: GuiGraphics, x: Int, y: Int, indent: Int, maxWidth: Int, renderer: Font, mouseX: Int, mouseY: Int): Option[InteractiveSegment] = {
     val width = imageWidth(maxWidth)
     val height = imageHeight(maxWidth)
     val xOffset = (maxWidth - width) / 2
@@ -42,35 +45,34 @@ private[markdown] class RenderSegment(val parent: Segment, val title: String, va
     lastY = y + yOffset
 
     val hovered = checkHovered(mouseX, mouseY, x + xOffset, y + yOffset, width, height)
+    val stack = graphics.pose
 
-    GL11.glPushMatrix()
-    GL11.glTranslatef(x + xOffset, y + yOffset, 0)
-    GL11.glScalef(s, s, s)
+    stack.pushPose()
+    stack.translate(x + xOffset, y + yOffset, 0)
+    stack.scale(s, s, s)
 
-    GL11.glEnable(GL11.GL_BLEND)
-    GL11.glEnable(GL11.GL_ALPHA_TEST)
+    RenderSystem.enableBlend()
+    //RenderSystem.enableAlphaTest()
+    // Disabled by text rendering above it (default state is disabled).
+    RenderSystem.enableDepthTest()
 
     if (hovered.isDefined) {
-      GL11.glColor4f(1, 1, 1, 0.15f)
-      GL11.glDisable(GL11.GL_TEXTURE_2D)
-      GL11.glBegin(GL11.GL_QUADS)
-      GL11.glVertex2f(0, 0)
-      GL11.glVertex2f(0, imageRenderer.getHeight)
-      GL11.glVertex2f(imageRenderer.getWidth, imageRenderer.getHeight)
-      GL11.glVertex2f(imageRenderer.getWidth, 0)
-      GL11.glEnd()
-      GL11.glEnable(GL11.GL_TEXTURE_2D)
+      stack.pushPose()
+      val color = 0x26FFFFFF
+      graphics.fill(0, 0, imageRenderer.getWidth, imageRenderer.getHeight, color)
+
+      stack.popPose()
     }
 
-    GL11.glColor4f(1, 1, 1, 1)
+    RenderSystem.setShaderColor(1, 1, 1, 1)
 
-    imageRenderer.render(mouseX - x, mouseY - y)
+    imageRenderer.render(graphics, mouseX - x, mouseY - y)
 
-    GL11.glDisable(GL11.GL_BLEND)
-    GL11.glDisable(GL11.GL_ALPHA_TEST)
-    GL11.glDisable(GL11.GL_LIGHTING)
+    RenderSystem.disableBlend()
+    //RenderSystem.disableAlphaTest()
+    //RenderSystem.disableLighting()
 
-    GL11.glPopMatrix()
+    stack.popPose()
 
     hovered
   }

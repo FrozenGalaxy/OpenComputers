@@ -1,83 +1,111 @@
 package li.cil.oc.common.block
 
+import li.cil.oc.client.KeyBindings
+import li.cil.oc.common.block.property.PropertyRotatable
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.common.item.data.RaidData
+import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.server.loot.LootFunctions
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import li.cil.oc.util.Tooltip
+import net.minecraft.core.BlockPos
+import net.minecraft.network.chat.{Component => ITextComponent}
+import net.minecraft.server.level.{ServerPlayer => ServerPlayerEntity}
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.player.{Player => PlayerEntity}
+import net.minecraft.world.item.Item.TooltipContext
+import net.minecraft.world.item.{ItemStack, TooltipFlag => ITooltipFlag}
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.block.state.{BlockState, StateDefinition => StateContainer}
+import net.minecraft.world.level.storage.loot.LootParams
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams
+import net.minecraft.world.level.{Level => World}
+
 import java.util
 
-import li.cil.oc.client.KeyBindings
-import li.cil.oc.common.GuiType
-import li.cil.oc.common.item.data.RaidData
-import li.cil.oc.common.tileentity
-import net.minecraft.entity.EntityLivingBase
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
 
-import scala.reflect.ClassTag
+class Raid(props: Properties) extends SimpleBlock(props) with traits.GUI {
 
-class Raid(protected implicit val tileTag: ClassTag[tileentity.Raid]) extends SimpleBlock with traits.GUI with traits.CustomDrops[tileentity.Raid] {
-  override protected def customTextures = Array(
-    None,
-    None,
-    Some("RaidSide"),
-    Some("RaidFront"),
-    Some("RaidSide"),
-    Some("RaidSide")
-  )
+  protected override def createBlockStateDefinition(builder: StateContainer.Builder[Block, BlockState]) =
+    builder.add(PropertyRotatable.Facing)
 
-  // ----------------------------------------------------------------------- //
-
-  override protected def tooltipTail(metadata: Int, stack: ItemStack, player: EntityPlayer, tooltip: util.List[String], advanced: Boolean) {
-    super.tooltipTail(metadata, stack, player, tooltip, advanced)
+  override protected def tooltipTail(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
+    super.tooltipTail(stack, context, tooltip, advanced)
     if (KeyBindings.showExtendedTooltips) {
       val data = new RaidData(stack)
-      for (disk <- data.disks if disk != null) {
-        tooltip.add("- " + disk.getDisplayName)
+      for (disk <- data.disks if !disk.isEmpty) {
+        tooltip.add(ITextComponent.literal("- " + disk.getHoverName.getString).setStyle(Tooltip.DefaultStyle))
       }
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def guiType = GuiType.Raid
+  override def openGui(player: ServerPlayerEntity, world: World, pos: BlockPos): Unit = world.getBlockEntity(pos) match {
+    case te: blockentity.Raid => MenuTypes.openRaidGui(player, te)
+    case _ =>
+  }
 
-  override def hasTileEntity(metadata: Int) = true
-
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Raid()
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.Raid(pos, state)
 
   // ----------------------------------------------------------------------- //
 
-  override def hasComparatorInputOverride = true
+  override def hasAnalogOutputSignal(state: BlockState): Boolean = true
 
-  override def getComparatorInputOverride(world: World, x: Int, y: Int, z: Int, side: Int) =
-    world.getTileEntity(x, y, z) match {
-      case raid: tileentity.Raid if raid.presence.forall(ok => ok) => 15
+  override def getAnalogOutputSignal(state: BlockState, world: World, pos: BlockPos): Int =
+    world.getBlockEntity(pos) match {
+      case raid: blockentity.Raid if raid.presence.forall(ok => ok) => 15
       case _ => 0
     }
 
-  override protected def doCustomInit(tileEntity: tileentity.Raid, player: EntityLivingBase, stack: ItemStack): Unit = {
-    super.doCustomInit(tileEntity, player, stack)
-    if (!tileEntity.world.isRemote) {
-      val data = new RaidData(stack)
-      for (i <- 0 until math.min(data.disks.length, tileEntity.getSizeInventory)) {
-        tileEntity.setInventorySlotContents(i, data.disks(i))
+  override def setPlacedBy(world: World, pos: BlockPos, state: BlockState, placer: LivingEntity, stack: ItemStack): Unit = {
+    super.setPlacedBy(world, pos, state, placer, stack)
+    world.getBlockEntity(pos) match {
+      case tileEntity: blockentity.Raid if !world.isClientSide => {
+        val data = new RaidData(stack)
+        for (i <- 0 until math.min(data.disks.length, tileEntity.getContainerSize)) {
+          tileEntity.setItem(i, data.disks(i))
+        }
+        data.label.foreach(tileEntity.label.setLabel)
+        for(address <- stack.getComponent(OCComponents.ADDRESS)) {
+          tileEntity.tryCreateRaid(address)
+          tileEntity.filesystem.foreach(_.loadData(stack))
+        }
       }
-      data.label.foreach(tileEntity.label.setLabel)
-      if (!data.filesystem.hasNoTags) {
-        tileEntity.tryCreateRaid(data.filesystem.getCompoundTag("node").getString("address"))
-        tileEntity.filesystem.foreach(_.load(data.filesystem))
-      }
+      case _ =>
     }
   }
 
-  override protected def doCustomDrops(tileEntity: tileentity.Raid, player: EntityPlayer, willHarvest: Boolean): Unit = {
-    super.doCustomDrops(tileEntity, player, willHarvest)
-    val stack = createItemStack()
-    if (tileEntity.items.exists(_.isDefined)) {
-      val data = new RaidData()
-      data.disks = tileEntity.items.map(_.orNull)
-      tileEntity.filesystem.foreach(_.save(data.filesystem))
-      data.label = Option(tileEntity.label.getLabel)
-      data.save(stack)
+  override def getDrops(state: BlockState, ctx: LootParams.Builder): util.List[ItemStack] = {
+    val newCtx = ctx.withDynamicDrop(LootFunctions.DYN_ITEM_DATA, f => {
+      ctx.getOptionalParameter(LootContextParams.BLOCK_ENTITY) match {
+        case tileEntity: blockentity.Raid =>
+          val stack = createItemStack()
+          if (tileEntity.items.exists(!_.isEmpty)) {
+            val data = new RaidData()
+            data.disks = tileEntity.items.clone()
+            val reg = tileEntity.getLevel.registryAccess()
+            tileEntity.filesystem.foreach(_.saveData(stack))
+            data.label = Option(tileEntity.label.getLabel(reg))
+            data.saveData(stack)
+          }
+          f.accept(stack)
+        case _ =>
+      }
+    })
+    super.getDrops(state, newCtx)
+  }
+
+  override def playerWillDestroy(world: World, pos: BlockPos, state: BlockState, player: PlayerEntity): BlockState = {
+    if (!world.isClientSide && player.isCreative) {
+      world.getBlockEntity(pos) match {
+        case tileEntity: blockentity.Raid if tileEntity.items.exists(!_.isEmpty) =>
+          Block.dropResources(state, world, pos, tileEntity, player, player.getMainHandItem)
+        case _ =>
+      }
     }
-    dropBlockAsItem(tileEntity.world, tileEntity.x, tileEntity.y, tileEntity.z, stack)
+    super.playerWillDestroy(world, pos, state, player)
   }
 }

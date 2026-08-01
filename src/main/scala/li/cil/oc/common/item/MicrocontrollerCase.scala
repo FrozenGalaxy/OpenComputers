@@ -1,11 +1,16 @@
 package li.cil.oc.common.item
 
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class MicrocontrollerCase(val parent: Delegator, val tier: Int) extends traits.Delegate with traits.ItemTier {
-  override val unlocalizedName = super.unlocalizedName + tier
+
+class MicrocontrollerCase(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
 
   override protected def tierFromDriver(stack: ItemStack) = tier
 
-  override protected def tooltipName = Option(super.unlocalizedName)
+  override protected def tooltipName = Option(unlocalizedName)
 }

@@ -1,34 +1,17 @@
 package li.cil.oc.common.block
 
-import li.cil.oc.Settings
-import li.cil.oc.client.Textures
-import li.cil.oc.common.tileentity
-import li.cil.oc.integration.coloredlights.ModColoredLights
-import net.minecraft.client.renderer.texture.IIconRegister
-import net.minecraft.world.World
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.blockentity.BlockEntityTypes
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.entity.{BlockEntity, BlockEntityType}
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.{BlockGetter => IBlockReader}
+import net.minecraft.world.level.{Level => World}
+import net.minecraft.world.level.block.state.BlockState
 
-class PowerDistributor extends SimpleBlock {
-  ModColoredLights.setLightLevel(this, 5, 5, 3)
+class PowerDistributor(props: Properties) extends SimpleBlock(props) with traits.Tickable {
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.PowerDistributor(pos, state)
 
-  override protected def customTextures = Array(
-    None,
-    Some("PowerDistributorTop"),
-    Some("PowerDistributorSide"),
-    Some("PowerDistributorSide"),
-    Some("PowerDistributorSide"),
-    Some("PowerDistributorSide")
-  )
-
-  override def registerBlockIcons(iconRegister: IIconRegister) = {
-    super.registerBlockIcons(iconRegister)
-    Textures.PowerDistributor.iconSideOn = iconRegister.registerIcon(Settings.resourceDomain + ":PowerDistributorSideOn")
-    Textures.PowerDistributor.iconTopOn = iconRegister.registerIcon(Settings.resourceDomain + ":PowerDistributorTopOn")
-  }
-
-  // ----------------------------------------------------------------------- //
-
-  override def hasTileEntity(metadata: Int) = true
-
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.PowerDistributor()
+  override def getBlockEntityType: BlockEntityType[_ <: BlockEntity] = BlockEntityTypes.POWER_DISTRIBUTOR.get()
 }
 

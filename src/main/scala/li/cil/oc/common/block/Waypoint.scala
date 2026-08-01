@@ -1,44 +1,58 @@
 package li.cil.oc.common.block
 
-import li.cil.oc.OpenComputers
-import li.cil.oc.common.GuiType
-import li.cil.oc.common.tileentity
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.client.gui
+import li.cil.oc.common.block.property.PropertyRotatable
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.blockentity.BlockEntityTypes
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.client.Minecraft
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.block.state.StateDefinition
+import net.minecraft.world.InteractionResult
+import net.minecraft.core.Direction
+import net.minecraft.world.InteractionHand
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.entity.{BlockEntity, BlockEntityType}
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.level.Level
+import net.neoforged.api.distmarker.{Dist, OnlyIn}
 
-class Waypoint extends RedstoneAware {
-  override protected def customTextures = Array(
-    None,
-    Some("WaypointTop"),
-    Some("WaypointBack"),
-    Some("WaypointFront"),
-    Some("WaypointSide"),
-    Some("WaypointSide")
-  )
+class Waypoint(props: Properties) extends RedstoneAware(props) with traits.Tickable {
+  protected override def createBlockStateDefinition(builder: StateDefinition.Builder[Block, BlockState]) =
+    builder.add(PropertyRotatable.Pitch, PropertyRotatable.Yaw)
 
   // ----------------------------------------------------------------------- //
 
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Waypoint()
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.Waypoint(pos, state)
 
   // ----------------------------------------------------------------------- //
 
-  override def onBlockActivated(world: World, x: Int, y: Int, z: Int, player: EntityPlayer, side: ForgeDirection, hitX: Float, hitY: Float, hitZ: Float) = {
-    if (!player.isSneaking) {
-      if (world.isRemote) {
-        player.openGui(OpenComputers, GuiType.Waypoint.id, world, x, y, z)
+  override def useWithoutItem(state: BlockState, world: Level, pos: BlockPos, player: Player, hitResult: BlockHitResult): InteractionResult = {
+    if (!player.isCrouching) {
+      if (world.isClientSide) world.getBlockEntity(pos) match {
+        case t: blockentity.Waypoint => showGui(t)
+        case _ =>
       }
-      true
+      InteractionResult.sidedSuccess(world.isClientSide)
     }
-    else super.onBlockActivated(world, x, y, z, player, side, hitX, hitY, hitZ)
+    else super.useWithoutItem(state, world, pos, player, hitResult)
   }
 
-  override def getValidRotations(world: World, x: Int, y: Int, z: Int) =
-    world.getTileEntity(x, y, z) match {
-      case waypoint: tileentity.Waypoint =>
-        ForgeDirection.VALID_DIRECTIONS.filter {
+  @OnlyIn(Dist.CLIENT)
+  private def showGui(t: blockentity.Waypoint): Unit = {
+    Minecraft.getInstance.pushGuiLayer(new gui.Waypoint(t))
+  }
+
+  override def getValidRotations(world: Level, pos: BlockPos): Array[Direction] =
+    world.getBlockEntity(pos) match {
+      case waypoint: blockentity.Waypoint =>
+        Direction.values.filter {
           d => d != waypoint.facing && d != waypoint.facing.getOpposite
         }
-      case _ => super.getValidRotations(world, x, y, z)
+      case _ => super.getValidRotations(world, pos)
     }
+
+  override def getBlockEntityType: BlockEntityType[_ <: BlockEntity] = BlockEntityTypes.WAYPOINT.get()
 }

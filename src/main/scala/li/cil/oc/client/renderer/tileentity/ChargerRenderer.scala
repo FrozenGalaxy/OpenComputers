@@ -1,79 +1,78 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.math.Axis
 import li.cil.oc.client.Textures
-import li.cil.oc.common.tileentity.Charger
+import li.cil.oc.client.renderer.RenderTypes
+import li.cil.oc.common.blockentity.Charger
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import net.minecraftforge.common.util.ForgeDirection
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
+import net.minecraft.core.Direction
 
-object ChargerRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+object ChargerRenderer extends BlockEntityRendererProvider[Charger] {
+  override def create(ctx: BlockEntityRendererProvider.Context): ChargerRenderer =
+    new ChargerRenderer()
+}
 
-    val charger = tileEntity.asInstanceOf[Charger]
+class ChargerRenderer extends BlockEntityRenderer[Charger] {
+
+  override def render(charger: Charger, dt: Float, stack: PoseStack, buffer: MultiBufferSource, light: Int, overlay: Int): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering")
+
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+
     if (charger.chargeSpeed > 0) {
-      GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+      stack.pushPose()
 
-      RenderState.disableLighting()
-      RenderState.makeItBlend()
-      RenderState.setBlendAlpha(1)
-
-      GL11.glPushMatrix()
-
-      GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
+      stack.translate(0.5, 0.5, 0.5)
 
       charger.yaw match {
-        case ForgeDirection.WEST => GL11.glRotatef(-90, 0, 1, 0)
-        case ForgeDirection.NORTH => GL11.glRotatef(180, 0, 1, 0)
-        case ForgeDirection.EAST => GL11.glRotatef(90, 0, 1, 0)
+        case Direction.WEST => stack.mulPose(Axis.YP.rotationDegrees(-90))
+        case Direction.NORTH => stack.mulPose(Axis.YP.rotationDegrees(180))
+        case Direction.EAST => stack.mulPose(Axis.YP.rotationDegrees(90))
         case _ => // No yaw.
       }
 
-      GL11.glTranslatef(-0.5f, 0.5f, 0.5f)
-      GL11.glScalef(1, -1, 1)
+      stack.translate(-0.5f, 0.5f, 0.5f)
+      RenderState.mirrorScale(stack, 1, -1, 1)
 
-      val t = Tessellator.instance
+      val vBuffer = buffer.getBuffer(RenderTypes.BLOCK_OVERLAY)
+      val matrix = stack.last.pose
 
-      val frontIcon = Textures.Charger.iconFrontCharging
-      bindTexture(TextureMap.locationBlocksTexture)
-      t.startDrawingQuads()
-
-      val inverse = 1 - charger.chargeSpeed
-      t.addVertexWithUV(0, 1, 0.005, frontIcon.getMinU, frontIcon.getMaxV)
-      t.addVertexWithUV(1, 1, 0.005, frontIcon.getMaxU, frontIcon.getMaxV)
-      t.addVertexWithUV(1, inverse, 0.005, frontIcon.getMaxU, frontIcon.getInterpolatedV(inverse * 16))
-      t.addVertexWithUV(0, inverse, 0.005, frontIcon.getMinU, frontIcon.getInterpolatedV(inverse * 16))
-
-      if (charger.hasPower) {
-        val sideIcon = Textures.Charger.iconSideCharging
-        t.addVertexWithUV(-0.005, 1, -1, sideIcon.getMinU, sideIcon.getMaxV)
-        t.addVertexWithUV(-0.005, 1, 0, sideIcon.getMaxU, sideIcon.getMaxV)
-        t.addVertexWithUV(-0.005, 0, 0, sideIcon.getMaxU, sideIcon.getMinV)
-        t.addVertexWithUV(-0.005, 0, -1, sideIcon.getMinU, sideIcon.getMinV)
-
-        t.addVertexWithUV(1, 1, -1.005, sideIcon.getMinU, sideIcon.getMaxV)
-        t.addVertexWithUV(0, 1, -1.005, sideIcon.getMaxU, sideIcon.getMaxV)
-        t.addVertexWithUV(0, 0, -1.005, sideIcon.getMaxU, sideIcon.getMinV)
-        t.addVertexWithUV(1, 0, -1.005, sideIcon.getMinU, sideIcon.getMinV)
-
-        t.addVertexWithUV(1.005, 1, 0, sideIcon.getMinU, sideIcon.getMaxV)
-        t.addVertexWithUV(1.005, 1, -1, sideIcon.getMaxU, sideIcon.getMaxV)
-        t.addVertexWithUV(1.005, 0, -1, sideIcon.getMaxU, sideIcon.getMinV)
-        t.addVertexWithUV(1.005, 0, 0, sideIcon.getMinU, sideIcon.getMinV)
+      {
+        val inverse = 1 - charger.chargeSpeed.toFloat
+        val icon = Textures.getSprite(Textures.Block.ChargerFrontOn)
+        vBuffer.addVertex(matrix, 0, 1, 0.005f).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 1, 1, 0.005f).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 1, inverse, 0.005f).setUv(icon.getU1, icon.getV(inverse))
+        vBuffer.addVertex(matrix, 0, inverse, 0.005f).setUv(icon.getU0, icon.getV(inverse))
       }
 
-      t.draw()
+      if (charger.hasPower) {
+        val icon = Textures.getSprite(Textures.Block.ChargerSideOn)
 
-      RenderState.enableLighting()
+        vBuffer.addVertex(matrix, -0.005f, 1, -1).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, -0.005f, 1, 0).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, -0.005f, 0, 0).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, -0.005f, 0, -1).setUv(icon.getU0, icon.getV0)
 
-      GL11.glPopMatrix()
-      GL11.glPopAttrib()
+        vBuffer.addVertex(matrix, 1, 1, -1.005f).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 0, 1, -1.005f).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 0, 0, -1.005f).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 1, 0, -1.005f).setUv(icon.getU0, icon.getV0)
+
+        vBuffer.addVertex(matrix, 1.005f, 1, 0).setUv(icon.getU0, icon.getV1)
+        vBuffer.addVertex(matrix, 1.005f, 1, -1).setUv(icon.getU1, icon.getV1)
+        vBuffer.addVertex(matrix, 1.005f, 0, -1).setUv(icon.getU1, icon.getV0)
+        vBuffer.addVertex(matrix, 1.005f, 0, 0).setUv(icon.getU0, icon.getV0)
+      }
+
+      stack.popPose()
     }
 
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
 }

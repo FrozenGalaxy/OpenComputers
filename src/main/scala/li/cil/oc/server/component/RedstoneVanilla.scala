@@ -12,13 +12,14 @@ import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network._
-import li.cil.oc.common.tileentity.traits.{RedstoneAware, RedstoneChangedEventArgs}
+import li.cil.oc.common.blockentity.traits.{RedstoneAware, RedstoneChangedEventArgs}
 import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.ExtendedWorld._
 import li.cil.oc.util.ExtendedBlock._
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.util.ExtendedLevel._
+import li.cil.oc.util.RotationHelper
+import net.minecraft.core.Direction
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
 
 trait RedstoneVanilla extends RedstoneSignaller with DeviceInfo {
   def redstone: EnvironmentHost with RedstoneAware
@@ -36,7 +37,7 @@ trait RedstoneVanilla extends RedstoneSignaller with DeviceInfo {
 
   override def getDeviceInfo: util.Map[String, String] = deviceInfo
 
-  protected val SIDE_RANGE: Array[ForgeDirection] = ForgeDirection.VALID_DIRECTIONS
+  protected val SIDE_RANGE: Array[Direction] = Direction.values
 
   // ----------------------------------------------------------------------- //
   @Callback(direct = true, doc = "function([side:number]):number or table -- Get the redstone input (all sides, or optionally on the specified side)")
@@ -57,28 +58,32 @@ trait RedstoneVanilla extends RedstoneSignaller with DeviceInfo {
 
   @Callback(doc = "function([side:number, ]value:number or table):number or table --  Set the redstone output (all sides, or optionally on the specified side). Returns previous values")
   def setOutput(context: Context, args: Arguments): Array[AnyRef] = {
-    var ret: AnyRef = null
+    var ret: Array[AnyRef] = null
     if (getAssignment(args) match {
-      case (side: ForgeDirection, value: Int) =>
-        ret = new java.lang.Integer(redstone.getOutput(side))
+      case (side: Direction, value: Int) =>
+        ret = result(redstone.getOutput(side))
         redstone.setOutput(side, value)
       case (value: util.Map[_, _], _) =>
-        ret = valuesToMap(redstone.getOutput)
+        ret = result(valuesToMap(redstone.getOutput))
         redstone.setOutput(value)
+      case _ =>
+        ret = result(null)
+        false
     }) {
       if (Settings.get.redstoneDelay > 0)
         context.pause(Settings.get.redstoneDelay)
+      ret = result(null)
     }
-    result(ret)
+    ret
   }
 
   @Callback(direct = true, doc = "function(side:number):number -- Get the comparator input on the specified side.")
   def getComparatorInput(context: Context, args: Arguments): Array[AnyRef] = {
     val side = checkSide(args, 0)
     val blockPos = BlockPosition(redstone).offset(side)
-    if (redstone.world.blockExists(blockPos)) {
-      val block = redstone.world.getBlock(blockPos)
-      if (block.hasComparatorInputOverride) {
+    if (redstone.getEnvironmentLevel.blockExists(blockPos)) {
+      val block = redstone.getEnvironmentLevel.getBlock(blockPos)
+      if (redstone.getEnvironmentLevel.getBlockState(blockPos.toBlockPos).hasAnalogOutputSignal) {
         val comparatorOverride = block.getComparatorInputOverride(blockPos, side.getOpposite)
         return result(comparatorOverride)
       }
@@ -114,11 +119,11 @@ trait RedstoneVanilla extends RedstoneSignaller with DeviceInfo {
     }
   }
 
-  protected def checkSide(args: Arguments, index: Int): ForgeDirection = {
+  protected def checkSide(args: Arguments, index: Int): Direction = {
     val side = args.checkInteger(index)
     if (side < 0 || side > 5)
       throw new IllegalArgumentException("invalid side")
-    redstone.toGlobal(ForgeDirection.getOrientation(side))
+    redstone.toGlobal(Direction.from3DDataValue(side))
   }
 
   private def valuesToMap(ar: Array[Int]): Map[Int, Int] = SIDE_RANGE.map(_.ordinal).map{ case side if side < ar.length => side -> ar(side) }.toMap

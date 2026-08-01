@@ -1,7 +1,7 @@
 package li.cil.oc.api.driver.item;
 
-import li.cil.oc.api.driver.Item;
-import net.minecraft.item.ItemStack;
+import li.cil.oc.api.driver.DriverItem;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * This interface marks drivers for robot upgrades that provide inventory
@@ -10,7 +10,7 @@ import net.minecraft.item.ItemStack;
  * can be no hot-swappable inventories - at least none that are represented
  * in the GUI.
  */
-public interface Inventory extends Item {
+public interface Inventory extends DriverItem {
     /**
      * The additional amount of inventory space the specified item provides.
      *

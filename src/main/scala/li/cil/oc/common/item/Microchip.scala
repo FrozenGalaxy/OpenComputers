@@ -1,12 +1,14 @@
 package li.cil.oc.common.item
 
-import li.cil.oc.util.Rarity
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class Microchip(val parent: Delegator, val tier: Int) extends traits.Delegate {
-  override val unlocalizedName = super.unlocalizedName + tier
 
-  override protected def tooltipName = Option(super.unlocalizedName)
+class Microchip(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
 
-  override def rarity(stack: ItemStack) = Rarity.byTier(tier)
+  override protected def tooltipName = Option(unlocalizedName)
 }

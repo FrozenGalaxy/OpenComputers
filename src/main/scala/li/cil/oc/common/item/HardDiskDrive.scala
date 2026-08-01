@@ -1,20 +1,27 @@
 package li.cil.oc.common.item
 
 import li.cil.oc.Settings
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.minecraft.network.chat.Component
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class HardDiskDrive(val parent: Delegator, val tier: Int) extends traits.Delegate with traits.ItemTier with traits.FileSystemLike {
-  override val unlocalizedName: String = super.unlocalizedName + tier
+class HardDiskDrive(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with traits.FileSystemLike with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
+
   val kiloBytes: Int = Settings.get.hddSizes(tier)
   val platterCount: Int = Settings.get.hddPlatterCounts(tier)
 
-  override def displayName(stack: ItemStack): Option[String] = {
-    val localizedName = parent.internalGetItemStackDisplayName(stack)
-    Some(if (kiloBytes >= 1024) {
-      localizedName + s" (${kiloBytes / 1024}MB)"
+  override def getName(stack: ItemStack): Component = {
+    val localizedName = super.getName(stack).copy()
+    if (kiloBytes >= 1024) {
+      localizedName.append(s" (${kiloBytes / 1024}MB)")
     }
     else {
-      localizedName + s" (${kiloBytes}KB)"
-    })
+      localizedName.append(s" (${kiloBytes}KB)")
+    }
+    localizedName
   }
 }

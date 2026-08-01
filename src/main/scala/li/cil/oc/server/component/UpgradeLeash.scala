@@ -2,7 +2,6 @@ package li.cil.oc.server.component
 
 import java.util
 import java.util.UUID
-
 import li.cil.oc.Constants
 import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
@@ -15,20 +14,27 @@ import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.Node
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.common.EventHandler
+import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.ExtendedArguments._
 import li.cil.oc.util.ExtendedNBT._
-import net.minecraft.entity.Entity
-import net.minecraft.entity.EntityLiving
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.nbt.NBTTagString
-import net.minecraftforge.common.util.Constants.NBT
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.Mob
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.StringTag
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
+import net.minecraft.nbt.Tag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-class UpgradeLeash(val host: Entity) extends prefab.ManagedEnvironment with traits.WorldAware with DeviceInfo {
+class UpgradeLeash(val host: Entity) extends AbstractManagedEnvironment with traits.LevelAware with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("leash").
     create()
@@ -51,18 +57,18 @@ class UpgradeLeash(val host: Entity) extends prefab.ManagedEnvironment with trai
 
   @Callback(doc = """function(side:number):boolean -- Tries to put an entity on the specified side of the device onto a leash.""")
   def leash(context: Context, args: Arguments): Array[AnyRef] = {
-    if (leashedEntities.size >= MaxLeashedEntities) return result(Unit, "too many leashed entities")
+    if (leashedEntities.size >= MaxLeashedEntities) return result((), "too many leashed entities")
     val side = args.checkSideAny(0)
     val nearBounds = position.bounds
-    val farBounds = nearBounds.offset(side.offsetX * 2.0, side.offsetY * 2.0, side.offsetZ * 2.0)
-    val bounds = nearBounds.func_111270_a(farBounds)
-    entitiesInBounds[EntityLiving](bounds).find(_.allowLeashing()) match {
+    val farBounds = nearBounds.move(side.getStepX * 2.0, side.getStepY * 2.0, side.getStepZ * 2.0)
+    val bounds = nearBounds.minmax(farBounds)
+    entitiesInBounds[Mob](classOf[Mob], bounds).find(_.canBeLeashed()) match {
       case Some(entity) =>
-        entity.setLeashedToEntity(host, true)
-        leashedEntities += entity.getUniqueID
+        entity.setLeashedTo(host, false)
+        leashedEntities += entity.getUUID
         context.pause(0.1)
         result(true)
-      case _ => result(Unit, "no unleashed entity")
+      case _ => result((), "no unleashed entity")
     }
   }
 
@@ -72,34 +78,34 @@ class UpgradeLeash(val host: Entity) extends prefab.ManagedEnvironment with trai
     null
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     super.onDisconnect(node)
     if (node == this.node) {
       unleashAll()
     }
   }
 
-  private def unleashAll() {
-    entitiesInBounds[EntityLiving](position.bounds.expand(5, 5, 5)).foreach(entity => {
-      if (leashedEntities.contains(entity.getUniqueID) && entity.getLeashedToEntity == host) {
-        entity.clearLeashed(true, false)
+  private def unleashAll(): Unit = {
+    entitiesInBounds(classOf[Mob], position.bounds.inflate(5, 5, 5)).foreach(entity => {
+      if (leashedEntities.contains(entity.getUUID) && entity.getLeashHolder == host) {
+        entity.dropLeash(true, false)
       }
     })
     leashedEntities.clear()
   }
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    leashedEntities ++= nbt.getTagList("leashedEntities", NBT.TAG_STRING).
-      map((s: NBTTagString) => UUID.fromString(s.func_150285_a_()))
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+    for(entities <- holder.getComponent(OCComponents.LEASHED_ENTITIES))
+      leashedEntities ++= entities
     // Re-acquire leashed entities. Need to do this manually because leashed
-    // entities only remember their leashee if it's an EntityLivingBase...
+    // entities only remember their leashee if it's an LivingEntity...
     EventHandler.scheduleServer(() => {
       val foundEntities = mutable.Set.empty[UUID]
-      entitiesInBounds[EntityLiving](position.bounds.expand(5, 5, 5)).foreach(entity => {
-        if (leashedEntities.contains(entity.getUniqueID)) {
-          entity.setLeashedToEntity(host, true)
-          foundEntities += entity.getUniqueID
+      entitiesInBounds(classOf[Mob], position.bounds.inflate(5, 5, 5)).foreach(entity => {
+        if (leashedEntities.contains(entity.getUUID)) {
+          entity.setLeashedTo(host, false)
+          foundEntities += entity.getUUID
         }
       })
       val missing = leashedEntities.diff(foundEntities)
@@ -110,8 +116,8 @@ class UpgradeLeash(val host: Entity) extends prefab.ManagedEnvironment with trai
     })
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setNewTagList("leashedEntities", leashedEntities.map(_.toString))
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    holder.setComponent(OCComponents.LEASHED_ENTITIES, leashedEntities.toList)
   }
 }

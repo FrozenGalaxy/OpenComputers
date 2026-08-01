@@ -1,5 +1,6 @@
 # Gradle
 /.gradle
+/.gradle-user
 /build
 
 # Eclipse
@@ -18,6 +19,10 @@
 # Debugging
 /eclipse
 /run
+/run-data
+
+# Windows...
+**/Thumbs.db
 
 # OS X
 .DS_Store
@@ -29,3 +34,16 @@
 /config
 /options.txt
 /usernamecache.json
+/.metals
+/.bloop
+/.scalafmt.conf
+/font
+/src/data/resources/.cache
+.mimocode/
+
+# Local porting references and inspection tools
+/.reference-*/
+/.reference-*.zip
+/OpenComputers-CE-master-*/
+/OpenComputers-CE-master-*.zip
+/.minecraft-*-inspect.jar

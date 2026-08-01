@@ -1,62 +1,44 @@
 package li.cil.oc.common.block
 
-import java.util
-
-import cpw.mods.fml.relauncher.Side
-import cpw.mods.fml.relauncher.SideOnly
+import com.mojang.serialization.{Codec, MapCodec}
+import com.mojang.serialization.codecs.RecordCodecBuilder
 import li.cil.oc.Settings
-import li.cil.oc.common.GuiType
-import li.cil.oc.common.tileentity
-import li.cil.oc.util.Color
-import li.cil.oc.util.Rarity
+import li.cil.oc.common.block.Case.CODEC
+import li.cil.oc.common.block.property.PropertyRotatable
+import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.blockentity
+import li.cil.oc.common.blockentity.BlockEntityTypes
 import li.cil.oc.util.Tooltip
-import net.minecraft.client.renderer.texture.IIconRegister
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.util.IIcon
-import net.minecraft.world.IBlockAccess
-import net.minecraft.world.World
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.core.{BlockPos, Direction}
+import net.minecraft.network.chat.{Component => ITextComponent}
+import net.minecraft.server.level.{ServerPlayer => ServerPlayerEntity}
+import net.minecraft.util.ExtraCodecs
+import net.minecraft.world.{InteractionHand => Hand}
+import net.minecraft.world.entity.player.{Player => PlayerEntity}
+import net.minecraft.world.item.Item.TooltipContext
+import net.minecraft.world.item.{Item, ItemStack, TooltipFlag => ITooltipFlag}
+import net.minecraft.world.level.{BlockGetter => IBlockReader, Level => World}
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.entity.{BlockEntity, BlockEntityType}
+import net.minecraft.world.level.block.state.BlockBehaviour.{Properties, propertiesCodec, simpleCodec}
+import net.minecraft.world.level.block.state.{BlockState, StateDefinition => StateContainer}
+import net.minecraft.world.level.material.FluidState
 
-class Case(val tier: Int) extends RedstoneAware with traits.PowerAcceptor with traits.StateAware with traits.GUI {
-  private val iconsOn = new Array[IIcon](6)
+import java.util
+import scala.collection.convert.ImplicitConversionsToScala._
 
-  // ----------------------------------------------------------------------- //
+class Case(props: Properties, val tier: Int) extends RedstoneAware(props) with traits.PowerAcceptor with traits.StateAware with traits.GUI with traits.Tickable {
+  override def codec(): MapCodec[Case] = CODEC
 
-  override protected def customTextures = Array(
-    Some("CaseTop"),
-    Some("CaseTop"),
-    Some("CaseBack"),
-    Some("CaseFront"),
-    Some("CaseSide"),
-    Some("CaseSide")
-  )
-
-  override def registerBlockIcons(iconRegister: IIconRegister) = {
-    super.registerBlockIcons(iconRegister)
-    System.arraycopy(icons, 0, iconsOn, 0, icons.length)
-    iconsOn(ForgeDirection.NORTH.ordinal) = iconRegister.registerIcon(Settings.resourceDomain + ":CaseBackOn")
-    iconsOn(ForgeDirection.WEST.ordinal) = iconRegister.registerIcon(Settings.resourceDomain + ":CaseSideOn")
-    iconsOn(ForgeDirection.EAST.ordinal) = iconsOn(ForgeDirection.WEST.ordinal)
-  }
-
-  override def getIcon(world: IBlockAccess, x: Int, y: Int, z: Int, worldSide: ForgeDirection, localSide: ForgeDirection) = {
-    if (world.getTileEntity(x, y, z) match {
-      case computer: tileentity.Case => computer.isRunning
-      case _ => false
-    }) iconsOn(localSide.ordinal)
-    else getIcon(localSide.ordinal(), 0)
-  }
-
-  @SideOnly(Side.CLIENT)
-  override def getRenderColor(metadata: Int) = Color.byTier(tier)
+  protected override def createBlockStateDefinition(builder: StateContainer.Builder[Block, BlockState]): Unit =
+    builder.add(PropertyRotatable.Facing, property.PropertyRunning.Running)
 
   // ----------------------------------------------------------------------- //
 
-  override def rarity(stack: ItemStack) = Rarity.byTier(tier)
-
-  override protected def tooltipBody(metadata: Int, stack: ItemStack, player: EntityPlayer, tooltip: util.List[String], advanced: Boolean) {
-    tooltip.addAll(Tooltip.get(getClass.getSimpleName, slots))
+  override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
+    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase, slots)) {
+      tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
+    }
   }
 
   private def slots = tier match {
@@ -70,29 +52,52 @@ class Case(val tier: Int) extends RedstoneAware with traits.PowerAcceptor with t
 
   override def energyThroughput = Settings.get.caseRate(tier)
 
-  override def guiType = GuiType.Case
+  override def openGui(player: ServerPlayerEntity, world: World, pos: BlockPos): Unit = world.getBlockEntity(pos) match {
+    case te: blockentity.Case if te.stillValid(player) => MenuTypes.openCaseGui(player, te)
+    case _ =>
+  }
 
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Case(tier)
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.Case(pos, state, tier)
 
   // ----------------------------------------------------------------------- //
 
-  override def onBlockActivated(world: World, x: Int, y: Int, z: Int, player: EntityPlayer,
-                                side: ForgeDirection, hitX: Float, hitY: Float, hitZ: Float) = {
-    if (player.isSneaking) {
-      if (!world.isRemote) world.getTileEntity(x, y, z) match {
-        case computer: tileentity.Case if !computer.machine.isRunning && computer.isUseableByPlayer(player) => computer.machine.start()
+  override def localOnBlockActivated(world: World, pos: BlockPos, player: PlayerEntity, hand: Hand, heldItem: ItemStack, side: Direction, hitX: Float, hitY: Float, hitZ: Float) = {
+    if (player.isCrouching) {
+      if (!world.isClientSide) world.getBlockEntity(pos) match {
+        case computer: blockentity.Case if !computer.machine.isRunning && computer.stillValid(player) => computer.machine.start()
         case _ =>
       }
       true
     }
-    else super.onBlockActivated(world, x, y, z, player, side, hitX, hitY, hitZ)
+    else super.localOnBlockActivated(world, pos, player, hand, heldItem, side, hitX, hitY, hitZ)
   }
 
-  override def removedByPlayer(world: World, player: EntityPlayer, x: Int, y: Int, z: Int, willHarvest: Boolean): Boolean =
-    world.getTileEntity(x, y, z) match {
-      case c: tileentity.Case =>
-        if (c.isCreative && (!player.capabilities.isCreativeMode || !c.canInteract(player.getCommandSenderName))) false
-        else c.canInteract(player.getCommandSenderName) && super.removedByPlayer(world, player, x, y, z, willHarvest)
-      case _ => super.removedByPlayer(world, player, x, y, z, willHarvest)
+  override def onDestroyedByPlayer(state: BlockState,
+                               world: World,
+                               pos: BlockPos,
+                               player: PlayerEntity,
+                               willHarvest: Boolean,
+                               fluid: FluidState
+                              ): Boolean = {
+    Option(world.getBlockEntity(pos)) match {
+      case Some(c: blockentity.Case) =>
+        val playerName = player.getName.getString
+        if (c.isCreative && (!player.isCreative || !c.canInteract(playerName))) {
+          false
+        } else {
+          c.canInteract(playerName) && super.onDestroyedByPlayer(state, world, pos, player, willHarvest, fluid)
+        }
+      case _ =>
+        super.onDestroyedByPlayer(state, world, pos, player, willHarvest, fluid)
     }
+  }
+
+  override def getBlockEntityType: BlockEntityType[_ <: BlockEntity] = BlockEntityTypes.CASE.get()
+}
+
+object Case {
+  final val CODEC = RecordCodecBuilder.mapCodec[Case](b => b.group(
+    propertiesCodec(),
+    Codec.INT.fieldOf("tier").forGetter(b => b.tier)
+  ).apply(b, (prop, tier) => new Case(prop, tier)))
 }

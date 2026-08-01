@@ -1,37 +1,30 @@
 package li.cil.oc.server.component
 
-import java.io.FileNotFoundException
-import java.io.IOException
-import java.util
-
-import li.cil.oc.Constants
-import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
-import li.cil.oc.api.driver.DeviceInfo.DeviceClass
-import li.cil.oc.Settings
+import li.cil.oc.{Constants, Settings}
 import li.cil.oc.api.Network
 import li.cil.oc.api.driver.DeviceInfo
-import li.cil.oc.api.fs.Label
-import li.cil.oc.api.fs.Mode
-import li.cil.oc.api.fs.{FileSystem => IFileSystem}
-import li.cil.oc.api.machine.Arguments
-import li.cil.oc.api.machine.Callback
-import li.cil.oc.api.machine.Context
-import li.cil.oc.api.network.EnvironmentHost
+import li.cil.oc.api.driver.DeviceInfo.{DeviceAttribute, DeviceClass}
+import li.cil.oc.api.fs.{Label, Mode, FileSystem => IFileSystem}
+import li.cil.oc.api.machine.{Arguments, Callback, Context}
 import li.cil.oc.api.network._
-import li.cil.oc.api.prefab
-import li.cil.oc.api.prefab.AbstractValue
+import li.cil.oc.api.prefab.{AbstractManagedEnvironment, AbstractValue}
 import li.cil.oc.common.SaveHandler
+import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.server.{PacketSender => ServerPacketSender}
 import li.cil.oc.util.ExtendedNBT._
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.nbt.NBTTagIntArray
-import net.minecraft.nbt.NBTTagList
-import net.minecraftforge.common.util.Constants.NBT
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.{CompoundTag, IntArrayTag, ListTag, Tag}
+import net.neoforged.neoforge.common.MutableDataComponentHolder
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-import scala.collection.convert.WrapAsJava._
+import java.io.{FileNotFoundException, IOException}
+import java.util
+import scala.collection.convert.ImplicitConversionsToJava._
 import scala.collection.mutable
 
-class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option[EnvironmentHost], val sound: Option[String], val speed: Int) extends prefab.ManagedEnvironment with DeviceInfo {
+class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option[EnvironmentHost], val sound: Option[String], val speed: Int) extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("filesystem", Visibility.Neighbors).
     withConnector().
@@ -61,7 +54,7 @@ class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option
 
   @Callback(direct = true, doc = """function():string -- Get the current label of the drive.""")
   def getLabel(context: Context, args: Arguments): Array[AnyRef] = fileSystem.synchronized {
-    if (label != null) result(label.getLabel) else null
+    if (label != null) result(label.getLabel(ServerLifecycleHooks.getCurrentServer.registryAccess())) else null
   }
 
   @Callback(doc = """function(value:string):string -- Sets the label of the drive. Returns the new value, which may be truncated.""")
@@ -69,7 +62,7 @@ class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option
     if (label == null) throw new Exception("drive does not support labeling")
     if (args.checkAny(0) == null) label.setLabel(null)
     else label.setLabel(args.checkString(0))
-    result(label.getLabel)
+    result(label.getLabel(ServerLifecycleHooks.getCurrentServer.registryAccess()))
   }
 
   @Callback(direct = true, doc = """function():boolean -- Returns whether the file system is read-only.""")
@@ -196,7 +189,7 @@ class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option
           result(bytes)
         }
         else {
-          result(Unit)
+          result()
         }
       case _ => throw new IOException("bad file descriptor")
     }
@@ -302,40 +295,32 @@ class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
 
-    nbt.getTagList("owners", NBT.TAG_COMPOUND).foreach((ownerNbt: NBTTagCompound) => {
-      val address = ownerNbt.getString("address")
-      if (address != "") {
-        owners += address -> ownerNbt.getIntArray("handles").to[mutable.Set]
-      }
-    })
+    for(handles <- holder.getComponent(OCComponents.HANDLES)) {
+      owners ++= handles.map { case k -> v => k -> v.to(mutable.Set) }
+    }
 
     if (label != null) {
-      label.load(nbt)
+      label.loadData(holder)
     }
-    fileSystem.load(nbt.getCompoundTag("fs"))
+
+    for(nbt <- holder.getComponent(OCComponents.FILESYSTEM_DATA)) {
+      fileSystem.loadData(nbt)
+    }
   }
 
-  override def save(nbt: NBTTagCompound) = fileSystem.synchronized {
-    super.save(nbt)
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
 
-    if (label != null) {
-      label.save(nbt)
+    if(label != null) {
+      label.saveData(holder)
     }
 
-    if (!SaveHandler.savingForClients) {
-      val ownersNbt = new NBTTagList()
-      for ((address, handles) <- owners) {
-        val ownerNbt = new NBTTagCompound()
-        ownerNbt.setString("address", address)
-        ownerNbt.setTag("handles", new NBTTagIntArray(handles.toArray))
-        ownersNbt.appendTag(ownerNbt)
-      }
-      nbt.setTag("owners", ownersNbt)
-
-      nbt.setNewCompoundTag("fs", fileSystem.save)
+    if(!SaveHandler.savingForClients) {
+      holder.setComponent(OCComponents.HANDLES, Map.from(owners.map { case k -> v => k -> v.toSet }))
+      holder.updateComponent(OCComponents.FILESYSTEM_DATA, new CompoundTag(), fileSystem.saveData)
     }
   }
 
@@ -359,7 +344,7 @@ class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option
     if (!owners.contains(owner) || !owners(owner).contains(handle))
       throw new IOException("bad file descriptor")
 
-  private def diskActivity() {
+  private def diskActivity(): Unit = {
     (sound, host) match {
       case (Some(s), Some(h)) => ServerPacketSender.sendFileSystemActivity(node, h, s)
       case _ =>
@@ -391,16 +376,19 @@ final class HandleValue extends AbstractValue {
     }
   }
 
-  override def load(nbt: NBTTagCompound): Unit = {
-    super.load(nbt)
-    owner = nbt.getString("owner")
-    handle = nbt.getInteger("handle")
+  private val OwnerTag = "owner"
+  private val HandleTag = "handle"
+
+  override def loadData(holder: DataComponentHolder, nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.loadData(holder, nbt, provider)
+    owner = nbt.getString(OwnerTag)
+    handle = nbt.getInt(HandleTag)
   }
 
-  override def save(nbt: NBTTagCompound): Unit = {
-    super.save(nbt)
-    nbt.setInteger("handle", handle)
-    nbt.setString("owner", owner)
+  override def saveData(holder: MutableDataComponentHolder, nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.saveData(holder, nbt, provider)
+    nbt.putString(OwnerTag, owner)
+    nbt.putInt(HandleTag, handle)
   }
 
   override def toString: String = handle.toString

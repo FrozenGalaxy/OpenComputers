@@ -1,8 +1,11 @@
 package li.cil.oc.util
 
-import net.minecraft.block.Block
-import net.minecraftforge.common.util.ForgeDirection
-import net.minecraftforge.fluids.IFluidBlock
+import net.minecraft.world.level.block.{Block, LiquidBlock}
+import net.minecraft.core.{BlockPos, Direction}
+import net.minecraft.tags.BlockTags
+import net.minecraft.world.level.block.LiquidBlock
+import net.minecraft.world.level.block.state.BlockState
+import net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction
 
 import scala.language.implicitConversions
 
@@ -11,27 +14,27 @@ object ExtendedBlock {
   implicit def extendedBlock(block: Block): ExtendedBlock = new ExtendedBlock(block)
 
   class ExtendedBlock(val block: Block) {
-    def isAir(position: BlockPosition) = block.isAir(position.world.get, position.x, position.y, position.z)
+    @Deprecated
+    def isAir(position: BlockPosition) = position.world.get.isEmptyBlock(position.toBlockPos)
+    
+    @Deprecated
+    def isReplaceable(position: BlockPosition) = block.defaultBlockState.is(BlockTags.REPLACEABLE)
 
-    def isReplaceable(position: BlockPosition) = block.isReplaceable(position.world.get, position.x, position.y, position.z)
+    @Deprecated
+    def getBlockHardness(position: BlockPosition) = position.world.get.getBlockState(position.toBlockPos).getDestroySpeed(position.world.get, position.toBlockPos)
 
-    def setBlockBoundsBasedOnState(position: BlockPosition) = block.setBlockBoundsBasedOnState(position.world.get, position.x, position.y, position.z)
-
-    def getSelectedBoundingBoxFromPool(position: BlockPosition) = block.getSelectedBoundingBoxFromPool(position.world.get, position.x, position.y, position.z)
-
-    def getCollisionBoundingBoxFromPool(position: BlockPosition) = block.getCollisionBoundingBoxFromPool(position.world.get, position.x, position.y, position.z)
-
-    def getComparatorInputOverride(position: BlockPosition, side: ForgeDirection) = block.getComparatorInputOverride(position.world.get, position.x, position.y, position.z, side.ordinal())
+    @Deprecated
+    def getComparatorInputOverride(position: BlockPosition, side: Direction) = position.world.get.getBlockState(position.toBlockPos).getAnalogOutputSignal(position.world.get, position.toBlockPos)
   }
 
-  implicit def extendedFluidBlock(block: IFluidBlock): ExtendedFluidBlock = new ExtendedFluidBlock(block)
-
-  class ExtendedFluidBlock(val block: IFluidBlock) {
-    def drain(position: BlockPosition, doDrain: Boolean) = block.drain(position.world.get, position.x, position.y, position.z, doDrain)
-
-    def canDrain(position: BlockPosition) = block.canDrain(position.world.get, position.x, position.y, position.z)
-
-    def getFilledPercentage(position: BlockPosition) = block.getFilledPercentage(position.world.get, position.x, position.y, position.z)
-  }
+//  implicit def extendedFluidBlock(block: LiquidBlock): ExtendedFluidBlock = new ExtendedFluidBlock(block)
+//
+//  class ExtendedFluidBlock(val block: LiquidBlock) {
+//    def drain(position: BlockPosition, action: FluidAction) = block.drain(position.world.get, position.toBlockPos, action)
+//
+//    def canDrain(position: BlockPosition) = block.canDrain(position.world.get, position.toBlockPos)
+//
+//    def getFilledPercentage(position: BlockPosition) = block.getFilledPercentage(position.world.get, position.toBlockPos)
+//  }
 
 }

@@ -1,27 +1,30 @@
 package li.cil.oc.client.gui
 
+import com.mojang.blaze3d.systems.RenderSystem
 import li.cil.oc.Localization
 import li.cil.oc.client.Textures
 import li.cil.oc.client.gui.widget.ProgressBar
 import li.cil.oc.client.renderer.TextBufferRenderCache
 import li.cil.oc.client.renderer.font.TextBufferRenderData
 import li.cil.oc.client.{PacketSender => ClientPacketSender}
-import li.cil.oc.common.container
-import li.cil.oc.common.entity
+import li.cil.oc.common.menu
 import li.cil.oc.util.PackedColor
 import li.cil.oc.util.RenderState
 import li.cil.oc.util.TextBuffer
-import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiButton
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.entity.player.InventoryPlayer
-import org.lwjgl.opengl.GL11
+import net.minecraft.world.entity.player.Inventory
+import net.minecraft.network.chat.Component
+import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, PoseStack, Tesselator, VertexFormat}
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.GuiGraphics
 
-import scala.collection.convert.WrapAsJava._
+import scala.jdk.javaapi.CollectionConverters.asJavaCollection
 
-class Drone(playerInventory: InventoryPlayer, val drone: entity.Drone) extends DynamicGuiContainer(new container.Drone(playerInventory, drone)) with traits.DisplayBuffer {
-  xSize = 176
-  ySize = 148
+class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
+  extends DynamicGuiContainer(state, playerInventory, name)
+  with traits.DisplayBuffer {
+
+  imageWidth = 176
+  imageHeight = 148
 
   protected var powerButton: ImageButton = _
 
@@ -31,7 +34,7 @@ class Drone(playerInventory: InventoryPlayer, val drone: entity.Drone) extends D
 
     override def dirty = _dirty
 
-    override def dirty_=(value: Boolean) = _dirty = value
+    override def dirty_=(value: Boolean): Unit = _dirty = value
 
     override def data = buffer
 
@@ -46,104 +49,95 @@ class Drone(playerInventory: InventoryPlayer, val drone: entity.Drone) extends D
   private val inventoryX = 97
   private val inventoryY = 7
 
-  private val power = addWidget(new ProgressBar(28, 48))
+  private val power = addCustomWidget(new ProgressBar(28, 48))
 
   private val selectionSize = 20
   private val selectionsStates = 17
-  private val selectionStepV = 1 / selectionsStates.toDouble
+  private val selectionStepV = 1 / selectionsStates.toFloat
 
-  protected override def actionPerformed(button: GuiButton) {
-    if (button.id == 0) {
-      ClientPacketSender.sendDronePower(drone, !drone.isRunning)
-    }
-  }
-
-  override def drawScreen(mouseX: Int, mouseY: Int, dt: Float) {
-    powerButton.toggled = drone.isRunning
-    bufferRenderer.dirty = drone.statusText.lines.zipWithIndex.exists {
+  override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
+    powerButton.toggled = inventoryContainer.isRunning
+    bufferRenderer.dirty = inventoryContainer.statusText.getString.linesIterator.zipWithIndex.exists {
       case (line, i) => buffer.set(0, i, line, vertical = false)
     }
-    super.drawScreen(mouseX, mouseY, dt)
+    super.render(graphics, mouseX, mouseY, dt)
   }
 
-  override def initGui() {
-    super.initGui()
-    powerButton = new ImageButton(0, guiLeft + 7, guiTop + 45, 18, 18, Textures.guiButtonPower, canToggle = true)
-    add(buttonList, powerButton)
+  override protected def init(): Unit = {
+    super.init()
+    powerButton = new ImageButton(leftPos + 7, topPos + 45, 18, 18, (_: Button) =>
+      ClientPacketSender.sendDronePower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUI.ButtonPower, canToggle = true)
+    addRenderableWidget(powerButton)
   }
 
-  override protected def drawBuffer() {
-    GL11.glTranslatef(bufferX, bufferY, 0)
-    RenderState.disableLighting()
+  override protected def drawBuffer(stack: PoseStack): Unit = {
+    stack.translate(bufferX, bufferY, 0)
+    RenderState.disableEntityLighting()
     RenderState.makeItBlend()
-    GL11.glScaled(scale, scale, 1)
-    GL11.glPushAttrib(GL11.GL_DEPTH_BUFFER_BIT)
-    GL11.glDepthMask(false)
-    GL11.glColor3f(0.5f, 0.5f, 1f)
-    TextBufferRenderCache.render(bufferRenderer)
-    GL11.glPopAttrib()
+    stack.scale(scale.toFloat, scale.toFloat, 1)
+    RenderState.pushAttrib()
+    RenderSystem.depthMask(false)
+    RenderSystem.setShaderColor(0.5f, 0.5f, 1f, 1f)
+    TextBufferRenderCache.render(stack, bufferRenderer)
+    RenderState.popAttrib()
   }
 
-  override protected def changeSize(w: Double, h: Double, recompile: Boolean) = 2.0
+  override protected def changeSize(w: Double, h: Double) = 2.0
 
-  override protected def drawSecondaryForegroundLayer(mouseX: Int, mouseY: Int) {
-    drawBufferLayer()
-    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS) // Me lazy... prevents NEI render glitch.
-    if (func_146978_c(power.x, power.y, power.width, power.height, mouseX, mouseY)) {
-      val tooltip = new java.util.ArrayList[String]
+  override protected def renderLabels(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit =
+    drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
+
+  override protected def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
+    drawBufferLayer(graphics.pose)
+    RenderState.pushAttrib()
+    if (isHovering(power.x, power.y, power.width, power.height, mouseX - leftPos, mouseY - topPos)) {
+      val tooltip = new java.util.ArrayList[Component]
       val format = Localization.Computer.Power + ": %d%% (%d/%d)"
-      tooltip.add(format.format(
-        drone.globalBuffer * 100 / math.max(drone.globalBufferSize, 1),
-        drone.globalBuffer,
-        drone.globalBufferSize))
-      copiedDrawHoveringText(tooltip, mouseX - guiLeft, mouseY - guiTop, fontRendererObj)
+      tooltip.add(Component.literal(format.format(
+        inventoryContainer.globalBuffer * 100 / math.max(inventoryContainer.globalBufferSize, 1),
+        inventoryContainer.globalBuffer, inventoryContainer.globalBufferSize)))
+      graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
-    if (powerButton.func_146115_a) {
-      val tooltip = new java.util.ArrayList[String]
-      tooltip.addAll(asJavaCollection(if (drone.isRunning) Localization.Computer.TurnOff.lines.toIterable else Localization.Computer.TurnOn.lines.toIterable))
-      copiedDrawHoveringText(tooltip, mouseX - guiLeft, mouseY - guiTop, fontRendererObj)
+    if (powerButton.isMouseOver(mouseX, mouseY)) {
+      val tooltip = new java.util.ArrayList[Component]
+      tooltip.addAll(asJavaCollection(if (inventoryContainer.isRunning) Localization.Computer.TurnOff.linesIterator.map(Component.literal).toIterable else Localization.Computer.TurnOn.linesIterator.map(Component.literal).toIterable))
+      graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
-    GL11.glPopAttrib()
+    RenderState.popAttrib()
   }
 
-  override protected def drawGuiContainerBackgroundLayer(dt: Float, mouseX: Int, mouseY: Int) {
-    GL11.glColor3f(1, 1, 1) // Required under Linux.
-    mc.renderEngine.bindTexture(Textures.guiDrone)
-    drawTexturedModalRect(guiLeft, guiTop, 0, 0, xSize, ySize)
-    power.level = drone.globalBuffer.toDouble / math.max(drone.globalBufferSize.toDouble, 1.0)
-    drawWidgets()
-    if (drone.mainInventory.getSizeInventory > 0) {
-      drawSelection()
+  override protected def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+    graphics.blit(Textures.GUI.Drone, leftPos, topPos, 0, 0, imageWidth, imageHeight)
+    power.level = inventoryContainer.globalBuffer.toFloat / math.max(inventoryContainer.globalBufferSize.toFloat, 1.0f)
+    drawWidgets(graphics)
+    if (inventoryContainer.otherInventory.getContainerSize > 0) {
+      drawSelection(graphics)
     }
 
-    drawInventorySlots()
-  }
-
-  protected override def drawGradientRect(par1: Int, par2: Int, par3: Int, par4: Int, par5: Int, par6: Int) {
-    super.drawGradientRect(par1, par2, par3, par4, par5, par6)
-    RenderState.makeItBlend()
+    drawInventorySlots(graphics)
   }
 
   // No custom slots, we just extend DynamicGuiContainer for the highlighting.
-  override protected def drawSlotBackground(x: Int, y: Int) {}
+  override protected def drawSlotBackground(graphics: GuiGraphics, x: Int, y: Int): Unit = {}
 
-  private def drawSelection() {
-    val slot = drone.selectedSlot
+  private def drawSelection(graphics: GuiGraphics): Unit = {
+    val stack = graphics.pose()
+    val slot = inventoryContainer.selectedSlot
     if (slot >= 0 && slot < 16) {
-      RenderState.makeItBlend()
-      Minecraft.getMinecraft.renderEngine.bindTexture(Textures.guiRobotSelection)
-      val now = System.currentTimeMillis() / 1000.0
-      val offsetV = ((now - now.toInt) * selectionsStates).toInt * selectionStepV
-      val x = guiLeft + inventoryX - 1 + (slot % 4) * (selectionSize - 2)
-      val y = guiTop + inventoryY - 1 + (slot / 4) * (selectionSize - 2)
+      Textures.bind(Textures.GUI.RobotSelection)
+      val now = System.currentTimeMillis() % 1000 / 1000.0f
+      val offsetV = (now * selectionsStates).toInt * selectionStepV
+      val x = leftPos + inventoryX - 1 + (slot % 4) * (selectionSize - 2)
+      val y = topPos + inventoryY - 1 + (slot / 4) * (selectionSize - 2)
 
-      val t = Tessellator.instance
-      t.startDrawingQuads()
-      t.addVertexWithUV(x, y, zLevel, 0, offsetV)
-      t.addVertexWithUV(x, y + selectionSize, zLevel, 0, offsetV + selectionStepV)
-      t.addVertexWithUV(x + selectionSize, y + selectionSize, zLevel, 1, offsetV + selectionStepV)
-      t.addVertexWithUV(x + selectionSize, y, zLevel, 1, offsetV)
-      t.draw()
+      val t = Tesselator.getInstance
+      val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
+      r.addVertex(stack.last.pose(), x, y, 0).setUv(0, offsetV)
+      r.addVertex(stack.last.pose(), x, y + selectionSize, 0).setUv(0, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), x + selectionSize, y + selectionSize, 0).setUv(1, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), x + selectionSize, y, 0).setUv(1, offsetV)
+      BufferUploader.drawWithShader(r.buildOrThrow())
     }
   }
 }

@@ -1,11 +1,17 @@
 package li.cil.oc.api;
 
-import cpw.mods.fml.common.event.FMLInterModComms;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.nbt.NBTTagString;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.fml.InterModComms;
 import org.apache.commons.lang3.tuple.Pair;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
 
 /**
  * This is a pure utility class to more comfortably register things that can
@@ -23,6 +29,19 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 @SuppressWarnings("unused")
 public final class IMC {
+    public static final String REGISTER_ASSEMBLER_FILTER = "registerAssemblerFilter";
+    public static final String REGISTER_ASSEMBLER_TEMPLATE = "registerAssemblerTemplate";
+    public static final String REGISTER_DISASSEMBLER_TEMPLATE = "registerDisassemblerTemplate";
+    public static final String REGISTER_TOOL_DURABILITY_PROVIDER = "registerToolDurabilityProvider";
+    public static final String REGISTER_WRENCH_TOOL = "registerWrenchTool";
+    public static final String REGISTER_WRENCH_TOOL_CHECK = "registerWrenchToolCheck";
+    public static final String REGISTER_ITEM_CHARGE = "registerItemCharge";
+    public static final String REGISTER_INK_PROVIDER = "registerInkProvider";
+    public static final String BLACKLIST_PERIPHERAL = "blacklistPeripheral";
+    public static final String BLACKLIST_HOST = "blacklistHost";
+    public static final String REGISTER_CUSTOM_POWER_SYSTEM = "registerCustomPowerSystem";
+    public static final String REGISTER_PROGRAM_DISK_LABEL = "registerProgramDiskLabel";
+
     /**
      * Register a callback that is used as a filter for assembler templates.
      * Any templates that require a base item that is rejected by <em>any</em>
@@ -34,13 +53,13 @@ public final class IMC {
      * boolean callback(ItemStack stack)
      * </pre>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param callback the callback to register as a filtering method.
      */
     public static void registerAssemblerFilter(final String callback) {
-        FMLInterModComms.sendMessage(MOD_ID, "registerAssemblerFilter", callback);
+        InterModComms.sendTo(MOD_ID, REGISTER_ASSEMBLER_FILTER, () -> callback);
     }
 
     /**
@@ -52,7 +71,7 @@ public final class IMC {
      * Object[] validate(IInventory inventory)
      * Object[] assemble(IInventory inventory)
      * </pre>
-     * Values in the array returned by <tt>validate</tt> must be one of the following:
+     * Values in the array returned by {@code validate} must be one of the following:
      * <pre>
      * // Valid or not.
      * new Object[]{Boolean}
@@ -61,7 +80,7 @@ public final class IMC {
      * // Valid or not, text for progess bar, warnings for start button tooltip (one per line).
      * new Object[]{Boolean, IChatComponent, IChatComponent[]}
      * </pre>
-     * Values in the array returned by <tt>assemble</tt> must be one of the following:
+     * Values in the array returned by {@code assemble} must be one of the following:
      * <pre>
      * // The assembled device.
      * new Object[]{ItemStack}
@@ -69,8 +88,8 @@ public final class IMC {
      * new Object[]{ItemStack, Number}
      * </pre>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param name           the name of the device created using the
      *                       template. Optional, only used in logging.
@@ -94,72 +113,72 @@ public final class IMC {
      *                       template. The length determines the number of
      *                       upgrades. Maximum number is nine.
      * @param componentSlots the types and tiers of component slots provided by
-     *                       this template. May contain <tt>null</tt> entries
+     *                       this template. May contain {@code null} entries
      *                       to skip slots (slots are ordered top-to-bottom,
      *                       left-to-right). For example, a robot template
-     *                       with only two card slots will pass <tt>null</tt>
+     *                       with only two card slots will pass {@code null}
      *                       for the third component slot. Up to nine.
      */
     public static void registerAssemblerTemplate(final String name, final String select, final String validate, final String assemble, final Class host, final int[] containerTiers, final int[] upgradeTiers, final Iterable<Pair<String, Integer>> componentSlots) {
-        final NBTTagCompound nbt = new NBTTagCompound();
+        final CompoundTag nbt = new CompoundTag();
         if (name != null) {
-            nbt.setString("name", name);
+            nbt.putString("name", name);
         }
-        nbt.setString("select", select);
-        nbt.setString("validate", validate);
-        nbt.setString("assemble", assemble);
+        nbt.putString("select", select);
+        nbt.putString("validate", validate);
+        nbt.putString("assemble", assemble);
         if (host != null) {
-            nbt.setString("hostClass", host.getName());
+            nbt.putString("hostClass", host.getName());
         }
 
-        final NBTTagList containersNbt = new NBTTagList();
+        final ListTag containersNbt = new ListTag();
         if (containerTiers != null) {
             for (int tier : containerTiers) {
-                final NBTTagCompound slotNbt = new NBTTagCompound();
-                slotNbt.setInteger("tier", tier);
-                containersNbt.appendTag(slotNbt);
+                final CompoundTag slotNbt = new CompoundTag();
+                slotNbt.putInt("tier", tier);
+                containersNbt.add(slotNbt);
             }
         }
-        if (containersNbt.tagCount() > 0) {
-            nbt.setTag("containerSlots", containersNbt);
+        if (containersNbt.size() > 0) {
+            nbt.put("containerSlots", containersNbt);
         }
 
-        final NBTTagList upgradesNbt = new NBTTagList();
+        final ListTag upgradesNbt = new ListTag();
         if (upgradeTiers != null) {
             for (int tier : upgradeTiers) {
-                final NBTTagCompound slotNbt = new NBTTagCompound();
-                slotNbt.setInteger("tier", tier);
-                upgradesNbt.appendTag(slotNbt);
+                final CompoundTag slotNbt = new CompoundTag();
+                slotNbt.putInt("tier", tier);
+                upgradesNbt.add(slotNbt);
             }
         }
-        if (upgradesNbt.tagCount() > 0) {
-            nbt.setTag("upgradeSlots", upgradesNbt);
+        if (upgradesNbt.size() > 0) {
+            nbt.put("upgradeSlots", upgradesNbt);
         }
 
-        final NBTTagList componentsNbt = new NBTTagList();
+        final ListTag componentsNbt = new ListTag();
         if (componentSlots != null) {
             for (Pair<String, Integer> slot : componentSlots) {
                 if (slot == null) {
-                    componentsNbt.appendTag(new NBTTagCompound());
+                    componentsNbt.add(new CompoundTag());
                 } else {
-                    final NBTTagCompound slotNbt = new NBTTagCompound();
-                    slotNbt.setString("type", slot.getLeft());
-                    slotNbt.setInteger("tier", slot.getRight());
-                    componentsNbt.appendTag(slotNbt);
+                    final CompoundTag slotNbt = new CompoundTag();
+                    slotNbt.putString("type", slot.getLeft());
+                    slotNbt.putInt("tier", slot.getRight());
+                    componentsNbt.add(slotNbt);
                 }
             }
         }
-        if (componentsNbt.tagCount() > 0) {
-            nbt.setTag("componentSlots", componentsNbt);
+        if (componentsNbt.size() > 0) {
+            nbt.put("componentSlots", componentsNbt);
         }
 
-        FMLInterModComms.sendMessage(MOD_ID, "registerAssemblerTemplate", nbt);
+        InterModComms.sendTo(MOD_ID, REGISTER_ASSEMBLER_TEMPLATE, () -> nbt);
     }
 
     /**
      * Register a new template for the disassembler.
      * <br>
-     * The <tt>disassemble</tt> callback gets passed the item stack to
+     * The {@code disassemble} callback gets passed the item stack to
      * disassemble, and a list of inferred ingredients (based on crafting
      * recipes). This is useful for not having to compute those yourself when
      * you just want to add a number of items from an internal inventory to
@@ -179,8 +198,8 @@ public final class IMC {
      * random failure, the second being guaranteed drops (e.g. for item inventory contents).</li>
      * </ul>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param name        the name of the handler (e.g. name of the item
      *                    being handled). Optional, only used in logging.
@@ -190,22 +209,22 @@ public final class IMC {
      *                    ingredients from an item.
      */
     public static void registerDisassemblerTemplate(final String name, final String select, final String disassemble) {
-        final NBTTagCompound nbt = new NBTTagCompound();
+        final CompoundTag nbt = new CompoundTag();
         if (name != null) {
-            nbt.setString("name", name);
+            nbt.putString("name", name);
         }
-        nbt.setString("select", select);
-        nbt.setString("disassemble", disassemble);
+        nbt.putString("select", select);
+        nbt.putString("disassemble", disassemble);
 
-        FMLInterModComms.sendMessage(MOD_ID, "registerDisassemblerTemplate", nbt);
+        InterModComms.sendTo(MOD_ID, REGISTER_DISASSEMBLER_TEMPLATE, () -> nbt);
     }
 
     /**
      * Register a callback for providing tool durability information.
      * <br>
-     * If your provider does not handle a tool/item, return <tt>Double.NaN</tt>
+     * If your provider does not handle a tool/item, return {@link Double#NaN}
      * to indicate that another provider should be queried. The first value
-     * that isn't <tt>NaN</tt> will be used as the durability.
+     * that isn't {@link Double#NaN NaN} will be used as the durability.
      * <br>
      * The returned value must be the <em>relative</em> durability of the tool,
      * in a range of [0,1], with 0 being broken, 1 being new/fully repaired.
@@ -215,13 +234,13 @@ public final class IMC {
      * double callback(ItemStack stack)
      * </pre>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param callback the callback to register as a durability provider.
      */
     public static void registerToolDurabilityProvider(final String callback) {
-        FMLInterModComms.sendMessage(MOD_ID, "registerToolDurabilityProvider", callback);
+        InterModComms.sendTo(MOD_ID, REGISTER_TOOL_DURABILITY_PROVIDER, () -> callback);
     }
 
     /**
@@ -231,21 +250,21 @@ public final class IMC {
      * interacting with certain blocks while the player is holding such an item,
      * for example to avoid rotating blocks when opening their GUI.
      * <br>
-     * The returned value must be <tt>true</tt> if the wrench was used/usable,
-     * <tt>false</tt> otherwise.
+     * The returned value must be {@code true} if the wrench was used/usable,
+     * {@code false} otherwise.
      * <br>
      * Signature of callbacks must be:
      * <pre>
-     * boolean callback(EntityPlayer player, BlockPos pos, boolean changeDurability)
+     * boolean callback(PlayerEntity player, BlockPos pos, boolean changeDurability)
      * </pre>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param callback the callback to register as a wrench tool handler.
      */
     public static void registerWrenchTool(final String callback) {
-        FMLInterModComms.sendMessage(MOD_ID, "registerWrenchTool", callback);
+        InterModComms.sendTo(MOD_ID, REGISTER_WRENCH_TOOL, () -> callback);
     }
 
     /**
@@ -254,28 +273,28 @@ public final class IMC {
      * This is used to determine whether certain item stacks are wrench items,
      * which is used, for example, when "itemizing" a drone.
      * <br>
-     * The returned value must <tt>true</tt> if the item stack is a wrench,
-     * <tt>false</tt> otherwise.
+     * The returned value must {@code true} if the item stack is a wrench,
+     * {@code false} otherwise.
      * <br>
      * Signature of callbacks must be:
      * <pre>
      * boolean callback(ItemStack stack)
      * </pre>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param callback the callback to register as a wrench tool tester.
      */
     public static void registerWrenchToolCheck(final String callback) {
-        FMLInterModComms.sendMessage(MOD_ID, "registerWrenchToolCheck", callback);
+        InterModComms.sendTo(MOD_ID, REGISTER_WRENCH_TOOL_CHECK, () -> callback);
     }
 
     /**
      * Register a handler for items that can be charged.
      * <br>
      * This is used by the charger to determine whether items can be charged
-     * by it (<tt>canCharge</tt>) and to actually charge them (<tt>charge</tt>).
+     * by it ({@code canCharge}) and to actually charge them ({@code charge}).
      * <br>
      * Note that OpenComputers comes with a few built-in handlers for third-
      * party charged items, such as Redstone Flux and IndustrialCraft 2.
@@ -286,19 +305,19 @@ public final class IMC {
      * double charge(ItemStack stack, double amount, boolean simulate)
      * </pre>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param name      the name of the energy system/item type handled.
      * @param canCharge the callback to register for checking chargeability.
      * @param charge    the callback to register for charging items.
      */
     public static void registerItemCharge(final String name, final String canCharge, final String charge) {
-        final NBTTagCompound nbt = new NBTTagCompound();
-        nbt.setString("name", name);
-        nbt.setString("canCharge", canCharge);
-        nbt.setString("charge", charge);
-        FMLInterModComms.sendMessage(MOD_ID, "registerItemCharge", nbt);
+        final CompoundTag nbt = new CompoundTag();
+        nbt.putString("name", name);
+        nbt.putString("canCharge", canCharge);
+        nbt.putString("charge", charge);
+        InterModComms.sendTo(MOD_ID, REGISTER_ITEM_CHARGE, () -> nbt);
     }
 
     /**
@@ -316,13 +335,13 @@ public final class IMC {
      * int callback(ItemStack stack)
      * </pre>
      * <br>
-     * Callbacks must be declared as <tt>packagePath.className.methodName</tt>.
-     * For example: <tt>com.example.Integration.callbackMethod</tt>.
+     * Callbacks must be declared as {@code packagePath.className.methodName}.
+     * For example: {@code com.example.Integration.callbackMethod}.
      *
      * @param callback the callback to register as an ink provider.
      */
     public static void registerInkProvider(final String callback) {
-        FMLInterModComms.sendMessage(MOD_ID, "registerInkProvider", callback);
+        InterModComms.sendTo(MOD_ID, REGISTER_INK_PROVIDER, () -> callback);
     }
 
     /**
@@ -335,7 +354,7 @@ public final class IMC {
      * @param peripheral the class of the peripheral to blacklist.
      */
     public static void blacklistPeripheral(final Class peripheral) {
-        FMLInterModComms.sendMessage(MOD_ID, "blacklistPeripheral", peripheral.getName());
+        InterModComms.sendTo(MOD_ID, BLACKLIST_PERIPHERAL, () -> peripheral.getName());
     }
 
     /**
@@ -353,25 +372,16 @@ public final class IMC {
      * @param host  the class of the host to blacklist the component for.
      * @param stack the item stack representing the blacklisted component.
      */
-    public static void blacklistHost(final String name, final Class host, final ItemStack stack) {
-        final NBTTagCompound nbt = new NBTTagCompound();
-        nbt.setString("name", name);
-        nbt.setString("host", host.getName());
-        final NBTTagCompound stackNbt = new NBTTagCompound();
-        stack.writeToNBT(stackNbt);
-        nbt.setTag("item", stackNbt);
-        FMLInterModComms.sendMessage(MOD_ID, "blacklistHost", nbt);
-    }
-
-    /**
-     * Notifies OpenComputers that there is some 3rd-party power system present
-     * that adds integration on its side.
-     * <br>
-     * This will suppress the "no power system found" message on start up, and
-     * avoid auto-disabling power use.
-     */
-    public static void registerCustomPowerSystem() {
-        FMLInterModComms.sendMessage(MOD_ID, "registerCustomPowerSystem", "true");
+    public static void blacklistHost(final String name, final Class<?> host, final ItemStack stack) {
+        final CompoundTag nbt = new CompoundTag();
+        nbt.putString("name", name);
+        nbt.putString("host", host.getName());
+        final CompoundTag stackNbt = new CompoundTag();
+        stackNbt.putString("id", Objects.requireNonNull(stack.getItemHolder().getKey()).location().toString());
+        stackNbt.putByte("count", (byte) stack.getCount());
+        stackNbt.put("components", DataComponentPatch.CODEC.encode(stack.getComponentsPatch(), NbtOps.INSTANCE, new CompoundTag()).getOrThrow());
+        nbt.put("item", stackNbt);
+        InterModComms.sendTo(MOD_ID, BLACKLIST_HOST, () -> nbt);
     }
 
     /**
@@ -399,22 +409,22 @@ public final class IMC {
      * @param architectures the names of the architectures this entry applies to.
      */
     public static void registerProgramDiskLabel(final String programName, final String diskLabel, final String... architectures) {
-        final NBTTagCompound nbt = new NBTTagCompound();
-        nbt.setString("program", programName);
-        nbt.setString("label", diskLabel);
+        final CompoundTag nbt = new CompoundTag();
+        nbt.putString("program", programName);
+        nbt.putString("label", diskLabel);
         if (architectures != null && architectures.length > 0) {
-            final NBTTagList architecturesNbt = new NBTTagList();
+            final ListTag architecturesNbt = new ListTag();
             for (final String architecture : architectures) {
-                architecturesNbt.appendTag(new NBTTagString(architecture));
+                architecturesNbt.add(StringTag.valueOf(architecture));
             }
-            nbt.setTag("architectures", architecturesNbt);
+            nbt.put("architectures", architecturesNbt);
         }
-        FMLInterModComms.sendMessage(MOD_ID, "registerProgramDiskLabel", nbt);
+        InterModComms.sendTo(MOD_ID, REGISTER_PROGRAM_DISK_LABEL, () -> nbt);
     }
 
     // ----------------------------------------------------------------------- //
 
-    private static final String MOD_ID = "OpenComputers";
+    private static final String MOD_ID = "opencomputers";
 
     private IMC() {
     }

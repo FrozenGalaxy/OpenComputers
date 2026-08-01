@@ -4,31 +4,27 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
-
 import li.cil.oc.OpenComputers
-import li.cil.oc.api.Persistable
 import li.cil.oc.api.machine.Value
 import li.cil.oc.server.driver.Registry
 import li.cil.oc.server.machine.ArgumentsImpl
 import li.cil.oc.util.ExtendedLuaState.extendLuaState
-import net.minecraft.nbt.CompressedStreamTools
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.nbt.NbtIo
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 
 class UserdataAPI(owner: NativeLuaArchitecture) extends NativeLuaAPI(owner) {
-  def initialize() {
+  def initialize(): Unit = {
     lua.newTable()
 
     lua.pushScalaFunction(lua => {
-      val nbt = new NBTTagCompound()
-      val persistable = lua.toJavaObjectRaw(1).asInstanceOf[Persistable]
-      lua.pushString(persistable.getClass.getName)
-      persistable.save(nbt)
-      val baos = new ByteArrayOutputStream()
-      val dos = new DataOutputStream(baos)
-      CompressedStreamTools.write(nbt, dos)
-      lua.pushByteArray(baos.toByteArray)
+      val value = lua.toJavaObjectRaw(1).asInstanceOf[Value]
+      val server = ServerLifecycleHooks.getCurrentServer
+      val (className, data) = UserdataAPI.saveValue(value, owner.userdataSaveHolder, server.registryAccess())
+      lua.pushString(className)
+      lua.pushByteArray(data)
       2
     })
     lua.setField(-2, "save")
@@ -36,14 +32,10 @@ class UserdataAPI(owner: NativeLuaArchitecture) extends NativeLuaAPI(owner) {
     lua.pushScalaFunction(lua => {
       try {
         val className = lua.toString(1)
-        val clazz = Class.forName(className)
-        val persistable = clazz.newInstance.asInstanceOf[Persistable]
+        val server = ServerLifecycleHooks.getCurrentServer
         val data = lua.toByteArray(2)
-        val bais = new ByteArrayInputStream(data)
-        val dis = new DataInputStream(bais)
-        val nbt = CompressedStreamTools.read(dis)
-        persistable.load(nbt)
-        lua.pushJavaObjectRaw(persistable)
+        val value = UserdataAPI.loadValue(className, data, owner.userdataLoadHolder, server.registryAccess())
+        lua.pushJavaObjectRaw(value)
         1
       }
       catch {
@@ -113,5 +105,27 @@ class UserdataAPI(owner: NativeLuaArchitecture) extends NativeLuaAPI(owner) {
     lua.setField(-2, "doc")
 
     lua.setGlobal("userdata")
+  }
+}
+
+private[luac] object UserdataAPI {
+  def saveValue(value: Value, holder: net.neoforged.neoforge.common.MutableDataComponentHolder,
+                provider: net.minecraft.core.HolderLookup.Provider): (String, Array[Byte]) = {
+    val nbt = new CompoundTag()
+    value.saveData(holder, nbt, provider)
+    val baos = new ByteArrayOutputStream()
+    val dos = new DataOutputStream(baos)
+    NbtIo.write(nbt, dos)
+    value.getClass.getName -> baos.toByteArray
+  }
+
+  def loadValue(className: String, data: Array[Byte], holder: net.minecraft.core.component.DataComponentHolder,
+                provider: net.minecraft.core.HolderLookup.Provider): Value = {
+    val value = Class.forName(className).getDeclaredConstructor().newInstance().asInstanceOf[Value]
+    val bais = new ByteArrayInputStream(data)
+    val dis = new DataInputStream(bais)
+    val nbt = NbtIo.read(dis)
+    value.loadData(holder, nbt, provider)
+    value
   }
 }

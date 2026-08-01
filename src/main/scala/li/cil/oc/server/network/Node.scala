@@ -1,18 +1,19 @@
 package li.cil.oc.server.network
 
 import com.google.common.base.Strings
-import li.cil.oc.OpenComputers
-import li.cil.oc.api
-import li.cil.oc.api.network.Environment
-import li.cil.oc.api.network.Visibility
-import li.cil.oc.api.network.{Node => ImmutableNode}
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.{OpenComputers, api}
+import li.cil.oc.api.network.{Environment, Visibility, Node => ImmutableNode}
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.component.DataComponentHolder
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 
 trait Node extends ImmutableNode {
   def host: Environment
+
   def reachability: Visibility
 
   final var address: String = null
@@ -52,7 +53,7 @@ trait Node extends ImmutableNode {
 
   // ----------------------------------------------------------------------- //
 
-  def onConnect(node: ImmutableNode) {
+  def onConnect(node: ImmutableNode): Unit = {
     try {
       host.onConnect(node)
     } catch {
@@ -60,7 +61,7 @@ trait Node extends ImmutableNode {
     }
   }
 
-  def onDisconnect(node: ImmutableNode) {
+  def onDisconnect(node: ImmutableNode): Unit = {
     try {
       host.onDisconnect(node)
     } catch {
@@ -70,19 +71,20 @@ trait Node extends ImmutableNode {
 
   // ----------------------------------------------------------------------- //
 
-  def load(nbt: NBTTagCompound) = {
-    if (nbt.hasKey("address")) {
-      val newAddress = nbt.getString("address")
-      if (!Strings.isNullOrEmpty(newAddress) && newAddress != address) network match {
-        case wrapper: Network.Wrapper => wrapper.network.remap(this, newAddress)
-        case _ => address = newAddress
-      }
+  private[oc] def loadAddress(newAddress: String): Unit = {
+    if (!Strings.isNullOrEmpty(newAddress) && newAddress != address) network match {
+      case wrapper: Network.Wrapper => wrapper.network.remap(this, newAddress)
+      case _ => address = newAddress
     }
   }
 
-  def save(nbt: NBTTagCompound) = {
+  override def loadData(holder: DataComponentHolder): Unit = {
+    holder.getComponent(OCComponents.ADDRESS).foreach(loadAddress)
+  }
+
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
     if (address != null) {
-      nbt.setString("address", address)
+      holder.setComponent(OCComponents.ADDRESS, address)
     }
   }
 

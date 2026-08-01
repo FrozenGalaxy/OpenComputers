@@ -1,7 +1,12 @@
 package li.cil.oc.common.item
 
-class Memory(val parent: Delegator, val tier: Int) extends traits.Delegate with traits.ItemTier {
-  override val unlocalizedName = super.unlocalizedName + tier
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-  override protected def tooltipName = Option(super.unlocalizedName)
+class Memory(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
+
+  override protected def tooltipName = Option(unlocalizedName)
 }

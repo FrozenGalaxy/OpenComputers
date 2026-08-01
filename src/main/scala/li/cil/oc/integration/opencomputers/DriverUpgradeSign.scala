@@ -11,14 +11,14 @@ import li.cil.oc.common.Slot
 import li.cil.oc.server.component
 import li.cil.oc.server.component.UpgradeSignInAdapter
 import li.cil.oc.server.component.UpgradeSignInRotatable
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
 
 object DriverUpgradeSign extends Item with HostAware {
   override def worksWith(stack: ItemStack) = isOneOf(stack,
     api.Items.get(Constants.ItemName.SignUpgrade))
 
   override def createEnvironment(stack: ItemStack, host: EnvironmentHost) =
-    if (host.world != null && host.world.isRemote) null
+    if (host.getEnvironmentLevel != null && host.getEnvironmentLevel.isClientSide) null
     else host match {
       case rotatable: EnvironmentHost with Rotatable => new UpgradeSignInRotatable(rotatable)
       case adapter: EnvironmentHost with Adapter => new UpgradeSignInAdapter(adapter)

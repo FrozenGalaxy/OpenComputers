@@ -1,73 +1,69 @@
 package li.cil.oc.client.gui
 
-import li.cil.oc.Localization
+import com.mojang.blaze3d.systems.RenderSystem
 import li.cil.oc.client.Textures
 import li.cil.oc.client.gui.widget.ProgressBar
-import li.cil.oc.common.container
-import li.cil.oc.common.container.ComponentSlot
-import li.cil.oc.common.tileentity
-import net.minecraft.entity.player.InventoryPlayer
-import org.lwjgl.opengl.GL11
+import li.cil.oc.common.menu
+import li.cil.oc.common.menu.ComponentSlot
+import li.cil.oc.util.RenderState
+import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.player.Inventory
+import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.client.gui.GuiGraphics
 
-class Printer(playerInventory: InventoryPlayer, val printer: tileentity.Printer) extends DynamicGuiContainer(new container.Printer(playerInventory, printer)) {
-  xSize = 176
-  ySize = 166
+class Printer(state: menu.Printer, playerInventory: Inventory, name: Component)
+  extends DynamicGuiContainer(state, playerInventory, name) {
 
-  private val materialBar = addWidget(new ProgressBar(40, 21) {
+  imageWidth = 176
+  imageHeight = 166
+
+  private val materialBar = addCustomWidget(new ProgressBar(40, 21) {
     override def width = 62
 
     override def height = 12
 
-    override def barTexture = Textures.guiPrinterMaterial
+    override def barTexture = Textures.GUI.PrinterMaterial
   })
-  private val inkBar = addWidget(new ProgressBar(40, 53) {
+
+  private val inkBar = addCustomWidget(new ProgressBar(40, 53) {
     override def width = 62
 
     override def height = 12
 
-    override def barTexture = Textures.guiPrinterInk
+    override def barTexture = Textures.GUI.PrinterInk
   })
-  private val progressBar = addWidget(new ProgressBar(105, 20) {
+
+  private val progressBar = addCustomWidget(new ProgressBar(105, 20) {
     override def width = 46
 
     override def height = 46
 
-    override def barTexture = Textures.guiPrinterProgress
+    override def barTexture = Textures.GUI.PrinterProgress
   })
 
-  override def initGui() {
-    super.initGui()
+  override def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int) = {
+    super.drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
+    RenderState.pushAttrib()
+    if (isHovering(materialBar.x, materialBar.y, materialBar.width, materialBar.height, mouseX - leftPos, mouseY - topPos)) {
+      val tooltip: java.util.List[Component] = java.util.List.of(Component.literal(inventoryContainer.amountMaterial + "/" + inventoryContainer.maxAmountMaterial))
+      graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
+    }
+    if (isHovering(inkBar.x, inkBar.y, inkBar.width, inkBar.height, mouseX - leftPos, mouseY - topPos)) {
+      val tooltip: java.util.List[Component] = java.util.List.of(Component.literal(inventoryContainer.amountInk + "/" + inventoryContainer.maxAmountInk))
+      graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
+    }
+    RenderState.popAttrib()
   }
 
-  override def drawSecondaryForegroundLayer(mouseX: Int, mouseY: Int) = {
-    super.drawSecondaryForegroundLayer(mouseX, mouseY)
-    fontRendererObj.drawString(
-      Localization.localizeImmediately(printer.getInventoryName),
-      8, 6, 0x404040)
-    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS) // Me lazy... prevents NEI render glitch.
-    if (func_146978_c(materialBar.x, materialBar.y, materialBar.width, materialBar.height, mouseX, mouseY)) {
-      val tooltip = new java.util.ArrayList[String]
-      tooltip.add(inventoryContainer.amountMaterial + "/" + printer.maxAmountMaterial)
-      copiedDrawHoveringText(tooltip, mouseX - guiLeft, mouseY - guiTop, fontRendererObj)
-    }
-    if (func_146978_c(inkBar.x, inkBar.y, inkBar.width, inkBar.height, mouseX, mouseY)) {
-      val tooltip = new java.util.ArrayList[String]
-      tooltip.add(inventoryContainer.amountInk + "/" + printer.maxAmountInk)
-      copiedDrawHoveringText(tooltip, mouseX - guiLeft, mouseY - guiTop, fontRendererObj)
-    }
-    GL11.glPopAttrib()
-  }
-
-  override def drawGuiContainerBackgroundLayer(dt: Float, mouseX: Int, mouseY: Int) {
-    GL11.glColor3f(1, 1, 1) // Required under Linux.
-    mc.renderEngine.bindTexture(Textures.guiPrinter)
-    drawTexturedModalRect(guiLeft, guiTop, 0, 0, xSize, ySize)
-    materialBar.level = inventoryContainer.amountMaterial / printer.maxAmountMaterial.toDouble
-    inkBar.level = inventoryContainer.amountInk / printer.maxAmountInk.toDouble
+  override def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+    graphics.blit(Textures.GUI.Printer, leftPos, topPos, 0, 0, imageWidth, imageHeight)
+    materialBar.level = inventoryContainer.amountMaterial / inventoryContainer.maxAmountMaterial.toDouble
+    inkBar.level = inventoryContainer.amountInk / inventoryContainer.maxAmountInk.toDouble
     progressBar.level = inventoryContainer.progress
-    drawWidgets()
-    drawInventorySlots()
+    drawWidgets(graphics)
+    drawInventorySlots(graphics)
   }
 
-  override protected def drawDisabledSlot(slot: ComponentSlot) {}
+  override protected def drawDisabledSlot(graphics: GuiGraphics, slot: ComponentSlot): Unit = {}
 }

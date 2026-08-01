@@ -1,6 +1,5 @@
 package li.cil.oc.integration.opencomputers
 
-import cpw.mods.fml.common.FMLCommonHandler
 import li.cil.oc.Constants
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
@@ -16,18 +15,17 @@ import li.cil.oc.api.prefab.TextureTabIconRenderer
 import li.cil.oc.client.Textures
 import li.cil.oc.client.renderer.markdown.segment.render.BlockImageProvider
 import li.cil.oc.client.renderer.markdown.segment.render.ItemImageProvider
-import li.cil.oc.client.renderer.markdown.segment.render.OreDictImageProvider
+import li.cil.oc.client.renderer.markdown.segment.render.TagImageProvider
 import li.cil.oc.client.renderer.markdown.segment.render.TextureImageProvider
 import li.cil.oc.common.EventHandler
 import li.cil.oc.common.Loot
 import li.cil.oc.common.SaveHandler
-import li.cil.oc.common.asm.SimpleComponentTickHandler
 import li.cil.oc.common.block.SimpleBlock
 import li.cil.oc.common.event._
 import li.cil.oc.common.item.Analyzer
-import li.cil.oc.common.item.Delegator
 import li.cil.oc.common.item.RedstoneCard
 import li.cil.oc.common.item.Tablet
+import li.cil.oc.common.item.data.ItemData
 import li.cil.oc.common.nanomachines.provider.DisintegrationProvider
 import li.cil.oc.common.nanomachines.provider.HungryProvider
 import li.cil.oc.common.nanomachines.provider.MagnetProvider
@@ -37,22 +35,26 @@ import li.cil.oc.common.template._
 import li.cil.oc.integration.ModProxy
 import li.cil.oc.integration.Mods
 import li.cil.oc.integration.util.BundledRedstone
-import li.cil.oc.integration.util.WirelessRedstone
 import li.cil.oc.server.machine.luac.LuaStateFactory
 import li.cil.oc.server.machine.luac.NativeLua53Architecture
 import li.cil.oc.server.network.Waypoints
 import li.cil.oc.server.network.WirelessNetwork
 import li.cil.oc.util.Color
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
-import net.minecraftforge.common.ForgeChunkManager
-import net.minecraftforge.common.MinecraftForge
+import net.minecraft.world.item.ItemStack
+import net.minecraft.core.BlockPos
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.Level
+import net.neoforged.api.distmarker.Dist
+import net.neoforged.api.distmarker.OnlyIn
+import net.neoforged.fml.loading.FMLEnvironment
+import net.neoforged.neoforge.common.NeoForge
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
 object ModOpenComputers extends ModProxy {
   override def getMod = Mods.OpenComputers
 
-  override def initialize() {
+  override def initialize(): Unit = {
     DroneTemplate.register()
     MicrocontrollerTemplate.register()
     NavigationUpgradeTemplate.register()
@@ -89,37 +91,36 @@ object ModOpenComputers extends ModProxy {
     api.IMC.registerProgramDiskLabel("opl-flash", "openloader", "Lua 5.2", "Lua 5.3", "LuaJ")
     api.IMC.registerProgramDiskLabel("oppm", "oppm", "Lua 5.2", "Lua 5.3", "LuaJ")
 
-    ForgeChunkManager.setForcedChunkLoadingCallback(OpenComputers, ChunkloaderUpgradeHandler)
+    // ForgeChunkManager removed in NeoForge 1.21, chunk loading callback needs alternative approach
+    // ForgeChunkManager.setForcedChunkLoadingCallback(OpenComputers.ID, ChunkloaderUpgradeHandler)
 
-    FMLCommonHandler.instance.bus.register(EventHandler)
-    FMLCommonHandler.instance.bus.register(NanomachinesHandler.Common)
-    FMLCommonHandler.instance.bus.register(SimpleComponentTickHandler.Instance)
-    FMLCommonHandler.instance.bus.register(Tablet)
+    OpenComputers.proxy.modBus.addListener(EventHandler.onRegisterCapabilities)
+    OpenComputers.proxy.modBus.addListener(ChunkloaderUpgradeHandler.onRegisterTicketControllers)
 
-    MinecraftForge.EVENT_BUS.register(Analyzer)
-    MinecraftForge.EVENT_BUS.register(AngelUpgradeHandler)
-    MinecraftForge.EVENT_BUS.register(BlockChangeHandler)
-    MinecraftForge.EVENT_BUS.register(ChunkloaderUpgradeHandler)
-    MinecraftForge.EVENT_BUS.register(EventHandler)
-    MinecraftForge.EVENT_BUS.register(ExperienceUpgradeHandler)
-    MinecraftForge.EVENT_BUS.register(FileSystemAccessHandler)
-    MinecraftForge.EVENT_BUS.register(HoverBootsHandler)
-    MinecraftForge.EVENT_BUS.register(Loot)
-    MinecraftForge.EVENT_BUS.register(NanomachinesHandler.Common)
-    MinecraftForge.EVENT_BUS.register(NetworkActivityHandler)
-    MinecraftForge.EVENT_BUS.register(RobotCommonHandler)
-    MinecraftForge.EVENT_BUS.register(SaveHandler)
-    MinecraftForge.EVENT_BUS.register(Tablet)
-    MinecraftForge.EVENT_BUS.register(Waypoints)
-    MinecraftForge.EVENT_BUS.register(WirelessNetwork)
-    MinecraftForge.EVENT_BUS.register(WirelessNetworkCardHandler)
-    MinecraftForge.EVENT_BUS.register(li.cil.oc.client.ComponentTracker)
-    MinecraftForge.EVENT_BUS.register(li.cil.oc.server.ComponentTracker)
+    NeoForge.EVENT_BUS.register(EventHandler)
+    NeoForge.EVENT_BUS.register(NanomachinesHandler.Common)
+    NeoForge.EVENT_BUS.register(Tablet)
+    NeoForge.EVENT_BUS.register(Analyzer)
+    NeoForge.EVENT_BUS.register(AngelUpgradeHandler)
+    NeoForge.EVENT_BUS.register(ChunkloaderUpgradeHandler)
+    NeoForge.EVENT_BUS.register(ExperienceUpgradeHandler)
+    NeoForge.EVENT_BUS.register(FileSystemAccessHandler)
+    NeoForge.EVENT_BUS.register(HoverBootsHandler)
+    NeoForge.EVENT_BUS.register(Loot)
+    NeoForge.EVENT_BUS.register(NetworkActivityHandler)
+    NeoForge.EVENT_BUS.register(RobotCommonHandler)
+    NeoForge.EVENT_BUS.register(SaveHandler)
+    NeoForge.EVENT_BUS.register(Waypoints)
+    NeoForge.EVENT_BUS.register(WirelessNetwork)
+    NeoForge.EVENT_BUS.register(WirelessNetworkCardHandler)
+    NeoForge.EVENT_BUS.register(li.cil.oc.client.ComponentTracker)
+    NeoForge.EVENT_BUS.register(li.cil.oc.server.ComponentTracker)
 
     api.Driver.add(ConverterNanomachines)
     api.Driver.add(ConverterLinkedCard)
 
     api.Driver.add(DriverAPU)
+    api.Driver.add(DriverAudioCard)
     api.Driver.add(DriverComponentBus)
     api.Driver.add(DriverCPU)
     api.Driver.add(DriverDataCard)
@@ -131,6 +132,7 @@ object ModOpenComputers extends ModProxy {
     api.Driver.add(DriverLinkedCard)
     api.Driver.add(DriverLootDisk)
     api.Driver.add(DriverMemory)
+    api.Driver.add(DriverCreativeMemory)
     api.Driver.add(DriverNetworkCard)
     api.Driver.add(DriverKeyboard)
     api.Driver.add(DriverRedstoneCard)
@@ -146,6 +148,7 @@ object ModOpenComputers extends ModProxy {
     api.Driver.add(DriverScreen)
     api.Driver.add(DriverTransposer)
 
+    api.Driver.add(DriverCapacitorMountable)
     api.Driver.add(DriverDiskDriveMountable)
     api.Driver.add(DriverServer)
     api.Driver.add(DriverTerminalServer)
@@ -166,6 +169,7 @@ object ModOpenComputers extends ModProxy {
     api.Driver.add(DriverUpgradePiston)
     api.Driver.add(DriverUpgradeSign)
     api.Driver.add(DriverUpgradeSolarGenerator)
+    api.Driver.add(DriverUpgradeStickyPiston)
     api.Driver.add(DriverUpgradeTank)
     api.Driver.add(DriverUpgradeTankController)
     api.Driver.add(DriverUpgradeTractorBeam)
@@ -173,6 +177,7 @@ object ModOpenComputers extends ModProxy {
     api.Driver.add(DriverUpgradeMF)
 
     api.Driver.add(DriverAPU.Provider)
+    api.Driver.add(DriverAudioCard.Provider)
     api.Driver.add(DriverDataCard.Provider)
     api.Driver.add(DriverDebugCard.Provider)
     api.Driver.add(DriverEEPROM.Provider)
@@ -198,6 +203,7 @@ object ModOpenComputers extends ModProxy {
     api.Driver.add(DriverUpgradeNavigation.Provider)
     api.Driver.add(DriverUpgradePiston.Provider)
     api.Driver.add(DriverUpgradeSign.Provider)
+    api.Driver.add(DriverUpgradeStickyPiston.Provider)
     api.Driver.add(DriverUpgradeTankController.Provider)
     api.Driver.add(DriverUpgradeTractorBeam.Provider)
     api.Driver.add(DriverUpgradeMF.Provider)
@@ -228,6 +234,7 @@ object ModOpenComputers extends ModProxy {
       Constants.ItemName.InventoryUpgrade,
       Constants.ItemName.NavigationUpgrade,
       Constants.ItemName.PistonUpgrade,
+      Constants.ItemName.StickyPistonUpgrade,
       Constants.ItemName.SolarGeneratorUpgrade,
       Constants.ItemName.TankUpgrade,
       Constants.ItemName.TractorBeamUpgrade,
@@ -246,7 +253,6 @@ object ModOpenComputers extends ModProxy {
       Constants.ItemName.GraphicsCardTier3,
       Constants.ItemName.NetworkCard,
       Constants.ItemName.RedstoneCardTier1,
-      Constants.ItemName.AngelUpgrade,
       Constants.ItemName.CraftingUpgrade,
       Constants.ItemName.HoverUpgradeTier1,
       Constants.ItemName.HoverUpgradeTier2)
@@ -305,43 +311,44 @@ object ModOpenComputers extends ModProxy {
       Constants.ItemName.LeashUpgrade,
       Constants.ItemName.TradingUpgrade)
 
-    if (!WirelessRedstone.isAvailable) {
-      blacklistHost(classOf[internal.Drone], Constants.ItemName.RedstoneCardTier2)
-      blacklistHost(classOf[internal.Tablet], Constants.ItemName.RedstoneCardTier2)
-    }
-
     // Note: kinda nasty, but we have to check for availability for extended
     // redstone mods after integration init, so we have to set tier two
     // redstone card availability here, after all other mods were inited.
-    if (BundledRedstone.isAvailable || WirelessRedstone.isAvailable) {
+    if (BundledRedstone.isAvailable) {
       OpenComputers.log.info("Found extended redstone mods, enabling tier two redstone card.")
-      Delegator.subItem(api.Items.get(Constants.ItemName.RedstoneCardTier2).createItemStack(1)) match {
-        case Some(redstone: RedstoneCard) => redstone.showInItemList = true
-        case _ =>
-      }
+      ModOpenComputers.hasRedstoneCardT2 = true
     }
-
-    api.Manual.addProvider(DefinitionPathProvider)
-    api.Manual.addProvider(new ResourceContentProvider(Settings.resourceDomain, "doc/"))
-    api.Manual.addProvider("", TextureImageProvider)
-    api.Manual.addProvider("item", ItemImageProvider)
-    api.Manual.addProvider("block", BlockImageProvider)
-    api.Manual.addProvider("oredict", OreDictImageProvider)
-
-    api.Manual.addTab(new TextureTabIconRenderer(Textures.guiManualHome), "oc:gui.Manual.Home", "%LANGUAGE%/index.md")
-    api.Manual.addTab(new ItemStackTabIconRenderer(api.Items.get("case1").createItemStack(1)), "oc:gui.Manual.Blocks", "%LANGUAGE%/block/index.md")
-    api.Manual.addTab(new ItemStackTabIconRenderer(api.Items.get("cpu1").createItemStack(1)), "oc:gui.Manual.Items", "%LANGUAGE%/item/index.md")
 
     api.Nanomachines.addProvider(DisintegrationProvider)
     api.Nanomachines.addProvider(HungryProvider)
     api.Nanomachines.addProvider(ParticleProvider)
     api.Nanomachines.addProvider(PotionProvider)
     api.Nanomachines.addProvider(MagnetProvider)
+
+    if(FMLEnvironment.dist.isClient) {
+      initializeClient()
+    }
   }
 
-  def useWrench(player: EntityPlayer, x: Int, y: Int, z: Int, changeDurability: Boolean): Boolean = {
-    player.getHeldItem.getItem match {
-      case wrench: Wrench => wrench.useWrenchOnBlock(player, player.getEntityWorld, x, y, z, !changeDurability)
+  @OnlyIn(Dist.CLIENT)
+  private def initializeClient(): Unit = {
+    api.Manual.addProvider(DefinitionPathProvider)
+    api.Manual.addProvider(new ResourceContentProvider(Settings.resourceDomain, "doc/"))
+    api.Manual.addProvider("", TextureImageProvider)
+    api.Manual.addProvider("item", ItemImageProvider)
+    api.Manual.addProvider("block", BlockImageProvider)
+    api.Manual.addProvider("oredict", TagImageProvider)
+
+    api.Manual.addTab(new TextureTabIconRenderer(Textures.GUI.ManualHome), "oc:gui.Manual.Home", "%LANGUAGE%/index.md")
+    api.Manual.addTab(new ItemStackTabIconRenderer(api.Items.get("case1").createItemStack(1)), "oc:gui.Manual.Blocks", "%LANGUAGE%/block/index.md")
+    api.Manual.addTab(new ItemStackTabIconRenderer(api.Items.get("cpu1").createItemStack(1)), "oc:gui.Manual.Items", "%LANGUAGE%/item/index.md")
+  }
+
+  protected[oc] var hasRedstoneCardT2 = false
+
+  def useWrench(player: Player, pos: BlockPos, changeDurability: Boolean): Boolean = {
+    player.getItemInHand(InteractionHand.MAIN_HAND).getItem match {
+      case wrench: Wrench => wrench.useWrenchOnBlock(player, player.level, pos, !changeDurability)
       case _ => false
     }
   }
@@ -356,7 +363,7 @@ object ModOpenComputers extends ModProxy {
   def charge(stack: ItemStack, amount: Double, simulate: Boolean): Double = {
     stack.getItem match {
       case chargeable: Chargeable => chargeable.charge(stack, amount, simulate)
-      case _ => 0.0
+      case _ => amount
     }
   }
 
@@ -374,9 +381,11 @@ object ModOpenComputers extends ModProxy {
       0
   }
 
-  private def blacklistHost(host: Class[_], itemNames: String*) {
-    for (itemName <- itemNames) {
+  private def blacklistHost(host: Class[_], itemNames: String*): Unit = {
+    for (itemName <- itemNames) try {
       api.IMC.blacklistHost(itemName, host, api.Items.get(itemName).createItemStack(1))
+    } catch {
+      case t: Throwable => OpenComputers.log.warn(s"Error blacklisting '$itemName' for '${host.getSimpleName}.", t)
     }
   }
 
@@ -384,8 +393,7 @@ object ModOpenComputers extends ModProxy {
     private final val Blacklist = Set(
       Constants.ItemName.Debugger,
       Constants.ItemName.DiamondChip,
-      Constants.BlockName.Endstone,
-      Constants.ItemName.IronNugget
+      Constants.BlockName.Endstone
     )
 
     override def pathFor(stack: ItemStack): String = Option(api.Items.get(stack)) match {
@@ -393,7 +401,7 @@ object ModOpenComputers extends ModProxy {
       case _ => null
     }
 
-    override def pathFor(world: World, x: Int, y: Int, z: Int): String = world.getBlock(x, y, z) match {
+    override def pathFor(level: Level, pos: BlockPos): String = level.getBlockState(pos).getBlock match {
       case block: SimpleBlock => checkBlacklisted(api.Items.get(new ItemStack(block)))
       case _ => null
     }

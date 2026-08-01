@@ -9,6 +9,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
+import li.cil.oc.common.SaveHandler
+import li.cil.oc.server.fs.Buffered
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.event.server.ServerAboutToStartEvent
+import net.neoforged.neoforge.event.server.ServerStoppedEvent
 
 import scala.collection.mutable
 
@@ -21,6 +26,45 @@ object ThreadPoolFactory {
     }
     if (custom < 1) Thread.MIN_PRIORITY + (Thread.NORM_PRIORITY - Thread.MIN_PRIORITY) / 2
     else custom max Thread.MIN_PRIORITY min Thread.MAX_PRIORITY
+  }
+
+  @SubscribeEvent
+  def serverStart(e: ServerAboutToStartEvent): Unit = {
+    // Access these handles to ensure the pools actually exist.
+    SaveHandler.stateSaveHandler
+    Buffered.fileSaveHandler
+    ThreadPoolFactory.safePools.foreach(_.newThreadPool())
+
+    if (Settings.get.internetAccessConfigured()) {
+      if (Settings.get.internetFilteringRulesInvalid()) {
+        OpenComputers.log.warn("####################################################")
+        OpenComputers.log.warn("#                                                  #")
+        OpenComputers.log.warn("#  Could not parse Internet Card filtering rules!  #")
+        OpenComputers.log.warn("#  Review the server log and adjust the filtering  #")
+        OpenComputers.log.warn("#  list to ensure it is appropriately configured.  #")
+        OpenComputers.log.warn("#   (config/OpenComputers.cfg => filteringRules)   #")
+        OpenComputers.log.warn("# Internet access has been automatically disabled. #")
+        OpenComputers.log.warn("#                                                  #")
+        OpenComputers.log.warn("####################################################")
+      } else if (!Settings.get.internetFilteringRulesObserved && e.getServer.isDedicatedServer) {
+        OpenComputers.log.warn("####################################################")
+        OpenComputers.log.warn("#                                                  #")
+        OpenComputers.log.warn("#    It appears that you're running a dedicated    #")
+        OpenComputers.log.warn("#  server with OpenComputers installed! Make sure  #")
+        OpenComputers.log.warn("#  to review the Internet Card address filtering   #")
+        OpenComputers.log.warn("#  list to ensure it is appropriately configured.  #")
+        OpenComputers.log.warn("#   (config/OpenComputers.cfg => filteringRules)   #")
+        OpenComputers.log.warn("#                                                  #")
+        OpenComputers.log.warn("####################################################")
+      } else {
+        OpenComputers.log.info(f"Successfully applied ${Settings.get.internetFilteringRules.length} Internet Card filtering rules.")
+      }
+    }
+  }
+
+  @SubscribeEvent
+  def serverStop(e: ServerStoppedEvent): Unit = {
+    ThreadPoolFactory.safePools.foreach(_.waitForCompletion())
   }
 
   def create(name: String, threads: Int) = Executors.newScheduledThreadPool(threads,

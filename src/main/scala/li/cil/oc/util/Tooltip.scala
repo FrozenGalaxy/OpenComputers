@@ -4,14 +4,20 @@ import li.cil.oc.Localization
 import li.cil.oc.Settings
 import li.cil.oc.client.KeyBindings
 import net.minecraft.client.Minecraft
-
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
+import net.minecraft.client.gui.Font
+import net.minecraft.network.chat.Style
+import net.minecraft.ChatFormatting
+import net.minecraft.util.FormattedCharSink
+import net.minecraft.client.StringSplitter
 
 object Tooltip {
   private val maxWidth = 220
 
-  private def font = Minecraft.getMinecraft.fontRenderer
+  private def font = Minecraft.getInstance.font
+
+  val DefaultStyle = Style.EMPTY.applyFormat(ChatFormatting.GRAY)
 
   def get(name: String, args: Any*): java.util.List[String] = {
     if (!Localization.canLocalize(Settings.namespace + "tooltip." + name)) return Seq.empty[String]
@@ -19,14 +25,14 @@ object Tooltip {
       format(args.map(_.toString): _*)
     if (font == null) return tooltip.lines.toList // Some mods request tooltips before font renderer is available.
     val isSubTooltip = name.contains(".")
-    val shouldShorten = (isSubTooltip || font.getStringWidth(tooltip) > maxWidth) && !KeyBindings.showExtendedTooltips
+    val shouldShorten = (isSubTooltip || font.width(tooltip) > maxWidth) && !KeyBindings.showExtendedTooltips
     if (shouldShorten) {
       if (isSubTooltip) Seq.empty[String]
-      else Seq(Localization.localizeImmediately("tooltip.TooLong", KeyBindings.getKeyBindingName(KeyBindings.extendedTooltip)))
+      else Seq(Localization.localizeImmediately("tooltip.toolong", KeyBindings.getKeyBindingName(KeyBindings.extendedTooltip)))
     }
     else tooltip.
-      lines.
-      map(font.listFormattedStringToWidth(_, maxWidth).map(_.asInstanceOf[String].trim() + " ")).
+      linesIterator.
+      map(wrap(font, _, maxWidth).map(_.asInstanceOf[String].trim() + " ")).
       flatten.
       toList
   }
@@ -35,10 +41,18 @@ object Tooltip {
     if (KeyBindings.showExtendedTooltips) {
       Localization.localizeImmediately("tooltip." + name).
         format(args.map(_.toString): _*).
-        lines.
-        map(font.listFormattedStringToWidth(_, maxWidth).map(_.asInstanceOf[String].trim() + " ")).
-        flatten.
+        linesIterator.flatMap(wrap(font, _, maxWidth).map(_.trim() + " ")).
         toList
     }
     else Seq.empty[String]
+
+  private def wrap(font: Font, line: String, width: Int): java.util.List[String] = {
+    val list = new java.util.ArrayList[String]
+    font.getSplitter.splitLines(line, width, Style.EMPTY, true, new StringSplitter.LinePosConsumer {
+      override def accept(style: Style, start: Int, end: Int): Unit = {
+        list.add(line.substring(start, end))
+      }
+    })
+    list
+  }
 }

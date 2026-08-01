@@ -1,32 +1,36 @@
 package li.cil.oc.common.item.data
 
-import li.cil.oc.{Constants, Settings}
+import com.mojang.serialization.Codec
+import com.mojang.serialization.codecs.RecordCodecBuilder
+import li.cil.oc.Constants
+import li.cil.oc.Settings
+import li.cil.oc.api.Persistable
+import li.cil.oc.common.datacomponents.ScalaCodec
 import li.cil.oc.server.component.DebugCard.AccessContext
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-class DebugCardData extends ItemData(Constants.ItemName.DebugCard) {
-  def this(stack: ItemStack) {
+case class DebugCardData(var access: Option[AccessContext] = None) extends ItemData(Constants.ItemName.DebugCard) {
+  def this(stack: DataComponentHolder) = {
     this()
-    load(stack)
+    loadData(stack)
   }
 
-  var access: Option[AccessContext] = None
-
-  override def load(nbt: NBTTagCompound): Unit = {
-    access = AccessContext.load(dataTag(nbt))
+  override def loadData(holder: DataComponentHolder): Unit = {
+    access = AccessContext.loadData(holder)
   }
 
-  override def save(nbt: NBTTagCompound): Unit = {
-    val tag = dataTag(nbt)
-    AccessContext.remove(tag)
-    access.foreach(_.save(tag))
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    AccessContext.remove(holder)
+    access.foreach(_.saveData(holder))
   }
+}
 
-  private def dataTag(nbt: NBTTagCompound) = {
-    if (!nbt.hasKey(Settings.namespace + "data")) {
-      nbt.setTag(Settings.namespace + "data", new NBTTagCompound())
-    }
-    nbt.getCompoundTag(Settings.namespace + "data")
-  }
+object DebugCardData {
+  val CODEC = RecordCodecBuilder.create[DebugCardData](inst => inst.group(
+    ScalaCodec.optionFieldOf("access", AccessContext.CODEC).forGetter(_.access)
+  ).apply(inst, DebugCardData.apply _))
 }

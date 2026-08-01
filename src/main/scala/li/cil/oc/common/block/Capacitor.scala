@@ -1,52 +1,52 @@
 package li.cil.oc.common.block
 
+import com.mojang.serialization.MapCodec
+import li.cil.oc.common.block.Capacitor.CODEC
+
 import java.util.Random
+import li.cil.oc.common.blockentity
+import net.minecraft.world.level.block.state.BlockBehaviour.{Properties, simpleCodec}
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.{BlockGetter => IBlockReader}
+import net.minecraft.world.level.{Level => World}
+import net.minecraft.server.level.{ServerLevel => ServerWorld}
+import net.minecraft.util.RandomSource
 
-import li.cil.oc.common.tileentity
-import li.cil.oc.integration.coloredlights.ModColoredLights
-import net.minecraft.block.Block
-import net.minecraft.world.World
-
-class Capacitor extends SimpleBlock {
-  ModColoredLights.setLightLevel(this, 5, 5, 5)
-
-  setTickRandomly(true)
-
-  override protected def customTextures = Array(
-    None,
-    Some("CapacitorTop"),
-    Some("CapacitorSide"),
-    Some("CapacitorSide"),
-    Some("CapacitorSide"),
-    Some("CapacitorSide")
-  )
+class Capacitor(props: Properties) extends SimpleBlock(props) {
+  override def codec(): MapCodec[_ <: Capacitor] = CODEC
+  
+  @Deprecated
+  override def isRandomlyTicking(state: BlockState) = true
 
   // ----------------------------------------------------------------------- //
 
-  override def hasTileEntity(metadata: Int) = true
-
-  override def createTileEntity(world: World, metadata: Int) = new tileentity.Capacitor()
+  override def newBlockEntity(pos: BlockPos, state: BlockState) = new blockentity.Capacitor(pos, state)
 
   // ----------------------------------------------------------------------- //
 
-  override def hasComparatorInputOverride = true
+  override def hasAnalogOutputSignal(state: BlockState): Boolean = true
 
-  override def getComparatorInputOverride(world: World, x: Int, y: Int, z: Int, side: Int) =
-    world.getTileEntity(x, y, z) match {
-      case capacitor: tileentity.Capacitor if !world.isRemote =>
+  override def getAnalogOutputSignal(state: BlockState, world: World, pos: BlockPos): Int =
+    world.getBlockEntity(pos) match {
+      case capacitor: blockentity.Capacitor if !world.isClientSide =>
         math.round(15 * capacitor.node.localBuffer / capacitor.node.localBufferSize).toInt
       case _ => 0
     }
 
-  override def updateTick(world: World, x: Int, y: Int, z: Int, rng: Random): Unit = {
-    world.notifyBlocksOfNeighborChange(x, y, z, this)
+  override def tick(state: BlockState, world: ServerWorld, pos: BlockPos, rand: RandomSource): Unit = {
+    world.updateNeighborsAt(pos, this)
   }
 
-  override def tickRate(world : World) = 1
-
-  override def onNeighborBlockChange(world: World, x: Int, y: Int, z: Int, block: Block) =
-    world.getTileEntity(x, y, z) match {
-      case capacitor: tileentity.Capacitor => capacitor.recomputeCapacity()
+  @Deprecated
+  override def neighborChanged(state: BlockState, world: World, pos: BlockPos, block: Block, fromPos: BlockPos, b: Boolean): Unit =
+    world.getBlockEntity(pos) match {
+      case capacitor: blockentity.Capacitor => capacitor.recomputeCapacity()
       case _ =>
     }
+}
+
+object Capacitor {
+  final val CODEC = simpleCodec(new Capacitor(_))
 }

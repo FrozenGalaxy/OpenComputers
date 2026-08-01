@@ -2,9 +2,11 @@ package li.cil.oc.server.agent
 
 import io.netty.util.concurrent.Future
 import io.netty.util.concurrent.GenericFutureListener
-import net.minecraft.network.NetworkManager
-import net.minecraft.network.Packet
+import net.minecraft.network.{Connection, PacketSendListener}
+import net.minecraft.network.protocol.{Packet, PacketFlow}
 
-class FakeNetworkManager extends NetworkManager(false) {
-  override def scheduleOutboundPacket(packet: Packet, listener: GenericFutureListener[_ <: Future[_]]*) {}
+object FakeNetworkManager extends Connection(PacketFlow.CLIENTBOUND) {
+  override def send(packetIn: Packet[_]): Unit = {}
+
+  override def send(packetIn: Packet[_], listener: PacketSendListener): Unit = {}
 }

@@ -3,7 +3,7 @@ package li.cil.oc.common.item.traits
 import li.cil.oc.Settings
 import li.cil.oc.util.PackedColor
 
-trait GPULike extends Delegate {
+trait GPULike extends SimpleItem {
   def gpuTier: Int
 
   override protected def tooltipData: Seq[Any] = {
@@ -14,6 +14,7 @@ trait GPULike extends Delegate {
         case 0 => "1/1/4/2/2"
         case 1 => "2/4/8/4/4"
         case 2 => "4/8/16/8/8"
+        case 3 => "8/16/32/16/16"
       })
   }
 }

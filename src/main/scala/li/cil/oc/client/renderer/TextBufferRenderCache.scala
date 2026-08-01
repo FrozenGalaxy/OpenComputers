@@ -1,108 +1,48 @@
 package li.cil.oc.client.renderer
 
-import java.util.concurrent.Callable
-import java.util.concurrent.TimeUnit
-
-import com.google.common.cache.CacheBuilder
-import com.google.common.cache.RemovalListener
-import com.google.common.cache.RemovalNotification
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
-import cpw.mods.fml.common.gameevent.TickEvent.ClientTickEvent
+import com.mojang.blaze3d.vertex.{ByteBufferBuilder, PoseStack}
 import li.cil.oc.Settings
 import li.cil.oc.client.renderer.font.TextBufferRenderData
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.GLAllocation
-import net.minecraft.tileentity.TileEntity
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
 
-object TextBufferRenderCache extends Callable[Int] with RemovalListener[TileEntity, Int] {
+object TextBufferRenderCache {
   val renderer =
     if (Settings.get.fontRenderer == "texture") new font.StaticFontRenderer()
     else new font.DynamicFontRenderer()
-
-  private val cache = com.google.common.cache.CacheBuilder.newBuilder().
-    expireAfterAccess(2, TimeUnit.SECONDS).
-    removalListener(this).
-    asInstanceOf[CacheBuilder[TextBufferRenderData, Int]].
-    build[TextBufferRenderData, Int]()
-
-  // To allow access in cache entry init.
-  private var currentBuffer: TextBufferRenderData = _
 
   // ----------------------------------------------------------------------- //
   // Rendering
   // ----------------------------------------------------------------------- //
 
-  def render(buffer: TextBufferRenderData) {
-    currentBuffer = buffer
-    compileOrDraw(cache.get(currentBuffer, this))
+  def render(stack: PoseStack, buffer: TextBufferRenderData): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering")
+    renderDirect(stack, buffer)
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
 
-  private def compileOrDraw(list: Int) = {
-    if (currentBuffer.dirty) {
-      RenderState.checkError(getClass.getName + ".compileOrDraw: entering (aka: wasntme)")
+  def renderImmediate(stack: PoseStack, _renderBuffer: MultiBufferSource, buffer: TextBufferRenderData): Unit = {
+    RenderState.checkError(getClass.getName + ".renderImmediate: entering")
+    renderDirect(stack, buffer)
+    RenderState.checkError(getClass.getName + ".renderImmediate: leaving")
+  }
 
-      for (line <- currentBuffer.data.buffer) {
-        renderer.generateChars(line)
-      }
-
-      val doCompile = !RenderState.compilingDisplayList
-      if (doCompile) {
-        currentBuffer.dirty = false
-        GL11.glNewList(list, GL11.GL_COMPILE_AND_EXECUTE)
-
-        RenderState.checkError(getClass.getName + ".compileOrDraw: glNewList")
-      }
-
-      renderer.drawBuffer(currentBuffer.data, currentBuffer.viewport._1, currentBuffer.viewport._2)
-
-      RenderState.checkError(getClass.getName + ".compileOrDraw: drawString")
-
-      if (doCompile) {
-        GL11.glEndList()
-
-        RenderState.checkError(getClass.getName + ".compileOrDraw: glEndList")
-
-      }
-
-      RenderState.checkError(getClass.getName + ".compileOrDraw: leaving")
-
-      true
+  private def renderDirect(stack: PoseStack, buffer: TextBufferRenderData): Unit = {
+    for (line <- buffer.data.buffer) {
+      renderer.generateChars(line)
     }
-    else {
-      GL11.glCallList(list)
 
-      RenderState.checkError(getClass.getName + ".compileOrDraw: glCallList")
+    // Match the immediate-mode behavior of the working pre-1.13 renderer.
+    // The port's custom VBO cache loses render state in both GUI and block
+    // entity paths, leaving otherwise valid screen contents invisible.
+    val byteBuffer = new ByteBufferBuilder(786432)
+    try {
+      val source = MultiBufferSource.immediate(byteBuffer)
+      renderer.drawBuffer(stack, source, buffer.data, buffer.viewport._1, buffer.viewport._2)
+      source.endBatch()
+      buffer.dirty = false
     }
+    finally byteBuffer.close()
   }
 
-  // ----------------------------------------------------------------------- //
-  // Cache
-  // ----------------------------------------------------------------------- //
-
-  def call = {
-    RenderState.checkError(getClass.getName + ".call: entering (aka: wasntme)")
-
-    val list = GLAllocation.generateDisplayLists(1)
-    currentBuffer.dirty = true // Force compilation.
-
-    RenderState.checkError(getClass.getName + ".call: leaving")
-
-    list
-  }
-
-  def onRemoval(e: RemovalNotification[TileEntity, Int]) {
-    RenderState.checkError(getClass.getName + ".onRemoval: entering (aka: wasntme)")
-
-    GLAllocation.deleteDisplayLists(e.getValue)
-
-    RenderState.checkError(getClass.getName + ".onRemoval: leaving")
-  }
-
-  // ----------------------------------------------------------------------- //
-  // ITickHandler
-  // ----------------------------------------------------------------------- //
-
-  @SubscribeEvent
-  def onTick(e: ClientTickEvent) = cache.cleanUp()
 }

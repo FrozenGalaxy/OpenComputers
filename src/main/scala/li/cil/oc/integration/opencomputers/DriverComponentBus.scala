@@ -8,14 +8,14 @@ import li.cil.oc.api.driver.item.Processor
 import li.cil.oc.common.Slot
 import li.cil.oc.common.Tier
 import li.cil.oc.common.item
-import li.cil.oc.common.item.Delegator
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
 
 object DriverComponentBus extends Item with Processor {
   override def worksWith(stack: ItemStack) = isOneOf(stack,
     api.Items.get(Constants.ItemName.ComponentBusTier1),
     api.Items.get(Constants.ItemName.ComponentBusTier2),
     api.Items.get(Constants.ItemName.ComponentBusTier3),
+    api.Items.get(Constants.ItemName.ComponentBusTier4),
     api.Items.get(Constants.ItemName.ComponentBusCreative))
 
   override def createEnvironment(stack: ItemStack, host: EnvironmentHost) = null
@@ -24,14 +24,14 @@ object DriverComponentBus extends Item with Processor {
 
   // Clamp item tier because the creative bus needs to fit into tier 3 slots.
   override def tier(stack: ItemStack) =
-    Delegator.subItem(stack) match {
-      case Some(bus: item.ComponentBus) => bus.tier min Tier.Three
+    stack.getItem match {
+      case bus: item.ComponentBus => bus.tier min Tier.Four
       case _ => Tier.One
     }
 
   override def supportedComponents(stack: ItemStack) =
-    Delegator.subItem(stack) match {
-      case Some(bus: item.ComponentBus) => Settings.get.cpuComponentSupport(bus.tier)
+    stack.getItem match {
+      case bus: item.ComponentBus => Settings.get.cpuComponentSupport(bus.tier)
       case _ => Tier.One
     }
 

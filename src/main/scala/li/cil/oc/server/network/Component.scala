@@ -4,22 +4,28 @@ import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network
 import li.cil.oc.api.network._
 import li.cil.oc.api.network.{Node => ImmutableNode}
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.common.item.data.NodeData
 import li.cil.oc.server.driver.CompoundBlockEnvironment
 import li.cil.oc.server.driver.Registry
+import li.cil.oc.server.network.Node
 import li.cil.oc.server.machine.ArgumentsImpl
 import li.cil.oc.server.machine.Callbacks
 import li.cil.oc.server.machine.Callbacks.ComponentCallback
 import li.cil.oc.server.machine.Callbacks.PeripheralCallback
 import li.cil.oc.server.machine.Machine
 import li.cil.oc.util.SideTracker
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 trait Component extends network.Component with Node {
-  val name: String
-
   def visibility = _visibility
 
   private lazy val callbacks = Callbacks(host)
@@ -99,7 +105,7 @@ trait Component extends network.Component with Node {
 
   // ----------------------------------------------------------------------- //
 
-  override def methods = callbacks.keySet
+  override def methods = callbacks.keySet.asJavaCollection
 
   override def annotation(method: String) =
     callbacks.get(method) match {
@@ -119,16 +125,18 @@ trait Component extends network.Component with Node {
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    if (nbt.hasKey("visibility")) {
-      _visibility = Visibility.values()(nbt.getInteger("visibility"))
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+
+    for(visibility <- holder.getComponent(OCComponents.VISIBILITY)) {
+      _visibility = visibility
     }
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setInteger("visibility", _visibility.ordinal())
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+
+    holder.setComponent(OCComponents.VISIBILITY, _visibility)
   }
 
   override def toString = super.toString + s"@$name"

@@ -10,20 +10,29 @@ import li.cil.oc.api.Network
 import li.cil.oc.api.driver.DeviceInfo
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
 
-class CPU(val tier: Int) extends prefab.ManagedEnvironment with DeviceInfo {
+class CPU(val tier: Int) extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Neighbors).
     create()
 
-  private final lazy val deviceInfo = Map(
-    DeviceAttribute.Class -> DeviceClass.Processor,
-    DeviceAttribute.Description -> "CPU",
-    DeviceAttribute.Vendor -> Constants.DeviceInfo.DefaultVendor,
-    DeviceAttribute.Product -> ("FlexiArch " + (tier + 1).toString + " Processor"),
-    DeviceAttribute.Clock -> (Settings.get.callBudgets(tier) * 1000).toInt.toString
-  )
+  private final lazy val deviceInfo = if (tier != 3)
+    Map(
+      DeviceAttribute.Class -> DeviceClass.Processor,
+      DeviceAttribute.Description -> "CPU",
+      DeviceAttribute.Vendor -> Constants.DeviceInfo.DefaultVendor,
+      DeviceAttribute.Product -> ("FlexiArch " + (tier + 1).toString + " Processor"),
+      DeviceAttribute.Clock -> (Settings.get.callBudgets(tier) * 1000).toInt.toString
+    )
+    else Map(
+      DeviceAttribute.Class -> DeviceClass.Processor,
+      DeviceAttribute.Description -> "CPU",
+      DeviceAttribute.Vendor -> Constants.DeviceInfo.ViridiaComputronics,
+      DeviceAttribute.Product -> "SpeedStar Max Processor",
+      DeviceAttribute.Clock -> (Settings.get.callBudgets(tier) * 1000).toInt.toString
+    )
 
   override def getDeviceInfo: util.Map[String, String] = deviceInfo
 }

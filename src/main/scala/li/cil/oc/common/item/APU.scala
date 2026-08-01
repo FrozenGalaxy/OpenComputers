@@ -1,24 +1,24 @@
 package li.cil.oc.common.item
 
 import li.cil.oc.common.Tier
-import li.cil.oc.util.Rarity
-import net.minecraft.item.EnumRarity
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
 import scala.language.existentials
 
-class APU(val parent: Delegator, val tier: Int) extends traits.Delegate with traits.ItemTier with traits.CPULike with traits.GPULike {
-  override val unlocalizedName = super[Delegate].unlocalizedName + tier
+class APU(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with traits.CPULike with traits.GPULike with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
 
-  override def rarity(stack: ItemStack): EnumRarity =
-    if (tier == Tier.Three) Rarity.byTier(Tier.Four)
-    else super.rarity(stack)
+  override protected def tierFromDriver(stack: ItemStack) = cpuTier
 
-  override def cpuTier = math.min(Tier.Three, tier + 1)
+  override def cpuTier = math.min(Tier.Four, tier + 1)
 
-  override def gpuTier = tier
+  override def gpuTier = math.min(Tier.Four, tier)
 
-  override protected def tooltipName = Option(super[Delegate].unlocalizedName)
+  override protected def tooltipName = Option(unlocalizedName)
 
   override protected def tooltipData: Seq[Any] = {
     super[CPULike].tooltipData ++ super[GPULike].tooltipData

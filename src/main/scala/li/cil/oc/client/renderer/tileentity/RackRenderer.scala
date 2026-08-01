@@ -1,57 +1,66 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.math.Axis
 import li.cil.oc.api.event.RackMountableRenderEvent
-import li.cil.oc.common.tileentity.Rack
+import li.cil.oc.common.blockentity.Rack
+import li.cil.oc.common.datacomponents.CompoundStorage
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import net.minecraftforge.common.MinecraftForge
-import net.minecraftforge.common.util.ForgeDirection
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.LevelRenderer
+import net.minecraft.client.renderer.blockentity.{BlockEntityRenderer => TileEntityRenderer}
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
+import net.minecraft.core.Direction
+import net.neoforged.neoforge.common.NeoForge
 
-object RackRenderer extends TileEntitySpecialRenderer {
+object RackRenderer extends BlockEntityRendererProvider[Rack] {
+  override def create(ctx: BlockEntityRendererProvider.Context): RackRenderer =
+    new RackRenderer()
+}
+
+class RackRenderer extends TileEntityRenderer[Rack] {
   private final val vOffset = 2 / 16f
-  private final val vSize = 3 / 16f
+  private final val vSize   = 3 / 16f
 
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) = {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+  override def render(
+                       rack: Rack,
+                       dt: Float,
+                       stack: PoseStack,
+                       buffer: MultiBufferSource,
+                       light: Int,
+                       overlay: Int
+                     ): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering (aka: wasntme)")
 
-    val rack = tileEntity.asInstanceOf[Rack]
-    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+    RenderSystem.setShaderColor(1, 1, 1, 1)
 
-    GL11.glPushMatrix()
+    stack.pushPose()
 
-    GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
+    stack.translate(0.5, 0.5, 0.5)
 
     rack.yaw match {
-      case ForgeDirection.WEST => GL11.glRotatef(-90, 0, 1, 0)
-      case ForgeDirection.NORTH => GL11.glRotatef(180, 0, 1, 0)
-      case ForgeDirection.EAST => GL11.glRotatef(90, 0, 1, 0)
-      case _ => // No yaw.
+      case Direction.WEST  => stack.mulPose(Axis.YP.rotationDegrees(-90))
+      case Direction.NORTH => stack.mulPose(Axis.YP.rotationDegrees(180))
+      case Direction.EAST  => stack.mulPose(Axis.YP.rotationDegrees(90))
+      case _               => // No yaw.
     }
 
-    GL11.glTranslated(-0.5, 0.5, 0.505 - 1 / 16f)
-    GL11.glScalef(1, -1, 1)
+    stack.translate(-0.5, 0.5, 0.505 - 0.5f / 16f)
+    RenderState.mirrorScale(stack, 1, -1, 1)
 
-    // Note: we manually sync the rack inventory for this to work.
-    for (i <- 0 until rack.getSizeInventory) {
-      if (rack.getStackInSlot(i) != null) {
-        GL11.glPushMatrix()
-        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
-
-        val v0 = vOffset + i * vSize
-        val v1 = vOffset + (i + 1) * vSize
-        val event = new RackMountableRenderEvent.TileEntity(rack, i, rack.lastData(i), v0, v1)
-        MinecraftForge.EVENT_BUS.post(event)
-
-        GL11.glPopAttrib()
-        GL11.glPopMatrix()
+    val rackLight = LevelRenderer.getLightColor(rack.getLevel, rack.getBlockPos.relative(rack.facing))
+    for (i <- 0 until rack.getContainerSize) {
+      if (!rack.getItem(i).isEmpty) {
+        val v0    = vOffset + i * vSize
+        val v1    = vOffset + (i + 1) * vSize
+        val event = new RackMountableRenderEvent.BlockEntity(rack, i, rack.lastData(i) getOrElse CompoundStorage.EMPTY, stack, buffer, rackLight, overlay, v0, v1)
+        NeoForge.EVENT_BUS.post(event)
       }
     }
 
-    GL11.glPopMatrix()
-    GL11.glPopAttrib()
+    stack.popPose()
 
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
 }

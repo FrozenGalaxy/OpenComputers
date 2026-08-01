@@ -1,17 +1,31 @@
 package li.cil.oc.util
 
-import net.minecraft.util.AxisAlignedBB
-import net.minecraft.util.Vec3
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.core.Direction
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.{AABB, Vec3}
 
 import scala.language.implicitConversions
 
 object ExtendedAABB {
-  implicit def extendedAABB(bounds: AxisAlignedBB): ExtendedAABB = new ExtendedAABB(bounds)
+  implicit def extendedAABB(bounds: AABB): ExtendedAABB = new ExtendedAABB(bounds)
 
-  def unitBounds = AxisAlignedBB.getBoundingBox(0, 0, 0, 1, 1, 1)
+  def unitBounds = new AABB(0, 0, 0, 1, 1, 1)
 
-  class ExtendedAABB(val bounds: AxisAlignedBB) {
+  class ExtendedAABB(val bounds: AABB) {
+    def offset(pos: BlockPos) = {
+      new AABB(
+        bounds.minX + pos.getX,
+        bounds.minY + pos.getY,
+        bounds.minZ + pos.getZ,
+        bounds.maxX + pos.getX,
+        bounds.maxY + pos.getY,
+        bounds.maxZ + pos.getZ)
+    }
+
+    def minVec = new Vec3(bounds.minX, bounds.minY, bounds.minZ)
+
+    def maxVec = new Vec3(bounds.maxX, bounds.maxY, bounds.maxZ)
+
     def volume: Int = {
       val sx = ((bounds.maxX - bounds.minX) * 16).round.toInt
       val sy = ((bounds.maxY - bounds.minY) * 16).round.toInt
@@ -26,25 +40,25 @@ object ExtendedAABB {
       sx * sy * 2 + sx * sz * 2 + sy * sz * 2
     }
 
-    def rotateTowards(facing: ForgeDirection) = rotateY(facing match {
-      case ForgeDirection.WEST => 3
-      case ForgeDirection.NORTH => 2
-      case ForgeDirection.EAST => 1
+    def rotateTowards(facing: Direction) = rotateY(facing match {
+      case Direction.WEST => 3
+      case Direction.NORTH => 2
+      case Direction.EAST => 1
       case _ => 0
     })
 
-    def rotateY(count: Int): AxisAlignedBB = {
-      val min = Vec3.createVectorHelper(bounds.minX - 0.5, bounds.minY - 0.5, bounds.minZ - 0.5)
-      val max = Vec3.createVectorHelper(bounds.maxX - 0.5, bounds.maxY - 0.5, bounds.maxZ - 0.5)
-      min.rotateAroundY(count * Math.PI.toFloat * 0.5f)
-      max.rotateAroundY(count * Math.PI.toFloat * 0.5f)
-      AxisAlignedBB.getBoundingBox(
-        (math.min(min.xCoord + 0.5, max.xCoord + 0.5) * 32).round / 32f,
-        (math.min(min.yCoord + 0.5, max.yCoord + 0.5) * 32).round / 32f,
-        (math.min(min.zCoord + 0.5, max.zCoord + 0.5) * 32).round / 32f,
-        (math.max(min.xCoord + 0.5, max.xCoord + 0.5) * 32).round / 32f,
-        (math.max(min.yCoord + 0.5, max.yCoord + 0.5) * 32).round / 32f,
-        (math.max(min.zCoord + 0.5, max.zCoord + 0.5) * 32).round / 32f)
+    def rotateY(count: Int): AABB = {
+      var min = new Vec3(bounds.minX - 0.5, bounds.minY - 0.5, bounds.minZ - 0.5)
+      var max = new Vec3(bounds.maxX - 0.5, bounds.maxY - 0.5, bounds.maxZ - 0.5)
+      min = min.yRot(count * Math.PI.toFloat * 0.5f)
+      max = max.yRot(count * Math.PI.toFloat * 0.5f)
+      new AABB(
+        (math.min(min.x + 0.5, max.x + 0.5) * 32).round / 32f,
+        (math.min(min.y + 0.5, max.y + 0.5) * 32).round / 32f,
+        (math.min(min.z + 0.5, max.z + 0.5) * 32).round / 32f,
+        (math.max(min.x + 0.5, max.x + 0.5) * 32).round / 32f,
+        (math.max(min.y + 0.5, max.y + 0.5) * 32).round / 32f,
+        (math.max(min.z + 0.5, max.z + 0.5) * 32).round / 32f)
     }
   }
 

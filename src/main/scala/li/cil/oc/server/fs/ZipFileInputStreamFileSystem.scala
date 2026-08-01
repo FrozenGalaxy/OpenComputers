@@ -81,41 +81,57 @@ object ZipFileInputStreamFileSystem {
     build[String, ArchiveDirectory]()
 
   def fromFile(file: io.File, innerPath: String) = ZipFileInputStreamFileSystem.synchronized {
+    println("zip loading")
     try {
       Option(cache.get(file.getPath + ":" + innerPath, new Callable[ArchiveDirectory] {
         def call = {
           val zip = new ZipFile(file.getPath)
           try {
             val cleanedPath = innerPath.stripPrefix("/").stripSuffix("/") + "/"
-            val rootEntry = zip.getEntry(cleanedPath)
-            if (rootEntry == null || !rootEntry.isDirectory) {
-              throw new IllegalArgumentException(s"Root path $innerPath doesn't exist or is not a directory in ZIP file ${file.getName}.")
-            }
+            var hasRoot = false
             val directories = mutable.Set.empty[ArchiveDirectory]
             val files = mutable.Set.empty[ArchiveFile]
             val iterator = zip.entries()
             while (iterator.hasMoreElements) {
               val entry = iterator.nextElement()
               if (entry.getName.startsWith(cleanedPath)) {
+                hasRoot = true
                 if (entry.isDirectory) directories += new ArchiveDirectory(entry, cleanedPath)
                 else files += new ArchiveFile(zip, entry, cleanedPath)
               }
             }
-            var root: ArchiveDirectory = null
-            for (entry <- directories ++ files) {
+            if (!hasRoot) {
+              throw new IllegalArgumentException(s"Root path $innerPath doesn't exist in ZIP file ${file.getName}.")
+            }
+
+            val directoriesByPath = mutable.Map.empty[String, ArchiveDirectory]
+            for (dir <- directories) directoriesByPath += dir.path -> dir
+
+            def getOrCreateDir(path: String): ArchiveDirectory = {
+              directoriesByPath.getOrElseUpdate(path, {
+                val dir = new ArchiveDirectory(new java.util.zip.ZipEntry(cleanedPath + (if (path.isEmpty) "" else path + "/")), cleanedPath)
+                directories += dir
+                dir
+              })
+            }
+
+            for (entry <- files) {
+              val parentPath = entry.path.substring(0, math.max(entry.path.lastIndexOf('/'), 0))
+              getOrCreateDir(parentPath).children += entry
+            }
+
+            for (entry <- directories.toArray) {
               if (entry.path.length > 0) {
-                val parent = entry.path.substring(0, math.max(entry.path.lastIndexOf('/'), 0))
-                directories.find(d => d.path == parent) match {
-                  case Some(directory) => directory.children += entry
-                  case _ =>
+                val parentPath = entry.path.substring(0, math.max(entry.path.lastIndexOf('/'), 0))
+                val parentDir = getOrCreateDir(parentPath)
+                // Avoid duplicate additions if already mapped previously
+                if (!parentDir.children.contains(entry)) {
+                  parentDir.children += entry
                 }
               }
-              else {
-                assert(entry.isInstanceOf[ArchiveDirectory])
-                root = entry.asInstanceOf[ArchiveDirectory]
-              }
             }
-            root
+
+            getOrCreateDir("")
           }
           finally {
             zip.close()

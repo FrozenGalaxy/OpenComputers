@@ -1,13 +1,18 @@
 package li.cil.oc.client.gui
 
+import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.api
 import li.cil.oc.client.renderer.TextBufferRenderCache
 import li.cil.oc.client.renderer.gui.BufferRenderer
-import li.cil.oc.util.RenderState
-import org.lwjgl.input.Mouse
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.gui.{GuiGraphics, screens}
+import net.minecraft.client.KeyMapping
+import org.lwjgl.glfw.GLFW
+import net.minecraft.client.gui.components.events.ContainerEventHandler
+import net.minecraft.network.chat.Component
 
-class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val hasKeyboardCallback: () => Boolean, val hasPower: () => Boolean) extends traits.InputBuffer {
+class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val hasKeyboardCallback: () => Boolean, val hasPower: () => Boolean)
+  extends screens.Screen(Component.empty()) with traits.InputBuffer with ContainerEventHandler {
+
   override protected def hasKeyboard = hasKeyboardCallback()
 
   override protected def bufferX = 8 + x
@@ -20,68 +25,72 @@ class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val has
 
   private var x, y = 0
 
+  private var innerWidth, innerHeight = 0
+
   private var mx, my = -1
 
-  override def handleMouseInput() {
-    super.handleMouseInput()
-    if (hasMouse && Mouse.hasWheel && Mouse.getEventDWheel != 0) {
-      val mouseX = Mouse.getEventX * width / mc.displayWidth
-      val mouseY = height - Mouse.getEventY * height / mc.displayHeight - 1
+  override def mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean = {
+    if (hasMouse) {
       toBufferCoordinates(mouseX, mouseY) match {
         case Some((bx, by)) =>
-          val scroll = math.signum(Mouse.getEventDWheel)
-          buffer.mouseScroll(bx, by, scroll, null)
+          buffer.mouseScroll(bx, by, math.signum(scrollY.toInt), null)
+          return true
         case _ => // Ignore when out of bounds.
       }
     }
+    super.mouseScrolled(mouseX, mouseY, scrollX, scrollY)
   }
 
-  override protected def mouseClicked(mouseX: Int, mouseY: Int, button: Int) {
-    super.mouseClicked(mouseX, mouseY, button)
+  override def mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = {
     if (hasMouse) {
-      if (button == 0 || button == 1) {
+      if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
         clickOrDrag(mouseX, mouseY, button)
+        return true
       }
     }
+    super.mouseClicked(mouseX, mouseY, button)
   }
 
-  protected override def mouseClickMove(mouseX: Int, mouseY: Int, button: Int, timeSinceLast: Long) {
-    super.mouseClickMove(mouseX, mouseY, button, timeSinceLast)
-    if (hasMouse && timeSinceLast > 10) {
-      if (button == 0 || button == 1) {
+  override def mouseDragged(mouseX: Double, mouseY: Double, button: Int, deltaX: Double, deltaY: Double): Boolean = {
+    if (hasMouse) {
+      if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
         clickOrDrag(mouseX, mouseY, button)
+        return true
       }
     }
+    super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)
   }
 
-  protected override def mouseMovedOrUp(mouseX: Int, mouseY: Int, button: Int) {
-    super.mouseMovedOrUp(mouseX, mouseY, button)
-    if (hasMouse && button >= 0) {
+  override def mouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean = {
+    if (hasMouse) {
       if (didClick) {
         toBufferCoordinates(mouseX, mouseY) match {
           case Some((bx, by)) => buffer.mouseUp(bx, by, button, null)
           case _ => buffer.mouseUp(-1.0, -1.0, button, null)
         }
       }
+      val hasClicked = didClick
       didClick = false
       mx = -1
       my = -1
+      if (hasClicked) return true
     }
+    super.mouseReleased(mouseX, mouseY, button)
   }
 
-  private def clickOrDrag(mouseX: Int, mouseY: Int, button: Int) {
+  private def clickOrDrag(mouseX: Double, mouseY: Double, button: Int) = {
     toBufferCoordinates(mouseX, mouseY) match {
       case Some((bx, by)) if bx.toInt != mx || (by*2).toInt != my =>
         if (mx >= 0 && my >= 0) buffer.mouseDrag(bx, by, button, null)
         else buffer.mouseDown(bx, by, button, null)
         didClick = true
         mx = bx.toInt
-        my = (by*2).toInt // for high precision mode, sends some unnecessary packets when not using it, but eh
+        my = (by*2).toInt 
       case _ =>
     }
   }
 
-  private def toBufferCoordinates(mouseX: Int, mouseY: Int): Option[(Double, Double)] = {
+  private def toBufferCoordinates(mouseX: Double, mouseY: Double): Option[(Double, Double)] = {
     val bx = (mouseX - x - bufferMargin) / scale / TextBufferRenderCache.renderer.charRenderWidth
     val by = (mouseY - y - bufferMargin) / scale / TextBufferRenderCache.renderer.charRenderHeight
     val bw = buffer.getViewportWidth
@@ -90,35 +99,37 @@ class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val has
     else None
   }
 
-  override def drawScreen(mouseX: Int, mouseY: Int, dt: Float): Unit = {
-    super.drawScreen(mouseX, mouseY, dt)
-    drawBufferLayer()
+  override protected def init(): Unit = {
+    super.init()
+    minecraft.mouseHandler.releaseMouse()
+    KeyMapping.releaseAll()
   }
 
-  override def drawBuffer() {
-    GL11.glTranslatef(x, y, 0)
-    BufferRenderer.drawBackground()
+  override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
+    super.render(graphics, mouseX, mouseY, dt)
+    drawBufferLayer(graphics.pose)
+  }
+
+  override def drawBuffer(stack: PoseStack) = {
+    stack.translate(x, y, 0)
+    BufferRenderer.drawBackground(stack, innerWidth, innerHeight)
     if (hasPower()) {
-      GL11.glTranslatef(bufferMargin, bufferMargin, 0)
-      GL11.glScaled(scale, scale, 1)
-      RenderState.makeItBlend()
-      BufferRenderer.drawText(buffer)
+      stack.translate(bufferMargin, bufferMargin, 0)
+      stack.scale(scale.toFloat, scale.toFloat, 1)
+      BufferRenderer.drawText(stack, buffer)
     }
   }
 
-  override protected def changeSize(w: Double, h: Double, recompile: Boolean) = {
+  override protected def changeSize(w: Double, h: Double) = {
     val bw = buffer.renderWidth
     val bh = buffer.renderHeight
     val scaleX = math.min(width / (bw + bufferMargin * 2.0), 1)
     val scaleY = math.min(height / (bh + bufferMargin * 2.0), 1)
     val scale = math.min(scaleX, scaleY)
-    val innerWidth = (bw * scale).toInt
-    val innerHeight = (bh * scale).toInt
+    innerWidth = (bw * scale).toInt
+    innerHeight = (bh * scale).toInt
     x = (width - (innerWidth + bufferMargin * 2)) / 2
     y = (height - (innerHeight + bufferMargin * 2)) / 2
-    if (recompile) {
-      BufferRenderer.compileBackground(innerWidth, innerHeight)
-    }
     scale
   }
 }

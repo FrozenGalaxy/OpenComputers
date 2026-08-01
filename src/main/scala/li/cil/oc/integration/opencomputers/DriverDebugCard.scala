@@ -6,14 +6,14 @@ import li.cil.oc.api.driver.EnvironmentProvider
 import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.common.Slot
 import li.cil.oc.server.component
-import net.minecraft.item.ItemStack
+import net.minecraft.world.item.ItemStack
 
 object DriverDebugCard extends Item {
   override def worksWith(stack: ItemStack) = isOneOf(stack,
     api.Items.get(Constants.ItemName.DebugCard))
 
   override def createEnvironment(stack: ItemStack, host: EnvironmentHost) =
-    if (host.world != null && host.world.isRemote) null
+    if (host.getEnvironmentLevel != null && host.getEnvironmentLevel.isClientSide) null
     else new component.DebugCard(host)
 
   override def slot(stack: ItemStack) = Slot.Card

@@ -1,33 +1,22 @@
 package li.cil.oc.server.component
 
-import codechicken.lib.vec.Vector3
-import codechicken.wirelessredstone.core.WirelessReceivingDevice
-import codechicken.wirelessredstone.core.WirelessTransmittingDevice
-import cpw.mods.fml.common.Optional
-import li.cil.oc.Constants
-import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
-import li.cil.oc.api.driver.DeviceInfo.DeviceClass
-import li.cil.oc.Settings
+import li.cil.oc.{Constants, Settings}
 import li.cil.oc.api.driver.DeviceInfo
-import li.cil.oc.api.network.EnvironmentHost
-import li.cil.oc.api.machine.Arguments
-import li.cil.oc.api.machine.Callback
-import li.cil.oc.api.machine.Context
+import li.cil.oc.api.driver.DeviceInfo.{DeviceAttribute, DeviceClass}
+import li.cil.oc.api.machine.{Arguments, Callback, Context}
 import li.cil.oc.api.network._
 import li.cil.oc.common.EventHandler
-import li.cil.oc.common.tileentity.traits.RedstoneChangedEventArgs
-import li.cil.oc.integration.Mods
+import li.cil.oc.common.datacomponents.{OCComponents, WirelessRedstoneState}
 import li.cil.oc.integration.util
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraftforge.common.util.ForgeDirection
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.ImplicitConversionsToJava._
 
-@Optional.InterfaceList(Array(
-  new Optional.Interface(iface = "codechicken.wirelessredstone.core.WirelessReceivingDevice", modid = Mods.IDs.WirelessRedstoneCBE),
-  new Optional.Interface(iface = "codechicken.wirelessredstone.core.WirelessTransmittingDevice", modid = Mods.IDs.WirelessRedstoneCBE)
-))
-trait RedstoneWireless extends RedstoneSignaller with WirelessReceivingDevice with WirelessTransmittingDevice with DeviceInfo {
+trait RedstoneWireless extends RedstoneSignaller with DeviceInfo {
   def redstone: EnvironmentHost
 
   var wirelessFrequency = 0
@@ -103,36 +92,14 @@ trait RedstoneWireless extends RedstoneSignaller with WirelessReceivingDevice wi
 
   // ----------------------------------------------------------------------- //
 
-  @Optional.Method(modid = Mods.IDs.WirelessRedstoneCBE)
-  override def updateDevice(frequency: Int, on: Boolean) {
-    if (frequency == wirelessFrequency && on != wirelessInput) {
-      wirelessInput = on
-      onRedstoneChanged(RedstoneChangedEventArgs(ForgeDirection.UNKNOWN, if (on) 0 else 1, if (on) 1 else 0))
-    }
-  }
-
-  @Optional.Method(modid = Mods.IDs.WirelessRedstoneCBE)
-  override def getPosition = new Vector3(redstone.xPosition, redstone.yPosition, redstone.zPosition)
-
-  @Optional.Method(modid = Mods.IDs.WirelessRedstoneCBE)
-  override def getDimension = redstone.world.provider.dimensionId
-
-  @Optional.Method(modid = Mods.IDs.WirelessRedstoneCBE)
-  override def getFreq = wirelessFrequency
-
-  @Optional.Method(modid = Mods.IDs.WirelessRedstoneCBE)
-  override def getAttachedEntity = null
-
-  // ----------------------------------------------------------------------- //
-
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     super.onConnect(node)
     if (node == this.node) {
       EventHandler.scheduleWirelessRedstone(this)
     }
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     super.onDisconnect(node)
     if (node == this.node) {
       util.WirelessRedstone.removeReceiver(this)
@@ -144,17 +111,22 @@ trait RedstoneWireless extends RedstoneSignaller with WirelessReceivingDevice wi
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    wirelessFrequency = nbt.getInteger("wirelessFrequency")
-    wirelessInput = nbt.getBoolean("wirelessInput")
-    wirelessOutput = nbt.getBoolean("wirelessOutput")
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+
+    for(WirelessRedstoneState(frequency, input, output) <- holder.getComponent(OCComponents.WIRELESS_REDSTONE_STATE)) {
+      wirelessFrequency = frequency
+      wirelessInput = input
+      wirelessOutput = output
+    }
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setInteger("wirelessFrequency", wirelessFrequency)
-    nbt.setBoolean("wirelessInput", wirelessInput)
-    nbt.setBoolean("wirelessOutput", wirelessOutput)
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    holder.setComponent(OCComponents.WIRELESS_REDSTONE_STATE, WirelessRedstoneState(
+      wirelessFrequency,
+      wirelessInput,
+      wirelessOutput
+    ))
   }
 }

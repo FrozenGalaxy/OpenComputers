@@ -8,14 +8,21 @@ import li.cil.oc.api.network.ManagedEnvironment
 import li.cil.oc.common.Slot
 import li.cil.oc.server.component
 import li.cil.oc.util.ExtendedInventory._
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.util.ItemUtils
+import net.minecraft.core.component.DataComponents
+import li.cil.oc.util.ExtendedItemStack._
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.world.item.component.CustomData
+
+import java.util.function.Consumer
 
 object DriverServer extends Item with HostAware {
   override def worksWith(stack: ItemStack): Boolean = isOneOf(stack,
     api.Items.get(Constants.ItemName.ServerTier1),
     api.Items.get(Constants.ItemName.ServerTier2),
     api.Items.get(Constants.ItemName.ServerTier3),
+    api.Items.get(Constants.ItemName.ServerTier4),
     api.Items.get(Constants.ItemName.ServerCreative))
 
   override def createEnvironment(stack: ItemStack, host: EnvironmentHost): ManagedEnvironment = host match {
@@ -24,11 +31,4 @@ object DriverServer extends Item with HostAware {
   }
 
   override def slot(stack: ItemStack): String = Slot.RackMountable
-
-  override def dataTag(stack: ItemStack): NBTTagCompound = {
-    if (!stack.hasTagCompound) {
-      stack.setTagCompound(new NBTTagCompound())
-    }
-    stack.getTagCompound
-  }
 }

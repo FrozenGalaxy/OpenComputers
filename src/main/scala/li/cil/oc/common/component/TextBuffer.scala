@@ -1,46 +1,42 @@
 package li.cil.oc.common.component
 
 import com.google.common.base.Strings
-import cpw.mods.fml.common.eventhandler.SubscribeEvent
-import cpw.mods.fml.relauncher.Side
-import cpw.mods.fml.relauncher.SideOnly
-import li.cil.oc.Constants
-import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
-import li.cil.oc.api.driver.DeviceInfo.DeviceClass
-import li.cil.oc.OpenComputers
-import li.cil.oc.Settings
-import li.cil.oc.api
+import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.api.driver.DeviceInfo
-import li.cil.oc.api.machine.Arguments
-import li.cil.oc.api.machine.Callback
-import li.cil.oc.api.machine.Context
-import li.cil.oc.api.network.EnvironmentHost
+import li.cil.oc.api.driver.DeviceInfo.{DeviceAttribute, DeviceClass}
+import li.cil.oc.api.machine.{Arguments, Callback, Context}
 import li.cil.oc.api.network._
-import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.client.renderer.TextBufferRenderCache
 import li.cil.oc.client.renderer.font.TextBufferRenderData
-import li.cil.oc.client.{ComponentTracker => ClientComponentTracker}
-import li.cil.oc.client.{PacketSender => ClientPacketSender}
+import li.cil.oc.client.{ComponentTracker => ClientComponentTracker, PacketSender => ClientPacketSender}
 import li.cil.oc.common._
 import li.cil.oc.common.component.traits.VideoRamRasterizer
+import li.cil.oc.common.datacomponents.{CompoundStorage, MaximumVideoMode, OCComponents, VideoMode}
 import li.cil.oc.server.component.Keyboard
-import li.cil.oc.server.{ComponentTracker => ServerComponentTracker}
-import li.cil.oc.server.{PacketSender => ServerPacketSender}
-import li.cil.oc.util
-import li.cil.oc.util.BlockPosition
-import li.cil.oc.util.PackedColor
-import li.cil.oc.util.SideTracker
+import li.cil.oc.server.{ComponentTracker => ServerComponentTracker, PacketSender => ServerPacketSender}
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import li.cil.oc.util.{BlockPosition, PackedColor, SideTracker}
+import li.cil.oc.{Constants, OpenComputers, Settings, api, util}
 import net.minecraft.client.Minecraft
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraftforge.event.world.ChunkEvent
-import net.minecraftforge.event.world.WorldEvent
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.core.BlockPos
+import net.minecraft.core.component.{DataComponentHolder, DataComponents}
+import net.minecraft.nbt.{CompoundTag, NbtOps}
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.component.CustomData
+import net.minecraft.world.level.ChunkPos
+import net.neoforged.api.distmarker.{Dist, OnlyIn}
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.common.MutableDataComponentHolder
+import net.neoforged.neoforge.event.level.{ChunkEvent, LevelEvent}
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
 
-class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment with traits.TextBufferProxy with VideoRamRasterizer with DeviceInfo {
+class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment with traits.TextBufferProxy with VideoRamRasterizer with DeviceInfo {
   override val node = api.Network.newNode(this, Visibility.Network).
     withComponent("screen").
     withConnector().
@@ -110,7 +106,7 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
     DeviceAttribute.Vendor -> Constants.DeviceInfo.DefaultVendor,
     DeviceAttribute.Product -> "Text Screen V0",
     DeviceAttribute.Capacity -> (maxResolution._1 * maxResolution._2).toString,
-    DeviceAttribute.Width -> Array("1", "4", "8").apply(maxDepth.ordinal())
+    DeviceAttribute.Width -> Array("1", "4", "8", "16").apply(maxDepth.ordinal())
   )
 
   override def getDeviceInfo: java.util.Map[String, String] = deviceInfo
@@ -119,9 +115,9 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
 
   override val canUpdate = true
 
-  override def update() {
+  override def update(): Unit = {
     super.update()
-    if (isDisplaying && host.world.getTotalWorldTime % Settings.get.tickFrequency == 0) {
+    if (isDisplaying && host.getEnvironmentLevel.getGameTime % Settings.get.tickFrequency == 0) {
       if (relativeLitArea < 0) {
         // The relative lit area is the number of pixels that are not blank
         // versus the number of pixels in the *current* resolution. This is
@@ -130,10 +126,15 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
         val w = getViewportWidth
         val h = getViewportHeight
         var acc = 0f
-        for (y <- 0 until h) {
+        // Description packets and legacy saves may resize the character and
+        // color planes in separate steps. Never let one inconsistent frame
+        // take down the client tick loop while the next update repairs it.
+        val safeHeight = math.min(h, math.min(data.buffer.length, data.color.length))
+        for (y <- 0 until safeHeight) {
           val line = data.buffer(y)
           val colors = data.color(y)
-          for (x <- 0 until w) {
+          val safeWidth = math.min(w, math.min(line.length, colors.length))
+          for (x <- 0 until safeWidth) {
             val char = line(x)
             val color = colors(x)
             val bg = PackedColor.unpackBackground(color, data.format)
@@ -143,7 +144,7 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
             else if (fg == 0 && bg == 0) 0 else 1)
           }
         }
-        relativeLitArea = acc / (w * h).toDouble
+        relativeLitArea = if (w > 0 && h > 0) acc / (w * h).toDouble else 0
       }
       if (node != null) {
         val hadPower = hasPower
@@ -197,7 +198,7 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
   def getKeyboards(context: Context, args: Arguments): Array[AnyRef] = {
     context.pause(0.25)
     host match {
-      case screen: tileentity.Screen =>
+      case screen: blockentity.Screen =>
         Array(screen.screens.map(_.node).flatMap(_.neighbors.filter(_.host.isInstanceOf[Keyboard]).map(_.address)).toArray)
       case _ =>
         Array(node.neighbors.filter(_.host.isInstanceOf[Keyboard]).map(_.address).toArray)
@@ -211,24 +212,24 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
   def setPrecise(computer: Context, args: Arguments): Array[AnyRef] = {
     // Available for T3 screens only... easiest way to check for us is to
     // base it off of the maximum color depth.
-    if (maxDepth == Settings.screenDepthsByTier(Tier.Three)) {
+    if (maxDepth == Settings.screenDepthsByTier(Tier.Four)) {
       val oldValue = precisionMode
       precisionMode = args.checkBoolean(0)
       result(oldValue)
     }
-    else result(Unit, "unsupported operation")
+    else result((), "unsupported operation")
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def setEnergyCostPerTick(value: Double) {
+  override def setEnergyCostPerTick(value: Double): Unit = {
     powerConsumptionPerTick = value
     fullyLitCost = computeFullyLitCost()
   }
 
   override def getEnergyCostPerTick: Double = powerConsumptionPerTick
 
-  override def setPowerState(value: Boolean) {
+  override def setPowerState(value: Boolean): Unit = {
     if (isDisplaying != value) {
       isDisplaying = value
       if (isDisplaying) {
@@ -241,7 +242,7 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
 
   override def getPowerState: Boolean = isDisplaying
 
-  override def setMaximumResolution(width: Int, height: Int) {
+  override def setMaximumResolution(width: Int, height: Int): Unit = {
     if (width < 1) throw new IllegalArgumentException("width must be larger or equal to one")
     if (height < 1) throw new IllegalArgumentException("height must be larger or equal to one")
     maxResolution = (width, height)
@@ -253,7 +254,7 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
 
   override def getMaximumHeight: Int = maxResolution._2
 
-  override def setAspectRatio(width: Double, height: Double): Unit = this.synchronized(aspectRatio = (width, height))
+  override def setAspectRatio(width: Double, height: Double): Unit = this.synchronized(this.aspectRatio = (width, height))
 
   override def getAspectRatio: Double = aspectRatio._1 / aspectRatio._2
 
@@ -357,105 +358,123 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
     proxy.onBufferRawSetForeground(col, row, color)
   }
 
-  @SideOnly(Side.CLIENT)
-  override def renderText: Boolean = relativeLitArea != 0 && proxy.render()
+  @OnlyIn(Dist.CLIENT)
+  override def renderText(stack: PoseStack): Boolean = relativeLitArea != 0 && proxy.render(stack)
 
-  @SideOnly(Side.CLIENT)
+  @OnlyIn(Dist.CLIENT)
+  def renderText(stack: PoseStack, renderBuffer: MultiBufferSource): Boolean = relativeLitArea != 0 && (proxy match {
+    case client: TextBuffer.ClientProxy => client.render(stack, renderBuffer)
+    case _ => proxy.render(stack)
+  })
+
+  @OnlyIn(Dist.CLIENT)
   override def renderWidth: Int = TextBufferRenderCache.renderer.charRenderWidth * getViewportWidth
 
-  @SideOnly(Side.CLIENT)
+  @OnlyIn(Dist.CLIENT)
   override def renderHeight: Int = TextBufferRenderCache.renderer.charRenderHeight * getViewportHeight
 
-  @SideOnly(Side.CLIENT)
+  @OnlyIn(Dist.CLIENT)
   override def setRenderingEnabled(enabled: Boolean): Unit = isRendering = enabled
 
-  @SideOnly(Side.CLIENT)
+  @OnlyIn(Dist.CLIENT)
   override def isRenderingEnabled: Boolean = isRendering
 
-  override def keyDown(character: Char, code: Int, player: EntityPlayer): Unit =
+  override def keyDown(character: Char, code: Int, player: Player): Unit =
     proxy.keyDown(character, code, player)
 
-  override def keyUp(character: Char, code: Int, player: EntityPlayer): Unit =
+  override def keyUp(character: Char, code: Int, player: Player): Unit =
     proxy.keyUp(character, code, player)
 
-  override def clipboard(value: String, player: EntityPlayer): Unit =
+  override def textInput(codePt: Int, player: Player): Unit =
+    proxy.textInput(codePt, player)
+
+  override def clipboard(value: String, player: Player): Unit =
     proxy.clipboard(value, player)
 
-  override def mouseDown(x: Double, y: Double, button: Int, player: EntityPlayer): Unit =
+  override def mouseDown(x: Double, y: Double, button: Int, player: Player): Unit =
     proxy.mouseDown(x, y, button, player)
 
-  override def mouseDrag(x: Double, y: Double, button: Int, player: EntityPlayer): Unit =
+  override def mouseDrag(x: Double, y: Double, button: Int, player: Player): Unit =
     proxy.mouseDrag(x, y, button, player)
 
-  override def mouseUp(x: Double, y: Double, button: Int, player: EntityPlayer): Unit =
+  override def mouseUp(x: Double, y: Double, button: Int, player: Player): Unit =
     proxy.mouseUp(x, y, button, player)
 
-  override def mouseScroll(x: Double, y: Double, delta: Int, player: EntityPlayer): Unit =
+  override def mouseScroll(x: Double, y: Double, delta: Int, player: Player): Unit =
     proxy.mouseScroll(x, y, delta, player)
 
-  def copyToAnalyzer(line: Int, player: EntityPlayer): Unit = {
+  def copyToAnalyzer(line: Int, player: Player): Unit = {
     proxy.copyToAnalyzer(line, player)
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def onConnect(node: Node) {
+  override def onConnect(node: Node): Unit = {
     super.onConnect(node)
     if (node == this.node) {
-      ServerComponentTracker.add(host.world, node.address, this)
+      ServerComponentTracker.add(host.getEnvironmentLevel, node.address, this)
     }
   }
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     super.onDisconnect(node)
     if (node == this.node) {
-      ServerComponentTracker.remove(host.world, this)
+      ServerComponentTracker.remove(host.getEnvironmentLevel, this)
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    if (SideTracker.isClient) {
-      if (!Strings.isNullOrEmpty(proxy.nodeAddress)) return // Only load once.
-      proxy.nodeAddress = nbt.getCompoundTag("node").getString("address")
-      TextBuffer.registerClientBuffer(this)
-    }
-    else {
-      if (nbt.hasKey("buffer")) {
-        data.load(nbt.getCompoundTag("buffer"))
+  private def bufferPath = node.address + "_buffer"
+
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+    for(address <- holder.getComponent(OCComponents.ADDRESS)) {
+      if (SideTracker.isClient) {
+        if (!Strings.isNullOrEmpty(proxy.nodeAddress)) return // Only load once.
+        proxy.nodeAddress = address
+        TextBuffer.registerClientBuffer(this)
       }
-      else if (!Strings.isNullOrEmpty(node.address)) {
-        data.load(SaveHandler.loadNBT(nbt, node.address + "_buffer"))
+      else {
+        holder.getComponent(OCComponents.TEXT_BUFFER) match {
+          case Some(_) => data.loadData(holder)
+          case None =>
+            val saved = SaveHandler.loadNBT(host.getEnvironmentLevel.dimension().location(), new ChunkPos(new BlockPos(host.xPosition().toInt, host.yPosition().toInt, host.zPosition().toInt)), bufferPath)
+            if (!saved.isEmpty) {
+              val storage = CompoundStorage.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow()
+              data.loadData(storage)
+            }
+        }
       }
     }
 
-    if (nbt.hasKey(Settings.namespace + "isOn")) {
-      isDisplaying = nbt.getBoolean(Settings.namespace + "isOn")
-    }
-    if (nbt.hasKey(Settings.namespace + "hasPower")) {
-      hasPower = nbt.getBoolean(Settings.namespace + "hasPower")
-    }
-    if (nbt.hasKey(Settings.namespace + "maxWidth") && nbt.hasKey(Settings.namespace + "maxHeight")) {
-      val maxWidth = nbt.getInteger(Settings.namespace + "maxWidth")
-      val maxHeight = nbt.getInteger(Settings.namespace + "maxHeight")
+    for(isOnComponent <- holder.getComponent(OCComponents.IS_ON))
+      isDisplaying = isOnComponent
+    for(isPoweredComponent <- holder.getComponent(OCComponents.IS_POWERED))
+      hasPower = isPoweredComponent
+
+    for(MaximumVideoMode(maxWidth, maxHeight, depth) <- holder.getComponent(OCComponents.MAX_VIDEO_MODE)) {
       maxResolution = (maxWidth, maxHeight)
-    }
-    precisionMode = nbt.getBoolean(Settings.namespace + "precise")
 
-    if (nbt.hasKey(Settings.namespace + "viewportWidth")) {
-      val vpw = nbt.getInteger(Settings.namespace + "viewportWidth")
-      val vph = nbt.getInteger(Settings.namespace + "viewportHeight")
-      viewport = (vpw min data.width max 1, vph min data.height max 1)
-    } else {
-      viewport = data.size
+      // Restore maxDepth so that getMaximumColorDepth() returns the correct tier
+      // even if setMaximumColorDepth() was not called after construction (e.g.
+      // when the buffer lazy val was initialised before load(nbt) ran).
+      val depthValues = api.internal.TextBuffer.ColorDepth.values
+      val ordinal = depth min (depthValues.length - 1) max 0
+      maxDepth = depthValues(ordinal)
+    }
+
+    precisionMode = holder.getOrDefault(OCComponents.IS_PRECISE, false)
+
+    viewport = holder.getComponent(OCComponents.VIDEO_MODE) match {
+      case Some(VideoMode(vpw, vph)) => (vpw min data.width max 1, vph min data.height max 1)
+      case None => data.size
     }
   }
 
   // Null check for Waila (and other mods that may call this client side).
-  override def save(nbt: NBTTagCompound): Unit = if (node != null) {
-    super.save(nbt)
+  override def saveData(holder: MutableDataComponentHolder): Unit = if (node != null) {
+    super.saveData(holder)
     // Happy thread synchronization hack! Here's the problem: GPUs allow direct
     // calls for modifying screens to give a more responsive experience. This
     // causes the following problem: when saving, if the screen is saved first,
@@ -467,20 +486,23 @@ class TextBuffer(val host: EnvironmentHost) extends prefab.ManagedEnvironment wi
     // when their update() runs).
     if (node.network != null) {
       for (node <- node.network.nodes) node.host match {
-        case computer: tileentity.traits.Computer if !computer.machine.isPaused =>
+        case computer: blockentity.traits.Computer if !computer.machine.isPaused =>
           computer.machine.pause(0.1)
         case _ =>
       }
     }
 
-    SaveHandler.scheduleSave(host, nbt, node.address + "_buffer", data.save _)
-    nbt.setBoolean(Settings.namespace + "isOn", isDisplaying)
-    nbt.setBoolean(Settings.namespace + "hasPower", hasPower)
-    nbt.setInteger(Settings.namespace + "maxWidth", maxResolution._1)
-    nbt.setInteger(Settings.namespace + "maxHeight", maxResolution._2)
-    nbt.setBoolean(Settings.namespace + "precise", precisionMode)
-    nbt.setInteger(Settings.namespace + "viewportWidth", viewport._1)
-    nbt.setInteger(Settings.namespace + "viewportHeight", viewport._2)
+    SaveHandler.scheduleSave(host.asInstanceOf[EnvironmentHost], new CompoundTag(), bufferPath, (tag: CompoundTag) => {
+      val storage = new CompoundStorage()
+      data.saveData(storage)
+      tag.merge(CompoundStorage.CODEC.encodeStart(NbtOps.INSTANCE, storage).getOrThrow().asInstanceOf[CompoundTag])
+      ()
+    })
+    holder.setComponent(OCComponents.IS_ON, isDisplaying)
+    holder.setComponent(OCComponents.IS_POWERED, hasPower)
+    holder.setComponent(OCComponents.MAX_VIDEO_MODE, MaximumVideoMode(maxResolution._1, maxResolution._2, maxDepth.ordinal))
+    holder.setComponent(OCComponents.IS_PRECISE, precisionMode)
+    holder.setComponent(OCComponents.VIDEO_MODE, VideoMode(viewport._1, viewport._2))
   }
 }
 
@@ -488,32 +510,33 @@ object TextBuffer {
   var clientBuffers = mutable.ListBuffer.empty[TextBuffer]
 
   @SubscribeEvent
-  def onChunkUnload(e: ChunkEvent.Unload) {
+  def onChunkUnloaded(e: ChunkEvent.Unload): Unit = {
     val chunk = e.getChunk
     clientBuffers = clientBuffers.filter(t => {
       val blockPos = BlockPosition(t.host)
-      val keep = t.host.world != e.world || !chunk.isAtLocation(blockPos.x >> 4, blockPos.z >> 4)
+      val chunkPos = chunk.getPos
+      val keep = t.host.getEnvironmentLevel != e.getLevel || ((blockPos.x >> 4) != chunkPos.x || (blockPos.z >> 4) != chunkPos.z)
       if (!keep) {
-        ClientComponentTracker.remove(t.host.world, t)
+        ClientComponentTracker.remove(t.host.getEnvironmentLevel, t)
       }
       keep
     })
   }
 
   @SubscribeEvent
-  def onWorldUnload(e: WorldEvent.Unload) {
+  def onWorldUnload(e: LevelEvent.Unload): Unit = {
     clientBuffers = clientBuffers.filter(t => {
-      val keep = t.host.world != e.world
+      val keep = t.host.getEnvironmentLevel != e.getLevel
       if (!keep) {
-        ClientComponentTracker.remove(t.host.world, t)
+        ClientComponentTracker.remove(t.host.getEnvironmentLevel, t)
       }
       keep
     })
   }
 
-  def registerClientBuffer(t: TextBuffer) {
+  def registerClientBuffer(t: TextBuffer): Unit = {
     ClientPacketSender.sendTextBufferInit(t.proxy.nodeAddress)
-    ClientComponentTracker.add(t.host.world, t.proxy.nodeAddress, t)
+    ClientComponentTracker.add(t.host.getEnvironmentLevel, t.proxy.nodeAddress, t)
     clientBuffers += t
   }
 
@@ -524,38 +547,39 @@ object TextBuffer {
 
     var nodeAddress = ""
 
-    def markDirty() {
+    def setChanged(): Unit = {
       dirty = true
     }
 
-    def render() = false
+    @OnlyIn(Dist.CLIENT)
+    def render(stack: PoseStack) = false
 
     def onBufferColorChange(): Unit
 
-    def onBufferCopy(col: Int, row: Int, w: Int, h: Int, tx: Int, ty: Int) {
+    def onBufferCopy(col: Int, row: Int, w: Int, h: Int, tx: Int, ty: Int): Unit = {
       owner.relativeLitArea = -1
     }
 
     def onBufferDepthChange(depth: api.internal.TextBuffer.ColorDepth): Unit
 
-    def onBufferFill(col: Int, row: Int, w: Int, h: Int, c: Int) {
+    def onBufferFill(col: Int, row: Int, w: Int, h: Int, c: Int): Unit = {
       owner.relativeLitArea = -1
     }
 
     def onBufferPaletteChange(index: Int): Unit
 
-    def onBufferResolutionChange(w: Int, h: Int) {
+    def onBufferResolutionChange(w: Int, h: Int): Unit = {
       owner.relativeLitArea = -1
     }
 
-    def onBufferViewportResolutionChange(w: Int, h: Int) {
+    def onBufferViewportResolutionChange(w: Int, h: Int): Unit = {
       owner.relativeLitArea = -1
     }
 
-    def onBufferMaxResolutionChange(w: Int, h: Int) {
+    def onBufferMaxResolutionChange(w: Int, h: Int): Unit = {
     }
 
-    def onBufferSet(col: Int, row: Int, s: String, vertical: Boolean) {
+    def onBufferSet(col: Int, row: Int, s: String, vertical: Boolean): Unit = {
       owner.relativeLitArea = -1
     }
 
@@ -571,33 +595,35 @@ object TextBuffer {
       owner.relativeLitArea = -1
     }
 
-    def onBufferRawSetText(col: Int, row: Int, text: Array[Array[Int]]) {
+    def onBufferRawSetText(col: Int, row: Int, text: Array[Array[Int]]): Unit = {
       owner.relativeLitArea = -1
     }
 
-    def onBufferRawSetBackground(col: Int, row: Int, color: Array[Array[Int]]) {
+    def onBufferRawSetBackground(col: Int, row: Int, color: Array[Array[Int]]): Unit = {
       owner.relativeLitArea = -1
     }
 
-    def onBufferRawSetForeground(col: Int, row: Int, color: Array[Array[Int]]) {
+    def onBufferRawSetForeground(col: Int, row: Int, color: Array[Array[Int]]): Unit = {
       owner.relativeLitArea = -1
     }
 
-    def keyDown(character: Char, code: Int, player: EntityPlayer): Unit
+    def keyDown(character: Char, code: Int, player: Player): Unit
 
-    def keyUp(character: Char, code: Int, player: EntityPlayer): Unit
+    def keyUp(character: Char, code: Int, player: Player): Unit
 
-    def clipboard(value: String, player: EntityPlayer): Unit
+    def textInput(codePt: Int, player: Player): Unit
 
-    def mouseDown(x: Double, y: Double, button: Int, player: EntityPlayer): Unit
+    def clipboard(value: String, player: Player): Unit
 
-    def mouseDrag(x: Double, y: Double, button: Int, player: EntityPlayer): Unit
+    def mouseDown(x: Double, y: Double, button: Int, player: Player): Unit
 
-    def mouseUp(x: Double, y: Double, button: Int, player: EntityPlayer): Unit
+    def mouseDrag(x: Double, y: Double, button: Int, player: Player): Unit
 
-    def mouseScroll(x: Double, y: Double, delta: Int, player: EntityPlayer): Unit
+    def mouseUp(x: Double, y: Double, button: Int, player: Player): Unit
 
-    def copyToAnalyzer(line: Int, player: EntityPlayer): Unit
+    def mouseScroll(x: Double, y: Double, delta: Int, player: Player): Unit
+
+    def copyToAnalyzer(line: Int, player: Player): Unit
   }
 
   class ClientProxy(val owner: TextBuffer) extends Proxy {
@@ -611,52 +637,59 @@ object TextBuffer {
       override def viewport: (Int, Int) = owner.viewport
     }
 
-    override def render() = {
+    @OnlyIn(Dist.CLIENT)
+    override def render(stack: PoseStack) = {
       val wasDirty = dirty
-      TextBufferRenderCache.render(renderer)
+      TextBufferRenderCache.render(stack, renderer)
       wasDirty
     }
 
-    override def onBufferColorChange() {
-      markDirty()
+    @OnlyIn(Dist.CLIENT)
+    def render(stack: PoseStack, renderBuffer: MultiBufferSource): Boolean = {
+      TextBufferRenderCache.renderImmediate(stack, renderBuffer, renderer)
+      dirty
     }
 
-    override def onBufferCopy(col: Int, row: Int, w: Int, h: Int, tx: Int, ty: Int) {
+    override def onBufferColorChange(): Unit = {
+      setChanged()
+    }
+
+    override def onBufferCopy(col: Int, row: Int, w: Int, h: Int, tx: Int, ty: Int): Unit = {
       super.onBufferCopy(col, row, w, h, tx, ty)
-      markDirty()
+      setChanged()
     }
 
-    override def onBufferDepthChange(depth: api.internal.TextBuffer.ColorDepth) {
-      markDirty()
+    override def onBufferDepthChange(depth: api.internal.TextBuffer.ColorDepth): Unit = {
+      setChanged()
     }
 
-    override def onBufferFill(col: Int, row: Int, w: Int, h: Int, c: Int) {
+    override def onBufferFill(col: Int, row: Int, w: Int, h: Int, c: Int): Unit = {
       super.onBufferFill(col, row, w, h, c)
-      markDirty()
+      setChanged()
     }
 
-    override def onBufferPaletteChange(index: Int) {
-      markDirty()
+    override def onBufferPaletteChange(index: Int): Unit = {
+      setChanged()
     }
 
-    override def onBufferResolutionChange(w: Int, h: Int) {
+    override def onBufferResolutionChange(w: Int, h: Int): Unit = {
       super.onBufferResolutionChange(w, h)
-      markDirty()
+      setChanged()
     }
 
-    override def onBufferViewportResolutionChange(w: Int, h: Int) {
+    override def onBufferViewportResolutionChange(w: Int, h: Int): Unit = {
       super.onBufferViewportResolutionChange(w, h)
-      markDirty()
+      setChanged()
     }
 
-    override def onBufferSet(col: Int, row: Int, s: String, vertical: Boolean) {
+    override def onBufferSet(col: Int, row: Int, s: String, vertical: Boolean): Unit = {
       super.onBufferSet(col, row, s, vertical)
-      markDirty()
+      setChanged()
     }
 
     override def onBufferBitBlt(col: Int, row: Int, w: Int, h: Int, ram: component.GpuTextBuffer, fromCol: Int, fromRow: Int): Unit = {
       super.onBufferBitBlt(col, row, w, h, ram, fromCol, fromRow)
-      markDirty()
+      setChanged()
     }
 
     override def onBufferRamInit(ram: component.GpuTextBuffer): Unit = {
@@ -667,95 +700,100 @@ object TextBuffer {
       super.onBufferRamDestroy(ram)
     }
 
-    override def keyDown(character: Char, code: Int, player: EntityPlayer) {
+    override def keyDown(character: Char, code: Int, player: Player): Unit = {
       debug(s"{type = keyDown, char = $character, code = $code}")
       ClientPacketSender.sendKeyDown(nodeAddress, character, code)
     }
 
-    override def keyUp(character: Char, code: Int, player: EntityPlayer) {
+    override def keyUp(character: Char, code: Int, player: Player): Unit = {
       debug(s"{type = keyUp, char = $character, code = $code}")
       ClientPacketSender.sendKeyUp(nodeAddress, character, code)
     }
 
-    override def clipboard(value: String, player: EntityPlayer) {
+    override def textInput(codePt: Int, player: Player): Unit = {
+      debug(s"{type = textInput, codePt = $codePt}")
+      ClientPacketSender.sendTextInput(nodeAddress, codePt)
+    }
+
+    override def clipboard(value: String, player: Player): Unit = {
       debug(s"{type = clipboard}")
       ClientPacketSender.sendClipboard(nodeAddress, value)
     }
 
-    override def mouseDown(x: Double, y: Double, button: Int, player: EntityPlayer) {
+    override def mouseDown(x: Double, y: Double, button: Int, player: Player): Unit = {
       debug(s"{type = mouseDown, x = $x, y = $y, button = $button}")
       ClientPacketSender.sendMouseClick(nodeAddress, x, y, drag = false, button)
     }
 
-    override def mouseDrag(x: Double, y: Double, button: Int, player: EntityPlayer) {
+    override def mouseDrag(x: Double, y: Double, button: Int, player: Player): Unit = {
       debug(s"{type = mouseDrag, x = $x, y = $y, button = $button}")
       ClientPacketSender.sendMouseClick(nodeAddress, x, y, drag = true, button)
     }
 
-    override def mouseUp(x: Double, y: Double, button: Int, player: EntityPlayer) {
+    override def mouseUp(x: Double, y: Double, button: Int, player: Player): Unit = {
       debug(s"{type = mouseUp, x = $x, y = $y, button = $button}")
       ClientPacketSender.sendMouseUp(nodeAddress, x, y, button)
     }
 
-    override def mouseScroll(x: Double, y: Double, delta: Int, player: EntityPlayer) {
+    override def mouseScroll(x: Double, y: Double, delta: Int, player: Player): Unit = {
       debug(s"{type = mouseScroll, x = $x, y = $y, delta = $delta}")
       ClientPacketSender.sendMouseScroll(nodeAddress, x, y, delta)
     }
 
-    override def copyToAnalyzer(line: Int, player: EntityPlayer): Unit = {
+    override def copyToAnalyzer(line: Int, player: Player): Unit = {
       ClientPacketSender.sendCopyToAnalyzer(nodeAddress, line)
     }
 
     private lazy val Debugger = api.Items.get(Constants.ItemName.Debugger)
 
-    private def debug(message: String) {
-      if (Minecraft.getMinecraft != null && Minecraft.getMinecraft.thePlayer != null && api.Items.get(Minecraft.getMinecraft.thePlayer.getHeldItem) == Debugger) {
+    private def debug(message: String): Unit = {
+      if (Minecraft.getInstance != null && Minecraft.getInstance.player != null && api.Items.get(Minecraft.getInstance.player.getItemInHand(InteractionHand.MAIN_HAND)) == Debugger) {
         OpenComputers.log.info(s"[NETWORK DEBUGGER] Sending packet to node $nodeAddress: " + message)
       }
     }
   }
 
   class ServerProxy(val owner: TextBuffer) extends Proxy {
-    override def onBufferColorChange() {
+    override def onBufferColorChange(): Unit = {
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferColorChange(owner.pendingCommands, owner.data.foreground, owner.data.background))
     }
 
-    override def onBufferCopy(col: Int, row: Int, w: Int, h: Int, tx: Int, ty: Int) {
+    override def onBufferCopy(col: Int, row: Int, w: Int, h: Int, tx: Int, ty: Int): Unit = {
       super.onBufferCopy(col, row, w, h, tx, ty)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferCopy(owner.pendingCommands, col, row, w, h, tx, ty))
     }
 
-    override def onBufferDepthChange(depth: api.internal.TextBuffer.ColorDepth) {
+    override def onBufferDepthChange(depth: api.internal.TextBuffer.ColorDepth): Unit = {
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferDepthChange(owner.pendingCommands, depth))
     }
 
-    override def onBufferFill(col: Int, row: Int, w: Int, h: Int, c: Int) {
+    override def onBufferFill(col: Int, row: Int, w: Int, h: Int, c: Int): Unit = {
       super.onBufferFill(col, row, w, h, c)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferFill(owner.pendingCommands, col, row, w, h, c))
     }
 
-    override def onBufferPaletteChange(index: Int) {
+    override def onBufferPaletteChange(index: Int): Unit = {
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferPaletteChange(owner.pendingCommands, index, owner.getPaletteColor(index)))
     }
 
-    override def onBufferResolutionChange(w: Int, h: Int) {
+    override def onBufferResolutionChange(w: Int, h: Int): Unit = {
       super.onBufferResolutionChange(w, h)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferResolutionChange(owner.pendingCommands, w, h))
     }
 
-    override def onBufferViewportResolutionChange(w: Int, h: Int) {
+    override def onBufferViewportResolutionChange(w: Int, h: Int): Unit = {
       super.onBufferViewportResolutionChange(w, h)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferViewportResolutionChange(owner.pendingCommands, w, h))
     }
 
-    override def onBufferMaxResolutionChange(w: Int, h: Int) {
+    override def onBufferMaxResolutionChange(w: Int, h: Int): Unit = {
       if (owner.node.network != null) {
         super.onBufferMaxResolutionChange(w, h)
         owner.host.markChanged()
@@ -763,7 +801,7 @@ object TextBuffer {
       }
     }
 
-    override def onBufferSet(col: Int, row: Int, s: String, vertical: Boolean) {
+    override def onBufferSet(col: Int, row: Int, s: String, vertical: Boolean): Unit = {
       super.onBufferSet(col, row, s, vertical)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferSet(owner.pendingCommands, col, row, s, vertical))
@@ -778,9 +816,9 @@ object TextBuffer {
     override def onBufferRamInit(ram: component.GpuTextBuffer): Unit = {
       super.onBufferRamInit(ram)
       owner.host.markChanged()
-      val nbt = new NBTTagCompound()
-      ram.save(nbt)
-      owner.synchronized(ServerPacketSender.appendTextBufferRamInit(owner.pendingCommands, ram.owner, ram.id, nbt))
+      val nbt = new CompoundStorage()
+      ram.saveData(nbt)
+      owner.synchronized(ServerPacketSender.appendTextBufferRamInit(owner.pendingCommands, ram.owner, ram.id, CompoundStorage.CODEC.encode(nbt, NbtOps.INSTANCE, new CompoundTag()).getOrThrow().asInstanceOf[CompoundTag]))
     }
 
     override def onBufferRamDestroy(ram: component.GpuTextBuffer): Unit = {
@@ -789,74 +827,79 @@ object TextBuffer {
       owner.synchronized(ServerPacketSender.appendTextBufferRamDestroy(owner.pendingCommands, ram.owner, ram.id))
     }
 
-    override def onBufferRawSetText(col: Int, row: Int, text: Array[Array[Int]]) {
+    override def onBufferRawSetText(col: Int, row: Int, text: Array[Array[Int]]): Unit = {
       super.onBufferRawSetText(col, row, text)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferRawSetText(owner.pendingCommands, col, row, text))
     }
 
-    override def onBufferRawSetBackground(col: Int, row: Int, color: Array[Array[Int]]) {
+    override def onBufferRawSetBackground(col: Int, row: Int, color: Array[Array[Int]]): Unit = {
       super.onBufferRawSetBackground(col, row, color)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferRawSetBackground(owner.pendingCommands, col, row, color))
     }
 
-    override def onBufferRawSetForeground(col: Int, row: Int, color: Array[Array[Int]]) {
+    override def onBufferRawSetForeground(col: Int, row: Int, color: Array[Array[Int]]): Unit = {
       super.onBufferRawSetForeground(col, row, color)
       owner.host.markChanged()
       owner.synchronized(ServerPacketSender.appendTextBufferRawSetForeground(owner.pendingCommands, col, row, color))
     }
 
-    override def keyDown(character: Char, code: Int, player: EntityPlayer) {
+    override def keyDown(character: Char, code: Int, player: Player): Unit = {
       sendToKeyboards("keyboard.keyDown", player, Char.box(character), Int.box(code))
     }
 
-    override def keyUp(character: Char, code: Int, player: EntityPlayer) {
+    override def keyUp(character: Char, code: Int, player: Player): Unit = {
       sendToKeyboards("keyboard.keyUp", player, Char.box(character), Int.box(code))
     }
 
-    override def clipboard(value: String, player: EntityPlayer) {
+    override def textInput(codePt: Int, player: Player): Unit = {
+      sendToKeyboards("keyboard.textInput", player, Int.box(codePt))
+    }
+
+    override def clipboard(value: String, player: Player): Unit = {
       sendToKeyboards("keyboard.clipboard", player, value)
     }
 
-    override def mouseDown(x: Double, y: Double, button: Int, player: EntityPlayer) {
+    override def mouseDown(x: Double, y: Double, button: Int, player: Player): Unit = {
       sendMouseEvent(player, "touch", x, y, button)
     }
 
-    override def mouseDrag(x: Double, y: Double, button: Int, player: EntityPlayer) {
+    override def mouseDrag(x: Double, y: Double, button: Int, player: Player): Unit = {
       sendMouseEvent(player, "drag", x, y, button)
     }
 
-    override def mouseUp(x: Double, y: Double, button: Int, player: EntityPlayer) {
+    override def mouseUp(x: Double, y: Double, button: Int, player: Player): Unit = {
       sendMouseEvent(player, "drop", x, y, button)
     }
 
-    override def mouseScroll(x: Double, y: Double, delta: Int, player: EntityPlayer) {
+    override def mouseScroll(x: Double, y: Double, delta: Int, player: Player): Unit = {
       sendMouseEvent(player, "scroll", x, y, delta)
     }
 
-    override def copyToAnalyzer(line: Int, player: EntityPlayer): Unit = {
-      val stack = player.getHeldItem
-      if (stack != null) {
-        if (!stack.hasTagCompound) {
-          stack.setTagCompound(new NBTTagCompound())
-        }
-        stack.getTagCompound.removeTag(Settings.namespace + "clipboard")
+    override def copyToAnalyzer(line: Int, player: Player): Unit = {
+      val stack = player.getItemInHand(InteractionHand.MAIN_HAND)
+      if (!stack.isEmpty) {
+        stack.update(
+          DataComponents.CUSTOM_DATA,
+          CustomData.EMPTY,
+          (customData: CustomData) => {
+            val tag = customData.copyTag()
+            tag.remove(Settings.namespace + "clipboard")
+            CustomData.of(tag)
+          }
+        )
 
         if (line >= 0 && line < owner.getViewportHeight) {
           val text = owner.data.lineToString(line)
           if (!Strings.isNullOrEmpty(text)) {
-            stack.getTagCompound.setString(Settings.namespace + "clipboard", text)
+            stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe.putString(Settings.namespace + "clipboard", text)
           }
-        }
-
-        if (stack.getTagCompound.hasNoTags) {
-          stack.setTagCompound(null)
         }
       }
     }
 
-    private def sendMouseEvent(player: EntityPlayer, name: String, x: Double, y: Double, data: Int) = {
+    private def sendMouseEvent(player: Player, name: String, x: Double, y: Double, data: Int) = {
       val args = mutable.ArrayBuffer.empty[AnyRef]
 
       args += player
@@ -871,15 +914,15 @@ object TextBuffer {
       }
       args += Int.box(data)
       if (Settings.get.inputUsername) {
-        args += player.getCommandSenderName
+        args += player.getName.getString
       }
 
-      owner.node.sendToReachable("computer.checked_signal", args: _*)
+      owner.node.sendToReachable("computer.checked_signal", args.toSeq: _*)
     }
 
-    private def sendToKeyboards(name: String, values: AnyRef*) {
+    private def sendToKeyboards(name: String, values: AnyRef*): Unit = {
       owner.host match {
-        case screen: tileentity.Screen =>
+        case screen: blockentity.Screen =>
           screen.screens.foreach(_.node.sendToNeighbors(name, values: _*))
         case _ =>
           owner.node.sendToNeighbors(name, values: _*)

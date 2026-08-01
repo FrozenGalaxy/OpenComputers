@@ -1,103 +1,106 @@
 package li.cil.oc.client
 
-import cpw.mods.fml.client.registry.ClientRegistry
-import cpw.mods.fml.client.registry.RenderingRegistry
-import cpw.mods.fml.common.FMLCommonHandler
-import cpw.mods.fml.common.event.FMLInitializationEvent
-import cpw.mods.fml.common.event.FMLPreInitializationEvent
-import cpw.mods.fml.common.network.NetworkRegistry
-import li.cil.oc.Constants
-import li.cil.oc.OpenComputers
-import li.cil.oc.Settings
-import li.cil.oc.api
-import li.cil.oc.client
-import li.cil.oc.client.renderer.HighlightRenderer
-import li.cil.oc.client.renderer.MFUTargetRenderer
-import li.cil.oc.client.renderer.PetRenderer
-import li.cil.oc.client.renderer.TextBufferRenderCache
-import li.cil.oc.client.renderer.WirelessNetworkDebugRenderer
-import li.cil.oc.client.renderer.block.BlockRenderer
-import li.cil.oc.client.renderer.entity.DroneRenderer
-import li.cil.oc.client.renderer.item.ItemRenderer
+import li.cil.oc.{api, client}
+import li.cil.oc.client.gui.GuiTypes
+import li.cil.oc.client.renderer._
+import li.cil.oc.client.renderer.block.{ModelInitialization, NetSplitterModel}
+import li.cil.oc.client.renderer.entity.{DroneRenderer, ModelQuadcopter}
 import li.cil.oc.client.renderer.tileentity._
+import li.cil.oc.common.blockentity.BlockEntityTypes
 import li.cil.oc.common.component.TextBuffer
-import li.cil.oc.common.entity.Drone
-import li.cil.oc.common.event.NanomachinesHandler
-import li.cil.oc.common.event.RackMountableRenderHandler
-import li.cil.oc.common.init.Items
-import li.cil.oc.common.tileentity
-import li.cil.oc.common.{Proxy => CommonProxy}
+import li.cil.oc.common.entity.EntityTypes
+import li.cil.oc.common.event.{NanomachinesHandler, RackMountableRenderHandler}
+import li.cil.oc.common.{PacketHandler => CommonPacketHandler, Proxy => CommonProxy}
 import li.cil.oc.util.Audio
-import net.minecraftforge.client.MinecraftForgeClient
-import net.minecraftforge.common.MinecraftForge
-import org.lwjgl.opengl.GLContext
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers
+import net.minecraft.world.item.Item
+import net.minecraft.world.level.block.Block
+import net.neoforged.bus.api.{IEventBus, SubscribeEvent}
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent
+import net.neoforged.neoforge.client.event.{EntityRenderersEvent, RegisterKeyMappingsEvent}
+import net.neoforged.neoforge.common.NeoForge
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 
-private[oc] class Proxy extends CommonProxy {
-  override def preInit(e: FMLPreInitializationEvent) {
-    super.preInit(e)
+private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
+  modBus.register(this)
+  modBus.register(classOf[GuiTypes])
+  modBus.register(ModelInitialization)
+  modBus.register(NetSplitterModel)
+  modBus.register(Textures)
+
+  override def preInit(): Unit = {
+    super.preInit()
 
     api.API.manual = client.Manual
-
-    CommandHandler.register()
-
-    MinecraftForge.EVENT_BUS.register(gui.Icons)
   }
 
-  override def init(e: FMLInitializationEvent) {
+  override def init(e: FMLCommonSetupEvent): Unit = {
     super.init(e)
 
-    OpenComputers.channel.register(client.PacketHandler)
+    CommonPacketHandler.clientHandler = PacketHandler
 
-    Settings.blockRenderId = RenderingRegistry.getNextAvailableRenderId
-    RenderingRegistry.registerBlockHandler(BlockRenderer)
-    RenderingRegistry.registerEntityRenderingHandler(classOf[Drone], DroneRenderer)
+    e.enqueueWork((() => {
+      ModelInitialization.preInit()
 
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Adapter], AdapterRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Assembler], AssemblerRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Case], CaseRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Charger], ChargerRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Disassembler], DisassemblerRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.DiskDrive], DiskDriveRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Geolyzer], GeolyzerRenderer)
-    if (GLContext.getCapabilities.OpenGL15)
-      ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Hologram], HologramRenderer)
-    else
-      ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Hologram], HologramRendererFallback)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Microcontroller], MicrocontrollerRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.NetSplitter], NetSplitterRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.PowerDistributor], PowerDistributorRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Printer], PrinterRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Raid], RaidRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Rack], RackRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Switch], SwitchRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.AccessPoint], SwitchRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Relay], SwitchRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.RobotProxy], RobotRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Screen], ScreenRenderer)
-    ClientRegistry.bindTileEntitySpecialRenderer(classOf[tileentity.Transposer], TransposerRenderer)
+      ColorHandler.init()
 
-    MinecraftForgeClient.registerItemRenderer(Items.get(Constants.ItemName.Floppy).createItemStack(1).getItem, ItemRenderer)
-    MinecraftForgeClient.registerItemRenderer(Items.get(Constants.BlockName.Cable).createItemStack(1).getItem, ItemRenderer)
-    MinecraftForgeClient.registerItemRenderer(Items.get(Constants.BlockName.Print).createItemStack(1).getItem, ItemRenderer)
+      NeoForge.EVENT_BUS.register(HighlightRenderer)
+      NeoForge.EVENT_BUS.register(NanomachinesHandler.Client)
+      NeoForge.EVENT_BUS.register(PetRenderer)
+      NeoForge.EVENT_BUS.register(RackMountableRenderHandler)
+      NeoForge.EVENT_BUS.register(Sound)
+      NeoForge.EVENT_BUS.register(TextBuffer)
+      NeoForge.EVENT_BUS.register(MFUTargetRenderer)
+      NeoForge.EVENT_BUS.register(WirelessNetworkDebugRenderer)
+      NeoForge.EVENT_BUS.register(Audio)
+      NeoForge.EVENT_BUS.register(HologramRenderer)
+      NeoForge.EVENT_BUS.register(ScreenRenderer)
+    }): Runnable)
 
-    ClientRegistry.registerKeyBinding(KeyBindings.materialCosts)
-    ClientRegistry.registerKeyBinding(KeyBindings.clipboardPaste)
-
-    MinecraftForge.EVENT_BUS.register(HighlightRenderer)
-    MinecraftForge.EVENT_BUS.register(NanomachinesHandler.Client)
-    MinecraftForge.EVENT_BUS.register(PetRenderer)
-    MinecraftForge.EVENT_BUS.register(RackMountableRenderHandler)
-    MinecraftForge.EVENT_BUS.register(Sound)
-    MinecraftForge.EVENT_BUS.register(TextBuffer)
-    MinecraftForge.EVENT_BUS.register(MFUTargetRenderer)
-    MinecraftForge.EVENT_BUS.register(WirelessNetworkDebugRenderer)
-
-    NetworkRegistry.INSTANCE.registerGuiHandler(OpenComputers, GuiHandler)
-
-    FMLCommonHandler.instance.bus.register(Audio)
-    FMLCommonHandler.instance.bus.register(HologramRenderer)
-    FMLCommonHandler.instance.bus.register(PetRenderer)
-    FMLCommonHandler.instance.bus.register(Sound)
-    FMLCommonHandler.instance.bus.register(TextBufferRenderCache)
   }
+
+  @SubscribeEvent
+  def onRegisterLayerDefinitions(event: EntityRenderersEvent.RegisterLayerDefinitions): Unit = {
+    event.registerLayerDefinition(ModelQuadcopter.LAYER_LOCATION, () => ModelQuadcopter.createLayer())
+  }
+
+  @SubscribeEvent
+  def onRegisterKeyMappings(event: RegisterKeyMappingsEvent): Unit = {
+    event.register(KeyBindings.extendedTooltip)
+    event.register(KeyBindings.analyzeCopyAddr)
+    event.register(KeyBindings.clipboardPaste)
+  }
+
+  @SubscribeEvent
+  def onRegisterRenderers(e: EntityRenderersEvent.RegisterRenderers): Unit = {
+    e.registerEntityRenderer(EntityTypes.DRONE.get(), ctx => new DroneRenderer(ctx))
+
+    BlockEntityRenderers.register(BlockEntityTypes.ADAPTER.get(), AdapterRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.ASSEMBLER.get(), AssemblerRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.CASE.get(), CaseRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.CHARGER.get(), ChargerRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.DISASSEMBLER.get(), DisassemblerRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.DISK_DRIVE.get(), DiskDriveRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.GEOLYZER.get(), GeolyzerRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.HOLOGRAM.get(), HologramRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.MICROCONTROLLER.get(), ctx => new MicrocontrollerRenderer(ctx))
+    BlockEntityRenderers.register(BlockEntityTypes.NET_SPLITTER.get(), ctx => new NetSplitterRenderer(ctx))
+    BlockEntityRenderers.register(BlockEntityTypes.POWER_DISTRIBUTOR.get(), PowerDistributorRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.PRINTER.get(), PrinterRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.RAID.get(), RaidRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.RACK.get(), RackRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.RELAY.get(), RelayRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.ROBOT.get(), RobotRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.SCREEN.get(), ScreenRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.TRANSPOSER.get(), TransposerRenderer)
+  }
+
+  @SubscribeEvent
+  def onRegisterPayloads(event: RegisterPayloadHandlersEvent): Unit = {
+    registerPacket(event)
+  }
+
+  override def registerModel(instance: Item, id: String): Unit = ModelInitialization.registerModel(instance, id)
+
+  override def registerModel(instance: Block, id: String): Unit = ModelInitialization.registerModel(instance, id)
 }

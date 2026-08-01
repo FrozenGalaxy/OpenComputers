@@ -2,17 +2,18 @@ package li.cil.oc.server.fs
 
 import java.io
 import java.io.FileNotFoundException
+import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.util.concurrent.CancellationException
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-
 import li.cil.oc.OpenComputers
 import li.cil.oc.api.fs.Mode
 import li.cil.oc.util.ThreadPoolFactory
 import li.cil.oc.util.SafeThreadPool
-import net.minecraft.nbt.NBTTagCompound
+import net.minecraft.core.HolderLookup
+import net.minecraft.nbt.CompoundTag
 import org.apache.commons.io.FileUtils
 
 import scala.collection.mutable
@@ -28,7 +29,7 @@ trait Buffered extends OutputStreamFileSystem {
 
   // ----------------------------------------------------------------------- //
 
-  override def delete(path: String) = {
+  override def delete(path: String): Boolean = {
     if (super.delete(path)) {
       deletions += path -> System.currentTimeMillis()
       true
@@ -36,7 +37,7 @@ trait Buffered extends OutputStreamFileSystem {
     else false
   }
 
-  override def rename(from: String, to: String) = {
+  override def rename(from: String, to: String): Boolean = {
     if (super.rename(from, to)) {
       deletions += from -> System.currentTimeMillis()
       true
@@ -48,7 +49,7 @@ trait Buffered extends OutputStreamFileSystem {
 
   private var saving: Option[Future[_]] = None
 
-  override def load(nbt: NBTTagCompound): Unit = {
+  override def loadData(nbt: CompoundTag): Unit = {
     saving.foreach(f => try {
       f.get(120L, TimeUnit.SECONDS)
     } catch {
@@ -56,11 +57,11 @@ trait Buffered extends OutputStreamFileSystem {
       case e: CancellationException => // NO-OP
     })
     loadFiles(nbt)
-    super.load(nbt)
+    super.loadData(nbt)
   }
 
-  private def loadFiles(nbt: NBTTagCompound): Unit = this.synchronized {
-    def recurse(path: String, directory: io.File) {
+  private def loadFiles(nbt: CompoundTag): Unit = this.synchronized {
+    def recurse(path: String, directory: io.File): Unit = {
       makeDirectory(path)
       for (child <- directory.listFiles() if FileSystem.isValidFilename(child.getName)) {
         val childPath = path + child.getName
@@ -75,13 +76,12 @@ trait Buffered extends OutputStreamFileSystem {
                 val in = new io.FileInputStream(childFile)
                 val buffer = new Array[Byte](8 * 1024)
                 var read = 0
-                do {
-                  read = in.read(buffer)
+                while ( {read = in.read(buffer); read >= 0}) {
                   if (read > 0) {
                     if (read == buffer.length) stream.write(buffer)
-                    else stream.write(buffer.view(0, read).toArray)
+                    else stream.write(buffer.view.slice(0, read).toArray)
                   }
-                } while (read >= 0)
+                }
                 in.close()
               }
               catch {
@@ -101,8 +101,8 @@ trait Buffered extends OutputStreamFileSystem {
     else recurse("", fileRoot)
   }
 
-  override def save(nbt: NBTTagCompound) = {
-    super.save(nbt)
+  override def saveData(nbt: CompoundTag): Unit = {
+    super.saveData(nbt)
     saving = Buffered.fileSaveHandler.withPool(_.submit(new Runnable {
       override def run(): Unit = saveFiles()
     }))
@@ -134,14 +134,14 @@ trait Buffered extends OutputStreamFileSystem {
             val out = new io.FileOutputStream(childFile).getChannel
             val in = openInputChannel(childPath).get
 
-            buffer.clear()
+            buffer.asInstanceOf[Buffer].clear()
             while (in.read(buffer) != -1) {
-              buffer.flip()
+              buffer.asInstanceOf[Buffer].flip()
               out.write(buffer)
               buffer.compact()
             }
 
-            buffer.flip()
+            buffer.asInstanceOf[Buffer].flip()
             while (buffer.hasRemaining) {
               out.write(buffer)
             }

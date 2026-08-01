@@ -1,27 +1,32 @@
 package li.cil.oc.client.gui
 
-import li.cil.oc.Localization
+import com.mojang.blaze3d.systems.RenderSystem
 import li.cil.oc.client.Textures
 import li.cil.oc.client.gui.widget.ProgressBar
-import li.cil.oc.common.container
-import li.cil.oc.common.tileentity
-import net.minecraft.entity.player.InventoryPlayer
-import org.lwjgl.opengl.GL11
+import li.cil.oc.common.menu
+import net.minecraft.world.entity.player.Inventory
+import net.minecraft.network.chat.Component
+import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.client.gui.GuiGraphics
 
-class Disassembler(playerInventory: InventoryPlayer, val disassembler: tileentity.Disassembler) extends DynamicGuiContainer(new container.Disassembler(playerInventory, disassembler)) {
-  val progress = addWidget(new ProgressBar(18, 65))
+class Disassembler(state: menu.Disassembler, playerInventory: Inventory, name: Component)
+  extends DynamicGuiContainer(state, playerInventory, name) {
 
-  override def drawSecondaryForegroundLayer(mouseX: Int, mouseY: Int) = {
-    fontRendererObj.drawString(
-      Localization.localizeImmediately(disassembler.getInventoryName),
-      8, 6, 0x404040)
+  val progress = addCustomWidget(new ProgressBar(18, 65))
+
+  override protected def renderLabels(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
+    graphics.drawString(font, title, titleLabelX, titleLabelY, 0x404040)
+    drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
+
+    for (slot <- 0 until menu.slots.size()) {
+      drawSlotHighlight(graphics, menu.getSlot(slot))
+    }
   }
 
-  override def drawGuiContainerBackgroundLayer(dt: Float, mouseX: Int, mouseY: Int) {
-    GL11.glColor3f(1, 1, 1) // Required under Linux.
-    mc.renderEngine.bindTexture(Textures.guiDisassembler)
-    drawTexturedModalRect(guiLeft, guiTop, 0, 0, xSize, ySize)
+  override def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+    graphics.blit(Textures.GUI.Disassembler, leftPos, topPos, 0, 0, imageWidth, imageHeight)
     progress.level = inventoryContainer.disassemblyProgress / 100.0
-    drawWidgets()
+    drawWidgets(graphics)
   }
 }

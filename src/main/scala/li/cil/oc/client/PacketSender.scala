@@ -4,29 +4,41 @@ import li.cil.oc.Settings
 import li.cil.oc.common.CompressedPacketBuilder
 import li.cil.oc.common.PacketType
 import li.cil.oc.common.SimplePacketBuilder
+import li.cil.oc.common.menu
 import li.cil.oc.common.entity.Drone
-import li.cil.oc.common.tileentity._
-import li.cil.oc.common.tileentity.traits.Computer
+import li.cil.oc.common.blockentity._
+import li.cil.oc.common.blockentity.traits.Computer
 import net.minecraft.client.Minecraft
-import net.minecraft.client.audio.PositionedSoundRecord
-import net.minecraft.util.ResourceLocation
-import net.minecraftforge.common.util.ForgeDirection
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
+import net.minecraft.world.item.ItemStack
+import net.minecraft.core.Direction
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.sounds.SoundEvents
 
 object PacketSender {
   // Timestamp after which the next clipboard message may be sent. Used to
   // avoid spamming large packets on key repeat.
   protected var clipboardCooldown = 0L
-
-  def sendComputerPower(t: Computer, power: Boolean) {
+  
+  def sendComputerPower(computer: menu.Case, power: Boolean): Unit = {
     val pb = new SimplePacketBuilder(PacketType.ComputerPower)
 
-    pb.writeTileEntity(t)
+    pb.writeInt(computer.containerId)
     pb.writeBoolean(power)
 
     pb.sendToServer()
   }
 
-  def sendDriveMode(unmanaged: Boolean) {
+  def sendRobotPower(robot: menu.Robot, power: Boolean): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.ComputerPower)
+
+    pb.writeInt(robot.containerId)
+    pb.writeBoolean(power)
+
+    pb.sendToServer()
+  }
+
+  def sendDriveMode(unmanaged: Boolean): Unit = {
     val pb = new SimplePacketBuilder(PacketType.DriveMode)
 
     pb.writeBoolean(unmanaged)
@@ -40,16 +52,16 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendDronePower(e: Drone, power: Boolean) {
+  def sendDronePower(drone: menu.Drone, power: Boolean): Unit = {
     val pb = new SimplePacketBuilder(PacketType.DronePower)
 
-    pb.writeEntity(e)
+    pb.writeInt(drone.containerId)
     pb.writeBoolean(power)
 
     pb.sendToServer()
   }
 
-  def sendKeyDown(address: String, char: Char, code: Int) {
+  def sendKeyDown(address: String, char: Char, code: Int): Unit = {
     val pb = new SimplePacketBuilder(PacketType.KeyDown)
 
     pb.writeUTF(address)
@@ -59,7 +71,7 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendKeyUp(address: String, char: Char, code: Int) {
+  def sendKeyUp(address: String, char: Char, code: Int): Unit = {
     val pb = new SimplePacketBuilder(PacketType.KeyUp)
 
     pb.writeUTF(address)
@@ -69,12 +81,20 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendClipboard(address: String, value: String) {
+  def sendTextInput(address: String, codePt: Int): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.TextInput)
+
+    pb.writeUTF(address)
+    pb.writeInt(codePt)
+
+    pb.sendToServer()
+  }
+
+  def sendClipboard(address: String, value: String): Unit = {
     if (value != null && !value.isEmpty) {
-      if (value.length > Settings.get.maxClipboardTextLength || System.currentTimeMillis() < clipboardCooldown) {
-        val player = Minecraft.getMinecraft.thePlayer
-        val handler = Minecraft.getMinecraft.getSoundHandler
-        handler.playSound(new PositionedSoundRecord(new ResourceLocation("note.harp"), 1, 1, player.posX.toFloat, player.posY.toFloat, player.posZ.toFloat))
+      if (value.length > 64 * 1024 || System.currentTimeMillis() < clipboardCooldown) {
+        val handler = Minecraft.getInstance.getSoundManager
+        handler.play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_HARP.value, 1, 1))
       }
       else {
         clipboardCooldown = System.currentTimeMillis() + value.length / 10
@@ -90,7 +110,15 @@ object PacketSender {
     }
   }
 
-  def sendMouseClick(address: String, x: Double, y: Double, drag: Boolean, button: Int) {
+  def sendMachineItemStateRequest(stack: ItemStack): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.MachineItemStateRequest)
+
+    pb.writeItemStack(stack)
+
+    pb.sendToServer()
+  }
+
+  def sendMouseClick(address: String, x: Double, y: Double, drag: Boolean, button: Int): Unit = {
     val pb = new SimplePacketBuilder(PacketType.MouseClickOrDrag)
 
     pb.writeUTF(address)
@@ -102,7 +130,7 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendMouseScroll(address: String, x: Double, y: Double, scroll: Int) {
+  def sendMouseScroll(address: String, x: Double, y: Double, scroll: Int): Unit = {
     val pb = new SimplePacketBuilder(PacketType.MouseScroll)
 
     pb.writeUTF(address)
@@ -113,7 +141,7 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendMouseUp(address: String, x: Double, y: Double, button: Int) {
+  def sendMouseUp(address: String, x: Double, y: Double, button: Int): Unit = {
     val pb = new SimplePacketBuilder(PacketType.MouseUp)
 
     pb.writeUTF(address)
@@ -133,12 +161,12 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendMultiPlace() {
+  def sendMultiPlace(): Unit = {
     val pb = new SimplePacketBuilder(PacketType.MultiPartPlace)
     pb.sendToServer()
   }
 
-  def sendPetVisibility() {
+  def sendPetVisibility(): Unit = {
     val pb = new SimplePacketBuilder(PacketType.PetVisibility)
 
     pb.writeBoolean(!Settings.get.hideOwnPet)
@@ -146,10 +174,10 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendRackMountableMapping(t: Rack, mountableIndex: Int, nodeIndex: Int, side: Option[ForgeDirection]) {
+  def sendRackMountableMapping(rack: menu.Rack, mountableIndex: Int, nodeIndex: Int, side: Option[Direction]): Unit = {
     val pb = new SimplePacketBuilder(PacketType.RackMountableMapping)
 
-    pb.writeTileEntity(t)
+    pb.writeInt(rack.containerId)
     pb.writeInt(mountableIndex)
     pb.writeInt(nodeIndex)
     pb.writeDirection(side)
@@ -157,27 +185,27 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendRackRelayState(t: Rack, enabled: Boolean) {
+  def sendRackRelayState(rack: menu.Rack, enabled: Boolean): Unit = {
     val pb = new SimplePacketBuilder(PacketType.RackRelayState)
 
-    pb.writeTileEntity(t)
+    pb.writeInt(rack.containerId)
     pb.writeBoolean(enabled)
 
     pb.sendToServer()
   }
 
-  def sendRobotAssemblerStart(t: Assembler) {
+  def sendRobotAssemblerStart(assembler: menu.Assembler): Unit = {
     val pb = new SimplePacketBuilder(PacketType.RobotAssemblerStart)
 
-    pb.writeTileEntity(t)
+    pb.writeInt(assembler.containerId)
 
     pb.sendToServer()
   }
 
-  def sendRobotStateRequest(dimension: Int, x: Int, y: Int, z: Int) {
+  def sendRobotStateRequest(dimension: ResourceLocation, x: Int, y: Int, z: Int): Unit = {
     val pb = new SimplePacketBuilder(PacketType.RobotStateRequest)
 
-    pb.writeInt(dimension)
+    pb.writeUTF(dimension.toString)
     pb.writeInt(x)
     pb.writeInt(y)
     pb.writeInt(z)
@@ -185,17 +213,17 @@ object PacketSender {
     pb.sendToServer()
   }
 
-  def sendServerPower(t: Rack, mountableIndex: Int, power: Boolean) {
+  def sendServerPower(server: menu.Server, mountableIndex: Int, power: Boolean): Unit = {
     val pb = new SimplePacketBuilder(PacketType.ServerPower)
 
-    pb.writeTileEntity(t)
+    pb.writeInt(server.containerId)
     pb.writeInt(mountableIndex)
     pb.writeBoolean(power)
 
     pb.sendToServer()
   }
 
-  def sendTextBufferInit(address: String) {
+  def sendTextBufferInit(address: String): Unit = {
     val pb = new SimplePacketBuilder(PacketType.TextBufferInit)
 
     pb.writeUTF(address)
@@ -208,6 +236,15 @@ object PacketSender {
 
     pb.writeTileEntity(t)
     pb.writeUTF(t.label)
+
+    pb.sendToServer()
+  }
+
+  def sendHoloScreenResize(screen: HoloScreen, side: Direction): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.HoloScreenResize)
+
+    pb.writeTileEntity(screen)
+    pb.writeDirection(Option(side))
 
     pb.sendToServer()
   }

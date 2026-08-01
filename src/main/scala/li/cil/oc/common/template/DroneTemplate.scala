@@ -10,10 +10,14 @@ import li.cil.oc.common.item.data.DroneData
 import li.cil.oc.common.item.data.MicrocontrollerData
 import li.cil.oc.common.item.data.RobotData
 import li.cil.oc.util.ItemUtils
-import net.minecraft.inventory.IInventory
-import net.minecraft.item.ItemStack
+import net.minecraft.core.component.DataComponents
+import net.minecraft.world.Container
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.component.CustomData
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
-import scala.collection.convert.WrapAsJava._
+import scala.collection.JavaConverters.asJavaIterable
+import scala.collection.convert.ImplicitConversionsToJava._
 
 object DroneTemplate extends Template {
   override protected val suggestedComponents = Array(
@@ -25,19 +29,21 @@ object DroneTemplate extends Template {
 
   def selectTier2(stack: ItemStack) = api.Items.get(stack) == api.Items.get(Constants.ItemName.DroneCaseTier2)
 
+  def selectTier3(stack: ItemStack) = api.Items.get(stack) == api.Items.get(Constants.ItemName.DroneCaseTier3)
+
   def selectTierCreative(stack: ItemStack) = api.Items.get(stack) == api.Items.get(Constants.ItemName.DroneCaseCreative)
 
-  def validate(inventory: IInventory): Array[AnyRef] = validateComputer(inventory)
+  def validate(inventory: Container): Array[AnyRef] = validateComputer(inventory)
 
-  def assemble(inventory: IInventory) = {
-    val items = (0 until inventory.getSizeInventory).map(inventory.getStackInSlot)
+  def assemble(inventory: Container) = {
+    val items = (0 until inventory.getContainerSize).map(inventory.getItem)
     val data = new DroneData()
     data.tier = caseTier(inventory)
     data.name = RobotData.randomName
-    data.components = items.drop(1).filter(_ != null).toArray
+    data.components = items.drop(1).filter(!_.isEmpty).toArray
     data.storedEnergy = Settings.get.bufferDrone.toInt
     val stack = api.Items.get(Constants.ItemName.Drone).createItemStack(1)
-    data.save(stack)
+    CustomData.update(DataComponents.CUSTOM_DATA, stack, nbt => data.saveData(nbt, ServerLifecycleHooks.getCurrentServer.registryAccess()))
     val energy = Settings.get.droneBaseCost + complexity(inventory) * Settings.get.droneComplexityCost
 
     Array(stack, Double.box(energy))
@@ -52,7 +58,7 @@ object DroneTemplate extends Template {
     Array(api.Items.get(itemName).createItemStack(1)) ++ info.components
   }
 
-  def register() {
+  def register(): Unit = {
     // Tier 1
     api.IMC.registerAssemblerTemplate(
       "Drone (Tier 1)",
@@ -98,6 +104,30 @@ object DroneTemplate extends Template {
         (Slot.EEPROM, Tier.Any)
       ).map(toPair)))
 
+    // Tier 2
+    api.IMC.registerAssemblerTemplate(
+      "Drone (Tier 3)",
+      "li.cil.oc.common.template.DroneTemplate.selectTier3",
+      "li.cil.oc.common.template.DroneTemplate.validate",
+      "li.cil.oc.common.template.DroneTemplate.assemble",
+      hostClass,
+      null,
+      Array(
+        Tier.Four,
+        Tier.Three,
+        Tier.Two,
+        Tier.One
+      ),
+      asJavaIterable(Iterable(
+        (Slot.Card, Tier.Three),
+        (Slot.Card, Tier.Two),
+        null,
+        (Slot.CPU, Tier.One),
+        (Slot.Memory, Tier.Two),
+        (Slot.Memory, Tier.One),
+        (Slot.EEPROM, Tier.Any)
+      ).map(toPair)))
+
     // Creative
     api.IMC.registerAssemblerTemplate(
       "Drone (Creative)",
@@ -134,10 +164,10 @@ object DroneTemplate extends Template {
       "li.cil.oc.common.template.DroneTemplate.disassemble")
   }
 
-  override protected def maxComplexity(inventory: IInventory) =
+  override protected def maxComplexity(inventory: Container) =
     if (caseTier(inventory) == Tier.Two) 8
-    else if (caseTier(inventory) == Tier.Four) 9001 // Creative
+    else if (caseTier(inventory) == Tier.Five) 9001 // Creative
     else 5
 
-  override protected def caseTier(inventory: IInventory) = ItemUtils.caseTier(inventory.getStackInSlot(0))
+  override protected def caseTier(inventory: Container) = ItemUtils.caseTier(inventory.getItem(0))
 }

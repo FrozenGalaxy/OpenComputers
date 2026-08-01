@@ -1,60 +1,74 @@
 package li.cil.oc.common.item
 
 import java.util
-
 import li.cil.oc.OpenComputers
 import li.cil.oc.client.KeyBindings
-import li.cil.oc.common.GuiType
-import li.cil.oc.common.inventory.ServerInventory
-import li.cil.oc.util.Rarity
+import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.container.ServerInventory
 import li.cil.oc.util.Tooltip
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
 
 import scala.collection.mutable
+import scala.collection.convert.ImplicitConversionsToScala._
+import net.minecraft.world.InteractionResultHolder
+import net.minecraft.world.level.Level
+import net.minecraft.world.InteractionResult
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.player.Player
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.network.chat.Component
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class Server(val parent: Delegator, val tier: Int) extends traits.Delegate {
-  override val unlocalizedName = super.unlocalizedName + tier
+class Server(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with IItemExtension {
+  @Deprecated
+  override def getDescriptionId = super.getDescriptionId + tier
 
-  override protected def tooltipName = Option(super.unlocalizedName)
-
-  override def rarity(stack: ItemStack) = Rarity.byTier(tier)
-
-  override def maxStackSize = 1
+  override protected def tooltipName = Option(unlocalizedName)
 
   private object HelperInventory extends ServerInventory {
-    var container: ItemStack = null
+    var container = ItemStack.EMPTY
+
+    override def rackSlot = -1
   }
 
-  override protected def tooltipExtended(stack: ItemStack, tooltip: util.List[String]) {
+  override protected def tooltipExtended(stack: ItemStack, tooltip: util.List[Component]): Unit = {
     super.tooltipExtended(stack, tooltip)
     if (KeyBindings.showExtendedTooltips) {
       HelperInventory.container = stack
       HelperInventory.reinitialize()
-      val items = mutable.Map.empty[String, Int]
-      for (item <- (0 until HelperInventory.getSizeInventory).map(HelperInventory.getStackInSlot) if item != null) {
-        val itemName = item.getDisplayName
-        items += itemName -> (if (items.contains(itemName)) items(itemName) + 1 else 1)
+      val stacks = mutable.Map.empty[String, Int]
+      for (aStack <- (0 until HelperInventory.getContainerSize).map(HelperInventory.getItem) if !aStack.isEmpty) {
+        val displayName = aStack.getHoverName.getString
+        stacks += displayName -> (if (stacks.contains(displayName)) stacks(displayName) + 1 else 1)
       }
-      if (items.nonEmpty) {
-        tooltip.addAll(Tooltip.get("Server.Components"))
-        for (itemName <- items.keys.toArray.sorted) {
-          tooltip.add("- " + items(itemName) + "x " + itemName)
+      if (stacks.nonEmpty) {
+        for (curr <- Tooltip.get("server.Components")) {
+          tooltip.add(Component.literal(curr).setStyle(Tooltip.DefaultStyle))
+        }
+        for (itemName <- stacks.keys.toArray.sorted) {
+          tooltip.add(Component.literal("- " + stacks(itemName) + "x " + itemName).setStyle(Tooltip.DefaultStyle))
         }
       }
     }
   }
 
-  override def onItemRightClick(stack: ItemStack, world: World, player: EntityPlayer) = {
-    if (!player.isSneaking) {
-      // Open the GUI immediately on the client, too, to avoid the player
-      // changing the current slot before it actually opens, which can lead to
-      // desynchronization of the player inventory.
-      player.openGui(OpenComputers, GuiType.Server.id, world, 0, 0, 0)
-      player.swingItem()
+  override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
+    if (!player.isCrouching) {
+      if (!level.isClientSide) player match {
+        case srvPlr: ServerPlayer => MenuTypes.openServerGui(srvPlr, new ServerInventory {
+            override def container = stack
+
+            override def rackSlot = -1
+
+            override def stillValid(player: Player) = player == srvPlr
+          }, -1)
+        case _ =>
+      }
+      player.swing(InteractionHand.MAIN_HAND)
     }
-    stack
+    new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
   }
 
 }

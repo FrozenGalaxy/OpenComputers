@@ -1,38 +1,42 @@
 package li.cil.oc.server.component
 
 import java.util
-
 import com.google.common.base.Charsets
 import li.cil.oc.Constants
-import li.cil.oc.common.Tier
-import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
-import li.cil.oc.api.driver.DeviceInfo.DeviceClass
 import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.Network
 import li.cil.oc.api.component.RackBusConnectable
 import li.cil.oc.api.driver.DeviceInfo
+import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
+import li.cil.oc.api.driver.DeviceInfo.DeviceClass
 import li.cil.oc.api.internal.Rack
 import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.api.network._
-import li.cil.oc.api.prefab
+import li.cil.oc.api.prefab.AbstractManagedEnvironment
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import li.cil.oc.common.Tier
+import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.server.{PacketSender => ServerPacketSender}
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
 import net.minecraft.nbt._
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsJava._
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToJava._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
 
-class NetworkCard(val host: EnvironmentHost) extends prefab.ManagedEnvironment with RackBusConnectable with DeviceInfo with traits.WakeMessageAware {
-  protected val visibility = host match {
+class NetworkCard(val host: EnvironmentHost) extends AbstractManagedEnvironment with RackBusConnectable with DeviceInfo with traits.WakeMessageAware {
+  protected val visibility: Visibility = host match {
     case _: Rack => Visibility.Neighbors
     case _ => Visibility.Network
   }
 
-  override val node = Network.newNode(this, visibility).
+  override val node: Component = Network.newNode(this, visibility).
     withComponent("modem", Visibility.Neighbors).
     create()
 
@@ -112,17 +116,13 @@ class NetworkCard(val host: EnvironmentHost) extends prefab.ManagedEnvironment w
     result(true)
   }
 
-  //Removed in MC 1.11
-  @Callback(direct = true, doc = """function():number -- Gets the maximum packet size (config setting).""")
-  def maxPacketSize(context: Context, args: Arguments): Array[AnyRef] = result(Settings.get.maxNetworkPacketSize)
-
-  protected def doSend(packet: Packet) = visibility match {
+  protected def doSend(packet: Packet): Unit = visibility match {
     case Visibility.Neighbors => node.sendToNeighbors("network.message", packet)
     case Visibility.Network => node.sendToReachable("network.message", packet)
     case _ => // Ignore.
   }
 
-  protected def doBroadcast(packet: Packet) = visibility match {
+  protected def doBroadcast(packet: Packet): Unit = visibility match {
     case Visibility.Neighbors => node.sendToNeighbors("network.message", packet)
     case Visibility.Network => node.sendToReachable("network.message", packet)
     case _ => // Ignore.
@@ -130,14 +130,14 @@ class NetworkCard(val host: EnvironmentHost) extends prefab.ManagedEnvironment w
 
   // ----------------------------------------------------------------------- //
 
-  override def onDisconnect(node: Node) {
+  override def onDisconnect(node: Node): Unit = {
     super.onDisconnect(node)
     if (node == this.node) {
       openPorts.clear()
     }
   }
 
-  override def onMessage(message: Message) = {
+  override def onMessage(message: Message): Unit = {
     super.onMessage(message)
     if ((message.name == "computer.stopped" || message.name == "computer.started") && node.isNeighborOf(message.source))
       openPorts.clear()
@@ -161,26 +161,29 @@ class NetworkCard(val host: EnvironmentHost) extends prefab.ManagedEnvironment w
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
+  private final val OpenPortsTag = "openPorts"
+
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
     assert(openPorts.isEmpty)
-    openPorts ++= nbt.getIntArray("openPorts")
-    loadWakeMessage(nbt)
+    for(ports <- holder.getComponent(OCComponents.OPEN_PORTS))
+      openPorts ++= ports
+    loadWakeMessage(holder)
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setIntArray("openPorts", openPorts.toArray)
-    saveWakeMessage(nbt)
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    holder.setComponent(OCComponents.OPEN_PORTS, openPorts.toArray)
+    saveWakeMessage(holder)
   }
 
   // ----------------------------------------------------------------------- //
 
-  protected def checkPort(port: Int) =
+  protected def checkPort(port: Int): Int =
     if (port < 1 || port > 0xFFFF) throw new IllegalArgumentException("invalid port number")
     else port
 
-  private def networkActivity() {
+  private def networkActivity(): Unit = {
     host match {
       case h: EnvironmentHost => ServerPacketSender.sendNetworkActivity(node, h)
       case _ =>

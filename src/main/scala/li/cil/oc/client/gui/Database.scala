@@ -1,32 +1,37 @@
 package li.cil.oc.client.gui
 
+import com.mojang.blaze3d.systems.RenderSystem
 import li.cil.oc.client.Textures
 import li.cil.oc.common.Tier
-import li.cil.oc.common.container
-import li.cil.oc.common.inventory.DatabaseInventory
-import net.minecraft.entity.player.InventoryPlayer
-import org.lwjgl.opengl.GL11
+import li.cil.oc.common.menu
+import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.player.Inventory
 
-class Database(playerInventory: InventoryPlayer, val databaseInventory: DatabaseInventory) extends DynamicGuiContainer(new container.Database(playerInventory, databaseInventory)) with traits.LockedHotbar {
-  ySize = 256
+class Database(state: menu.Database, playerInventory: Inventory, name: Component)
+  extends DynamicGuiContainer(state, playerInventory, name)
+  with traits.LockedHotbar[menu.Database] {
 
-  override def lockedStack = databaseInventory.container
+  imageHeight = 256
 
-  override def drawSecondaryForegroundLayer(mouseX: Int, mouseY: Int) {}
+  override def lockedStack = inventoryContainer.container
 
-  override protected def drawGuiContainerBackgroundLayer(dt: Float, mouseX: Int, mouseY: Int) {
-    GL11.glColor4f(1, 1, 1, 1)
-    mc.renderEngine.bindTexture(Textures.guiDatabase)
-    drawTexturedModalRect(guiLeft, guiTop, 0, 0, xSize, ySize)
+  override protected def renderLabels(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit =
+    drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
 
-    if (databaseInventory.tier > Tier.One) {
-      mc.renderEngine.bindTexture(Textures.guiDatabase1)
-      drawTexturedModalRect(guiLeft, guiTop, 0, 0, xSize, ySize)
+  override def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {}
+
+  override protected def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {
+    RenderSystem.setShaderColor(1, 1, 1, 1)
+    graphics.blit(Textures.GUI.Database, leftPos, topPos, 0, 0, imageWidth, imageHeight)
+
+    if (inventoryContainer.tier > Tier.One) {
+      graphics.blit(Textures.GUI.Database1, leftPos, topPos, 0, 0, imageWidth, imageHeight)
     }
 
-    if (databaseInventory.tier > Tier.Two) {
-      mc.renderEngine.bindTexture(Textures.guiDatabase2)
-      drawTexturedModalRect(guiLeft, guiTop, 0, 0, xSize, ySize)
+    if (inventoryContainer.tier > Tier.Two) {
+      graphics.blit(Textures.GUI.Database2, leftPos, topPos, 0, 0, imageWidth, imageHeight)
     }
   }
 }

@@ -1,9 +1,14 @@
 package li.cil.oc.server.network
 
 import li.cil.oc.Settings
+import li.cil.oc.util.ExtendedDataComponentHolder._
 import li.cil.oc.api.network
 import li.cil.oc.api.network.{Node => ImmutableNode}
-import net.minecraft.nbt.NBTTagCompound
+import li.cil.oc.common.datacomponents.OCComponents
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
 trait Connector extends network.Connector with Node {
   var localBufferSize = 0.0
@@ -84,7 +89,7 @@ trait Connector extends network.Connector with Node {
     }
   }
 
-  def setLocalBufferSize(size: Double) {
+  def setLocalBufferSize(size: Double): Unit = {
     val clampedSize = math.max(size, 0)
     this.synchronized(distributor match {
       case Some(d) => d.synchronized {
@@ -109,22 +114,25 @@ trait Connector extends network.Connector with Node {
 
   // ----------------------------------------------------------------------- //
 
-  override def onDisconnect(node: ImmutableNode) {
+  override def onDisconnect(node: ImmutableNode): Unit = {
     super.onDisconnect(node)
     if (node == this) {
-      this.synchronized(distributor = None)
+      this.synchronized(this.distributor = None)
     }
   }
 
   // ----------------------------------------------------------------------- //
 
-  override def load(nbt: NBTTagCompound) {
-    super.load(nbt)
-    localBuffer = nbt.getDouble("buffer")
+  override def loadData(holder: DataComponentHolder): Unit = {
+    super.loadData(holder)
+
+    for(buffer <- holder.getComponent(OCComponents.CHARGE)) {
+      localBuffer = buffer
+    }
   }
 
-  override def save(nbt: NBTTagCompound) {
-    super.save(nbt)
-    nbt.setDouble("buffer", math.min(localBuffer, localBufferSize))
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    super.saveData(holder)
+    holder.setComponent(OCComponents.CHARGE, localBuffer)
   }
 }

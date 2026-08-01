@@ -1,14 +1,16 @@
 package li.cil.oc.client.renderer.markdown.segment
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.client.renderer.markdown.Document
-import net.minecraft.client.gui.FontRenderer
+import net.minecraft.client.gui.{Font, GuiGraphics}
 import org.lwjgl.opengl.GL11
 
 import scala.collection.mutable
 import scala.util.matching.Regex
 
 private[markdown] class TextSegment(val parent: Segment, val text: String) extends BasicTextSegment {
-  override def render(x: Int, y: Int, indent: Int, maxWidth: Int, renderer: FontRenderer, mouseX: Int, mouseY: Int): Option[InteractiveSegment] = {
+  override def render(graphics: GuiGraphics, x: Int, y: Int, indent: Int, maxWidth: Int, renderer: Font, mouseX: Int, mouseY: Int): Option[InteractiveSegment] = {
     var currentX = x + indent
     var currentY = y
     var chars = text
@@ -16,15 +18,16 @@ private[markdown] class TextSegment(val parent: Segment, val text: String) exten
     val wrapIndent = computeWrapIndent(renderer)
     var numChars = maxChars(chars, maxWidth - indent, maxWidth - wrapIndent, renderer)
     var hovered: Option[InteractiveSegment] = None
-    while (chars.length > 0) {
+    val stack = graphics.pose
+    while (chars.nonEmpty) {
       val part = chars.take(numChars)
       hovered = hovered.orElse(resolvedInteractive.fold(None: Option[InteractiveSegment])(_.checkHovered(mouseX, mouseY, currentX, currentY, stringWidth(part, renderer), (Document.lineHeight(renderer) * resolvedScale).toInt)))
-      GL11.glPushMatrix()
-      GL11.glTranslatef(currentX, currentY, 0)
-      GL11.glScalef(resolvedScale, resolvedScale, resolvedScale)
-      GL11.glTranslatef(-currentX, -currentY, 0)
-      renderer.drawString(resolvedFormat + part, currentX, currentY, resolvedColor)
-      GL11.glPopMatrix()
+      stack.pushPose()
+      stack.translate(currentX, currentY, 0)
+      stack.scale(resolvedScale, resolvedScale, resolvedScale)
+      stack.translate(-currentX, -currentY, 0)
+      graphics.drawString(renderer, resolvedFormat + part, currentX, currentY, resolvedColor)
+      stack.popPose()
       currentX = x + wrapIndent
       currentY += lineHeight(renderer)
       chars = chars.drop(numChars).dropWhile(_.isWhitespace)
@@ -62,9 +65,9 @@ private[markdown] class TextSegment(val parent: Segment, val text: String) exten
 
   // ----------------------------------------------------------------------- //
 
-  override protected def lineHeight(renderer: FontRenderer): Int = (super.lineHeight(renderer) * resolvedScale).toInt
+  override protected def lineHeight(renderer: Font): Int = (super.lineHeight(renderer) * resolvedScale).toInt
 
-  override protected def stringWidth(s: String, renderer: FontRenderer): Int = (renderer.getStringWidth(resolvedFormat + s) * resolvedScale).toInt
+  override protected def stringWidth(s: String, renderer: Font): Int = (renderer.width(resolvedFormat + s) * resolvedScale).toInt
 
   // ----------------------------------------------------------------------- //
 

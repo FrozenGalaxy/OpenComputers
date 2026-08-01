@@ -1,3 +1,8 @@
 package li.cil.oc.common.item
 
-class DiamondChip(val parent: Delegator) extends traits.Delegate
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.neoforged.neoforge.common.extensions.IItemExtension
+
+
+class DiamondChip(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension

@@ -1,3 +1,8 @@
 package li.cil.oc.common.item
 
-class UpgradeSign(val parent: Delegator) extends traits.Delegate with traits.ItemTier
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.neoforged.neoforge.common.extensions.IItemExtension
+
+
+class UpgradeSign(props: Properties) extends Item(props) with traits.SimpleItem with traits.ItemTier with IItemExtension

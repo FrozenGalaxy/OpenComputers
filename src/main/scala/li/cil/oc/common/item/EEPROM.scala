@@ -1,23 +1,33 @@
 package li.cil.oc.common.item
 
 import li.cil.oc.Settings
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import li.cil.oc.util.ExtendedItemStack._
+import li.cil.oc.util.{BlockPosition, ItemUtils}
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.LevelReader
+import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.player.Player
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class EEPROM extends traits.SimpleItem {
-  override def doesSneakBypassUse(world: World, x: Int, y: Int, z: Int, player: EntityPlayer): Boolean = true
+class EEPROM(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
+  override def getName(stack: ItemStack): Component = {
+    stack.getComponent(OCComponents.LABEL).foreach(label => return Component.literal(label))
 
-  override def getItemStackDisplayName(stack: ItemStack): String = {
-    if (stack.hasTagCompound) {
-      val tag = stack.getTagCompound
-      if (tag.hasKey(Settings.namespace + "data")) {
-        val data = tag.getCompoundTag(Settings.namespace + "data")
-        if (data.hasKey(Settings.namespace + "label")) {
-          return data.getString(Settings.namespace + "label")
-        }
+    // Legacy fallback for stacks from worlds created before data components.
+    val tag = ItemUtils.getTag(stack)
+    if (tag != null && tag.contains(Settings.namespace + "data")) {
+      val data = tag.getCompound(Settings.namespace + "data")
+      if (data.contains(Settings.namespace + "label")) {
+        return Component.literal(data.getString(Settings.namespace + "label"))
       }
     }
-    super.getItemStackDisplayName(stack)
+    super.getName(stack)
   }
+
+  override def doesSneakBypassUse(stack: ItemStack, world: LevelReader, pos: BlockPos, player: Player): Boolean = true
 }

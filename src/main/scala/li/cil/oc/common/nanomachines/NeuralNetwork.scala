@@ -6,17 +6,23 @@ import li.cil.oc.api
 import li.cil.oc.api.Persistable
 import li.cil.oc.api.nanomachines.Behavior
 import li.cil.oc.api.nanomachines.BehaviorProvider
+import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.server.PacketSender
 import li.cil.oc.util.ExtendedNBT._
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.entity.player.EntityPlayerMP
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraft.util.ChatComponentText
-import net.minecraft.util.EnumChatFormatting
-import net.minecraftforge.common.util.Constants.NBT
+import li.cil.oc.util.ExtendedDataComponentHolder._
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.Tag
+import net.minecraft.network.chat.Component
+import net.minecraft.{ChatFormatting, Util}
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.entity.player.Player
+import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-import scala.collection.convert.WrapAsScala._
+import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 class NeuralNetwork(controller: ControllerImpl) extends Persistable {
@@ -58,7 +64,7 @@ class NeuralNetwork(controller: ControllerImpl) extends Persistable {
     }
 
     // Build connections.
-    val rng = new Random(controller.player.getEntityWorld.rand.nextInt())
+    val rng = new Random(controller.player.level.random.nextInt())
 
     def connect[Sink <: ConnectorNeuron, Source <: Neuron](sinks: Iterable[Sink], sources: mutable.ArrayBuffer[Source]): Unit = {
       // Shuffle sink list to give each entry the same chance.
@@ -99,10 +105,10 @@ class NeuralNetwork(controller: ControllerImpl) extends Persistable {
   // Enter debug configuration, one input -> one behavior, and list mapping in console.
   def debug(): Unit = {
     val log = controller.player match {
-      case playerMP: EntityPlayerMP => (s: String) => PacketSender.sendClientLog(s, playerMP)
+      case playerMP: ServerPlayer => (s: String) => PacketSender.sendClientLog(s, playerMP)
       case _ => (s: String) => OpenComputers.log.info(s)
     }
-    log(s"Creating debug configuration for nanomachines in player ${controller.player.getDisplayName}.")
+    log(s"Creating debug configuration for nanomachines in player ${controller.player.getDisplayName.getString}.")
 
     behaviors.clear()
     behaviors ++= api.Nanomachines.getProviders.
@@ -123,13 +129,13 @@ class NeuralNetwork(controller: ControllerImpl) extends Persistable {
     }
   }
 
-  def print(player: EntityPlayer): Unit = {
+  def print(player: Player): Unit = {
     val sb = StringBuilder.newBuilder
     def colored(value: Any, enabled: Boolean) = {
-      if (enabled) sb.append(EnumChatFormatting.GREEN)
-      else sb.append(EnumChatFormatting.RED)
+      if (enabled) sb.append(ChatFormatting.GREEN)
+      else sb.append(ChatFormatting.RED)
       sb.append(value)
-      sb.append(EnumChatFormatting.RESET)
+      sb.append(ChatFormatting.RESET)
     }
     for (behavior <- behaviors) {
       val name = Option(behavior.behavior.getNameHint).getOrElse(behavior.behavior.getClass.getSimpleName)
@@ -153,59 +159,75 @@ class NeuralNetwork(controller: ControllerImpl) extends Persistable {
         }
       }
       sb.append(")")
-      player.addChatMessage(new ChatComponentText(sb.toString()))
+      player.sendSystemMessage(Component.literal(sb.toString()))
       sb.clear()
     }
   }
 
-  override def save(nbt: NBTTagCompound): Unit = {
-    save(nbt, forItem = false)
+  override def saveData(holder: MutableDataComponentHolder): Unit = {
+    val tag = new CompoundTag()
+    saveData(tag, forItem = false)
+    holder.setComponent(OCComponents.NANOMACHINES_NETWORK_INFO, tag)
   }
 
-  def save(nbt: NBTTagCompound, forItem: Boolean): Unit = {
-    nbt.setNewTagList("triggers", triggers.map(t => {
-      val nbt = new NBTTagCompound()
-      nbt.setBoolean("isActive", t.isActive && !forItem)
+  override def loadData(holder: DataComponentHolder): Unit = {
+    for(tag <- holder.getComponent(OCComponents.NANOMACHINES_NETWORK_INFO)) {
+      loadData(tag)
+    }
+  }
+
+  private final val TriggersTag = "triggers"
+  private final val IsActiveTag = "isActive"
+  private final val ConnectorsTag = "connectors"
+  private final val BehaviorsTag = "behaviors"
+  private final val BehaviorTag = "behavior"
+  private final val TriggerInputsTag = "triggerInputs"
+  private final val ConnectorInputsTag = "connectorInputs"
+
+  def saveData(nbt: CompoundTag, forItem: Boolean): Unit = {
+    nbt.setNewTagList(TriggersTag, triggers.map(t => {
+      val nbt = new CompoundTag()
+      nbt.putBoolean(IsActiveTag, t.isActive && !forItem)
       nbt
     }))
 
-    nbt.setNewTagList("connectors", connectors.map(c => {
-      val nbt = new NBTTagCompound()
-      nbt.setIntArray("triggerInputs", c.inputs.map(triggers.indexOf(_)).filter(_ >= 0).toArray)
+    nbt.setNewTagList(ConnectorsTag, connectors.map(c => {
+      val nbt = new CompoundTag()
+      nbt.putIntArray(TriggerInputsTag, c.inputs.map(triggers.indexOf(_)).filter(_ >= 0).toArray)
       nbt
     }))
 
-    nbt.setNewTagList("behaviors", behaviors.map(b => {
-      val nbt = new NBTTagCompound()
-      nbt.setIntArray("triggerInputs", b.inputs.map(triggers.indexOf(_)).filter(_ >= 0).toArray)
-      nbt.setIntArray("connectorInputs", b.inputs.map(connectors.indexOf(_)).filter(_ >= 0).toArray)
-      nbt.setTag("behavior", b.provider.writeToNBT(b.behavior))
+    nbt.setNewTagList(BehaviorsTag, behaviors.map(b => {
+      val nbt = new CompoundTag()
+      nbt.putIntArray(TriggerInputsTag, b.inputs.map(triggers.indexOf(_)).filter(_ >= 0).toArray)
+      nbt.putIntArray(ConnectorInputsTag, b.inputs.map(connectors.indexOf(_)).filter(_ >= 0).toArray)
+      nbt.put(BehaviorTag, b.provider.save(b.behavior))
       nbt
     }))
   }
 
-  override def load(nbt: NBTTagCompound): Unit = {
+  def loadData(nbt: CompoundTag): Unit = {
     triggers.clear()
-    nbt.getTagList("triggers", NBT.TAG_COMPOUND).foreach((t: NBTTagCompound) => {
+    nbt.getList(TriggersTag, Tag.TAG_COMPOUND).foreach((t: CompoundTag) => {
       val neuron = new TriggerNeuron()
-      neuron.isActive = t.getBoolean("isActive")
+      neuron.isActive = t.getBoolean(IsActiveTag)
       triggers += neuron
     })
 
     connectors.clear()
-    nbt.getTagList("connectors", NBT.TAG_COMPOUND).foreach((t: NBTTagCompound) => {
+    nbt.getList(ConnectorsTag, Tag.TAG_COMPOUND).foreach((t: CompoundTag) => {
       val neuron = new ConnectorNeuron()
-      neuron.inputs ++= t.getIntArray("triggerInputs").map(triggers.apply)
+      neuron.inputs ++= t.getIntArray(TriggerInputsTag).map(triggers.apply)
       connectors += neuron
     })
 
     behaviors.clear()
-    nbt.getTagList("behaviors", NBT.TAG_COMPOUND).foreach((t: NBTTagCompound) => {
-      api.Nanomachines.getProviders.find(p => p.readFromNBT(controller.player, t.getCompoundTag("behavior")) match {
+    nbt.getList(BehaviorsTag, Tag.TAG_COMPOUND).foreach((t: CompoundTag) => {
+      api.Nanomachines.getProviders.find(p => p.load(controller.player, t.getCompound(BehaviorTag)) match {
         case b: Behavior =>
           val neuron = new BehaviorNeuron(p, b)
-          neuron.inputs ++= t.getIntArray("triggerInputs").map(triggers.apply)
-          neuron.inputs ++= t.getIntArray("connectorInputs").map(connectors.apply)
+          neuron.inputs ++= t.getIntArray(TriggerInputsTag).map(triggers.apply)
+          neuron.inputs ++= t.getIntArray(ConnectorInputsTag).map(connectors.apply)
           behaviors += neuron
           true // Done.
         case _ =>
@@ -226,9 +248,9 @@ class NeuralNetwork(controller: ControllerImpl) extends Persistable {
   }
 
   class ConnectorNeuron extends Neuron {
-    val inputs = mutable.ArrayBuffer.empty[Neuron]
+    val inputs: ArrayBuffer[Neuron] = mutable.ArrayBuffer.empty[Neuron]
 
-    override def isActive = inputs.forall(_.isActive)
+    override def isActive: Boolean = inputs.forall(_.isActive)
   }
 
   class BehaviorNeuron(val provider: BehaviorProvider, val behavior: Behavior) extends ConnectorNeuron

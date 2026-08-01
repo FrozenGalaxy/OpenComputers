@@ -1,20 +1,21 @@
 package li.cil.oc.common.item.traits
 
 import java.util
-
-import cpw.mods.fml.relauncher.Side
-import cpw.mods.fml.relauncher.SideOnly
 import li.cil.oc.Localization
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
+import li.cil.oc.util.Tooltip
+import net.neoforged.api.distmarker.{Dist, OnlyIn}
+import net.minecraft.world.level.Level
+import net.minecraft.world.item.ItemStack
+import net.minecraft.network.chat.Component
+import net.minecraft.world.item.Item.TooltipContext
+import net.minecraft.world.item.TooltipFlag
 
-trait ItemTier extends Delegate {
-  self: Delegate =>
-  @SideOnly(Side.CLIENT)
-  override def tooltipLines(stack: ItemStack, player: EntityPlayer, tooltip: util.List[String], advanced: Boolean) {
-    super.tooltipLines(stack, player, tooltip, advanced)
-    if (advanced) {
-      tooltip.add(Localization.Tooltip.Tier(tierFromDriver(stack) + 1))
+trait ItemTier extends SimpleItem {
+  @OnlyIn(Dist.CLIENT)
+  override def appendHoverText(stack: ItemStack, context: TooltipContext, tooltip: util.List[Component], flag: TooltipFlag): Unit = {
+    super.appendHoverText(stack, context, tooltip, flag)
+    if (flag.isAdvanced) {
+      tooltip.add(Component.literal(Localization.Tooltip.Tier(tierFromDriver(stack) + 1)).setStyle(Tooltip.DefaultStyle))
     }
   }
 }

@@ -1,47 +1,44 @@
 package li.cil.oc.client.renderer.tileentity
 
+import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.client.Textures
+import li.cil.oc.client.renderer.RenderTypes
+import li.cil.oc.common.blockentity.Geolyzer
 import li.cil.oc.util.RenderState
-import net.minecraft.client.renderer.Tessellator
-import net.minecraft.client.renderer.texture.TextureMap
-import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer
-import net.minecraft.tileentity.TileEntity
-import org.lwjgl.opengl.GL11
+import net.minecraft.client.renderer.MultiBufferSource
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 
-object GeolyzerRenderer extends TileEntitySpecialRenderer {
-  override def renderTileEntityAt(tileEntity: TileEntity, x: Double, y: Double, z: Double, f: Float) {
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: entering (aka: wasntme)")
+object GeolyzerRenderer extends BlockEntityRendererProvider[Geolyzer] {
+  override def create(ctx: BlockEntityRendererProvider.Context): GeolyzerRenderer =
+    new GeolyzerRenderer()
+}
 
-    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS)
+class GeolyzerRenderer extends BlockEntityRenderer[Geolyzer] {
 
-    RenderState.disableLighting()
-    RenderState.makeItBlend()
-    RenderState.setBlendAlpha(1)
+  override def render(geolyzer: Geolyzer, dt: Float, stack: PoseStack, buffer: MultiBufferSource, light: Int, overlay: Int): Unit = {
+    RenderState.checkError(getClass.getName + ".render: entering")
 
-    GL11.glPushMatrix()
+    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F)
 
-    GL11.glTranslated(x + 0.5, y + 0.5, z + 0.5)
-    GL11.glScaled(1.0025, -1.0025, 1.0025)
-    GL11.glTranslatef(-0.5f, -0.5f, -0.5f)
+    stack.pushPose()
 
-    bindTexture(TextureMap.locationBlocksTexture)
-    val t = Tessellator.instance
-    t.startDrawingQuads()
+    stack.translate(0.5, 0.5, 0.5)
+    RenderState.mirrorScale(stack, 1.0025f, -1.0025f, 1.0025f)
+    stack.translate(-0.5, -0.5, -0.5)
 
-    val topOn = Textures.Geolyzer.iconTopOn
-    t.addVertexWithUV(0, 0, 1, topOn.getMinU, topOn.getMaxV)
-    t.addVertexWithUV(1, 0, 1, topOn.getMaxU, topOn.getMaxV)
-    t.addVertexWithUV(1, 0, 0, topOn.getMaxU, topOn.getMinV)
-    t.addVertexWithUV(0, 0, 0, topOn.getMinU, topOn.getMinV)
+    val r = buffer.getBuffer(RenderTypes.BLOCK_OVERLAY)
+    val matrix = stack.last.pose
 
-    t.draw()
+    val icon = Textures.getSprite(Textures.Block.GeolyzerTopOn)
+    r.addVertex(matrix, 0, 0, 1).setUv(icon.getU0, icon.getV1)
+    r.addVertex(matrix, 1, 0, 1).setUv(icon.getU1, icon.getV1)
+    r.addVertex(matrix, 1, 0, 0).setUv(icon.getU1, icon.getV0)
+    r.addVertex(matrix, 0, 0, 0).setUv(icon.getU0, icon.getV0)
 
-    RenderState.enableLighting()
+    stack.popPose()
 
-    GL11.glPopMatrix()
-    GL11.glPopAttrib()
-
-    RenderState.checkError(getClass.getName + ".renderTileEntityAt: leaving")
+    RenderState.checkError(getClass.getName + ".render: leaving")
   }
-
 }

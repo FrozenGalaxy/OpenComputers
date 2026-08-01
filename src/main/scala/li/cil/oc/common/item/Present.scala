@@ -1,35 +1,46 @@
 package li.cil.oc.common.item
 
 import java.util.Random
-
 import li.cil.oc.Constants
 import li.cil.oc.OpenComputers
 import li.cil.oc.api
 import li.cil.oc.util.InventoryUtils
 import li.cil.oc.util.ItemUtils
-import net.minecraft.entity.player.EntityPlayer
-import net.minecraft.item.ItemStack
-import net.minecraft.world.World
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Item.Properties
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.crafting.RecipeManager
 
 import scala.collection.mutable
+import net.minecraft.world.item.CreativeModeTab
+import net.minecraft.core.NonNullList
+import net.minecraft.world.level.Level
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.InteractionResultHolder
+import net.minecraft.world.InteractionResult
+import net.minecraft.world.level.block.SoundType
+import net.minecraft.sounds.SoundSource
+import net.minecraft.sounds.SoundEvents
+import net.neoforged.neoforge.common.extensions.IItemExtension
 
-class Present(val parent: Delegator) extends traits.Delegate {
-  showInItemList = false
-
-  override def onItemRightClick(stack: ItemStack, world: World, player: EntityPlayer) = {
-    if (stack.stackSize > 0) {
-      stack.stackSize -= 1
-      if (!world.isRemote) {
-        world.playSoundAtEntity(player, "random.levelup", 0.2f, 1f)
+class Present(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
+  override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
+    if (stack.getCount > 0) {
+      stack.shrink(1)
+      if (!level.isClientSide) {
+        level.playSound(player, player.getX, player.getY, player.getZ, SoundEvents.PLAYER_LEVELUP, SoundSource.MASTER, 0.2f, 1f)
+        Present.recipeManager = level.getRecipeManager
         val present = Present.nextPresent()
         InventoryUtils.addToPlayerInventory(present, player)
       }
     }
-    stack
+    new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
   }
 }
 
 object Present {
+  private var recipeManager: RecipeManager = null
+
   private lazy val Presents = {
     val result = mutable.ArrayBuffer.empty[ItemStack]
 
@@ -38,7 +49,7 @@ object Present {
       if (item != null) {
         val stack = item.createItemStack(1)
         // Only if it can be crafted (wasn't disabled in the config).
-        if (ItemUtils.getIngredients(stack).nonEmpty) {
+        if (ItemUtils.getIngredients(recipeManager, stack).nonEmpty) {
           for (i <- 0 until weight) result += stack
         }
       }
@@ -130,5 +141,5 @@ object Present {
 
   private val rng = new Random()
 
-  def nextPresent() = Presents(rng.nextInt(Presents.length)).copy()
+  private def nextPresent(): ItemStack = Presents(rng.nextInt(Presents.length)).copy()
 }

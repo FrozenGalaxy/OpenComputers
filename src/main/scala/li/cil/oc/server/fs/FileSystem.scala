@@ -1,32 +1,38 @@
 package li.cil.oc.server.fs
 
 import java.io
+import java.nio.file.Paths
 import java.net.MalformedURLException
 import java.net.URISyntaxException
 import java.net.URL
 import java.util.UUID
-
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
+import li.cil.oc.util.ExtendedDataComponentHolder._
 import li.cil.oc.api
 import li.cil.oc.api.fs.Label
 import li.cil.oc.api.network.EnvironmentHost
-import li.cil.oc.common.item.Delegator
+import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.item.traits.FileSystemLike
-import li.cil.oc.integration.Mods
-import li.cil.oc.integration.computercraft.DriverComputerCraftMedia
 import li.cil.oc.server.component
-import net.minecraft.item.ItemStack
-import net.minecraft.nbt.NBTTagCompound
-import net.minecraftforge.common.DimensionManager
+import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.world.item.ItemStack
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.level.storage.LevelResource
+import net.neoforged.fml.loading.FMLLoader
+import net.neoforged.neoforge.common.MutableDataComponentHolder
+import net.neoforged.neoforge.server.ServerLifecycleHooks
 
 import scala.util.Try
 
 object FileSystem extends api.detail.FileSystemAPI {
   lazy val isCaseInsensitive: Boolean = Settings.get.forceCaseInsensitive || (try {
     val uuid = UUID.randomUUID().toString
-    val lowerCase = new io.File(DimensionManager.getCurrentSaveRootDirectory, uuid + "oc_rox")
-    val upperCase = new io.File(DimensionManager.getCurrentSaveRootDirectory, uuid + "OC_ROX")
+    val saveDir = ServerLifecycleHooks.getCurrentServer.getWorldPath(LevelResource.ROOT).toFile
+    val lowerCase = new io.File(saveDir, uuid + "oc_rox")
+    val upperCase = new io.File(saveDir, uuid + "OC_ROX")
     // This should NEVER happen but could also lead to VERY weird bugs, so we
     // make sure the files don't exist.
     lowerCase.exists() && lowerCase.delete()
@@ -59,50 +65,56 @@ object FileSystem extends api.detail.FileSystemAPI {
     path
   }
 
-  override def fromClass(clazz: Class[_], domain: String, root: String): api.fs.FileSystem = {
-    val innerPath = ("/assets/" + domain + "/" + (root.trim + "/")).replace("//", "/")
+  override def fromResource(loc: ResourceLocation): api.fs.FileSystem = {
+    val innerPath = "assets/" + loc.getNamespace + "/" + (loc.getPath.trim + "/")
 
-    val codeSource = clazz.getProtectionDomain.getCodeSource.getLocation.getPath
-    val (codeUrl, isArchive) =
-      if (codeSource.contains(".zip!") || codeSource.contains(".jar!"))
-        (codeSource.substring(0, codeSource.lastIndexOf('!')), true)
-      else
-        (codeSource, false)
-
-    val url = Try {
-      new URL(codeUrl)
-    }.recoverWith {
-      case _: MalformedURLException => Try {
-        new URL("file://" + codeUrl)
-      }
+    // ModDevGradle exposes compiled classes and resources as separate roots.
+    // The mod file points at build/classes/java/main, so looking relative to
+    // that directory cannot find assets in build/resources/main. Resolve a
+    // real classpath directory first; packaged mods fall through to the JAR
+    // handling below.
+    Option(System.getProperty("fml.modFolders")).iterator.
+      flatMap(_.split(";").iterator).
+      flatMap { entry =>
+        entry.split("%%", 2) match {
+          case Array(namespace, root) if namespace.split(",").contains(loc.getNamespace) =>
+            Some(new io.File(root, innerPath))
+          case _ => None
+        }
+      }.
+      find(file => file.exists() && file.isDirectory) match {
+      case Some(directory) => return new ReadOnlyFileSystem(directory)
+      case _ =>
     }
-    val file = url.map(url => new io.File(url.toURI)).recoverWith {
-      case _: URISyntaxException => url.map(url => new io.File(url.getPath))
-    }.getOrElse(new io.File(codeSource))
 
-    if (isArchive) {
-      ZipFileInputStreamFileSystem.fromFile(file, innerPath.substring(1))
+    val loaders = Seq(getClass.getClassLoader, Thread.currentThread.getContextClassLoader).filter(_ != null).distinct
+    loaders.iterator.
+      flatMap(loader => Option(loader.getResource(innerPath))).
+      filter(_.getProtocol == "file").
+      flatMap(url => Try(Paths.get(url.toURI).toFile).toOption).
+      find(file => file.exists() && file.isDirectory) match {
+      case Some(directory) => return new ReadOnlyFileSystem(directory)
+      case _ =>
+    }
+
+    val modInfo = FMLLoader.getLoadingModList().getModFileById(loc.getNamespace)
+    val file = modInfo.getFile().getFilePath().toFile()
+
+    if (!file.exists) return null
+    if (!file.isDirectory) {
+      ZipFileInputStreamFileSystem.fromFile(file, innerPath)
     }
     else {
-      if (!file.exists || file.isDirectory) return null
-      new io.File(new io.File(file.getParent), innerPath) match {
+      new io.File(file, innerPath) match {
         case fsp if fsp.exists() && fsp.isDirectory =>
           new ReadOnlyFileSystem(fsp)
-        case _ =>
-          System.getProperty("java.class.path").split(System.getProperty("path.separator")).
-            find(cp => {
-              val fsp = new io.File(new io.File(cp), innerPath)
-              fsp.exists() && fsp.isDirectory
-            }) match {
-            case None => null
-            case Some(dir) => new ReadOnlyFileSystem(new io.File(new io.File(dir), innerPath))
-          }
+        case _ => null
       }
     }
   }
 
   override def fromSaveDirectory(root: String, capacity: Long, buffered: Boolean): Capacity = {
-    val path = new io.File(DimensionManager.getCurrentSaveRootDirectory, Settings.savePath + root)
+    val path = ServerLifecycleHooks.getCurrentServer.getWorldPath(new LevelResource(Settings.savePath + root)).toFile
     if (!path.isDirectory) {
       path.delete()
     }
@@ -115,13 +127,13 @@ object FileSystem extends api.detail.FileSystemAPI {
   }
 
   def removeAddress(fsStack: ItemStack): Boolean = {
-    Delegator.subItem(fsStack) match {
-      case Some(drive: FileSystemLike) => {
+    fsStack.getItem match {
+      case drive: FileSystemLike => {
         val data = li.cil.oc.integration.opencomputers.Item.dataTag(fsStack)
-        if (data.hasKey("node")) {
-          val nodeData = data.getCompoundTag("node")
-          if (nodeData.hasKey("address")) {
-            nodeData.removeTag("address")
+        if (data.contains("node")) {
+          val nodeData = data.getCompound("node")
+          if (nodeData.contains("address")) {
+            nodeData.remove("address")
             return true
           }
         }
@@ -132,12 +144,6 @@ object FileSystem extends api.detail.FileSystemAPI {
   }
 
   def fromMemory(capacity: Long): api.fs.FileSystem = new RamFileSystem(capacity)
-
-  def fromComputerCraft(mount: AnyRef): api.fs.FileSystem =
-    if (Mods.ComputerCraft.isAvailable) {
-      DriverComputerCraftMedia.createFileSystem(mount).orNull
-    }
-    else null
 
   override def asReadOnly(fileSystem: api.fs.FileSystem): api.fs.FileSystem =
     if (fileSystem.isReadOnly) fileSystem
@@ -171,13 +177,15 @@ object FileSystem extends api.detail.FileSystemAPI {
   class ReadOnlyLabel(val label: String) extends Label {
     def setLabel(value: String) = throw new IllegalArgumentException("label is read only")
 
-    def getLabel = label
+    def getLabel(provider: HolderLookup.Provider): String = label
 
-    override def load(nbt: NBTTagCompound) {}
+    private final val LabelTag = Settings.namespace + "fs.label"
 
-    override def save(nbt: NBTTagCompound) {
-      if (label != null) {
-        nbt.setString(Settings.namespace + "fs.label", label)
+    override def loadData(holder: DataComponentHolder): Unit = {}
+
+    override def saveData(holder: MutableDataComponentHolder): Unit = {
+      if(label != null) {
+        holder.setComponent(OCComponents.LABEL, label)
       }
     }
   }
