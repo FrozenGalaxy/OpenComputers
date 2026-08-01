@@ -10,18 +10,16 @@ import net.minecraft.core.Direction
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.phys.{BlockHitResult, HitResult}
-import net.neoforged.neoforge.event.RegisterCommandsEvent
 
 object SpawnComputerCommand {
   final val MaxDistance = 16.0
 
-  def onRegisterCommands(event: RegisterCommandsEvent): Unit = register(event.getDispatcher)
-
-  private def register(dispatcher: CommandDispatcher[CommandSourceStack]): Unit = {
+  def register(dispatcher: CommandDispatcher[CommandSourceStack]): Unit = {
     def command(name: String) = Commands.literal(name)
-      .requires(_.hasPermission(2))
+      .requires(CommandHandler.canUse(_, 2))
       .executes(context => execute(context.getSource))
 
+    dispatcher.register(command("oc_spawnComputer"))
     dispatcher.register(command("oc_spawncomputer"))
     dispatcher.register(command("oc_sc"))
   }

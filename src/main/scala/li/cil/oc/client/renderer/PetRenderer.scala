@@ -40,6 +40,7 @@ object PetRenderer {
     "f812c043-78ba-4324-82ae-e8f05c52ae6e" ->(0.1, 0.8, 0.5), // payonel
     "1db17ee7-8830-4bac-8018-de154340aae6" ->(0.0, 0.5, 1.0), // Kosmos
     "4485b0cf-e1d5-4e82-a45a-2dc0270b3bb8" ->(0.600, 0.329, 0.769), // TheSandromatic
+    "f5cd509e-fa84-4479-ad9e-f318454517e2" ->(0.078, 0.000, 1.000), // Forecaster
     "8df90a8c-a554-4886-86b0-71b1d36dfcc1" ->(0.000, 0.498, 1.000), // NaomiRavencroft
     "594f4191-90e3-459e-8ff7-06014b4dedd5" ->(0.20, 0.85, 0.80), // CutieRavencroft
     "927b049f-2397-4d31-a1db-e89c62482329" ->(0.8156, 0.0, 1.0), // ben_mkiv

@@ -10,7 +10,7 @@ import li.cil.oc.common.menu.MenuTypes
 import li.cil.oc.common.recipe.Recipes
 import li.cil.oc.integration.Mods
 import li.cil.oc.server.loot.LootFunctions
-import li.cil.oc.server.command.SpawnComputerCommand
+import li.cil.oc.server.command.CommandHandler
 import li.cil.oc.util.ThreadPoolFactory
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.{IEventBus, SubscribeEvent}
@@ -76,7 +76,7 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   modBus.register(OpenComputers.proxy)
   OpenComputers.proxy.preInit()
   NeoForge.EVENT_BUS.register(ThreadPoolFactory)
-  NeoForge.EVENT_BUS.addListener(SpawnComputerCommand.onRegisterCommands)
+  NeoForge.EVENT_BUS.addListener(CommandHandler.onRegisterCommands)
 
   // these used to use @EventBusSubscriber but Scala makes this impossible on NeoForge
   modBus.register(ChameliumBlock)
