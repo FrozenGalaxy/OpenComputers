@@ -33,8 +33,8 @@ object SpawnComputerCommand {
     player.pick(MaxDistance, 0.0f, false) match {
       case hit: BlockHitResult if hit.getType == HitResult.Type.BLOCK =>
         val casePos = (hit.getBlockPos.relative(hit.getDirection): net.minecraft.core.BlockPos)
-        val screenPos = casePos.above()
-        val keyboardPos = screenPos.above()
+        val screenPos = (casePos.above(): net.minecraft.core.BlockPos)
+        val keyboardPos = (screenPos.above(): net.minecraft.core.BlockPos)
 
         if (!level.isEmptyBlock(casePos) || !level.isEmptyBlock(screenPos) || !level.isEmptyBlock(keyboardPos)) {
           source.sendFailure(Component.literal("Target position obstructed."))
