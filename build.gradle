@@ -7,11 +7,25 @@ plugins {
 }
 
 group = mod_group_id
-def buildNumberFile = file('build.txt')
-def buildNumber = findProperty('build_number') ?:
+// GitHub tags are the canonical release version. A tag named v1.9.2
+// produces OpenComputers-v1.9.2.jar and reports v1.9.2 in-game.
+def githubTag = System.getenv('GITHUB_REF_TYPE') == 'tag'
+        ? System.getenv('GITHUB_REF_NAME')
+        : null
+
+// Non-release builds identify the current development line plus the CI build.
+// Jenkins provides BUILD_NUMBER; GitHub Actions provides GITHUB_RUN_NUMBER.
+// - GitHub tag v1.9.2      -> v1.9.2
+// - Jenkins build 154      -> 1.9.1-dev.154
+// - GitHub CI build 154    -> 1.9.1-dev.154
+// - Local build            -> 1.9.1-dev.local
+def ciBuildNumber = findProperty('build_number') ?:
+        System.getenv('BUILD_NUMBER') ?:
         System.getenv('GITHUB_RUN_NUMBER') ?:
-        (buildNumberFile.exists() ? buildNumberFile.text.trim() : '0')
-version = findProperty('release_tag') ?: "${mod_version}-${buildNumber}"
+        'local'
+
+version = githubTag ?: "${mod_version}-dev.${ciBuildNumber}"
+
 
 base {
     archivesName = mod_id
@@ -291,7 +305,7 @@ var generateModMetadata = tasks.register('generateModMetadata', ProcessResources
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
-            mod_version            : mod_version,
+            mod_version            : project.version,
             mod_authors            : mod_authors,
             mod_description        : mod_description
     ]
