@@ -29,40 +29,56 @@ object LuaStateFactory {
   // could delete a library that an earlier factory just extracted.
   private var cleanedOldLibraries = false
 
-  private def cleanupOldLibraries(libDir: File): Unit = synchronized {
+  private def cleanupOldLibraries(nativeDir: File): Unit = synchronized {
     if (cleanedOldLibraries) {
       return
     }
 
     cleanedOldLibraries = true
 
-    if (!libDir.isDirectory) {
-      return
-    }
-
-    val files = libDir.listFiles(new PatternFilenameFilter(
+    val filter = new PatternFilenameFilter(
       "^" + Pattern.quote("OpenComputersMod-") + ".*\\.(dll|so|dylib)$"
-    ))
+    )
 
-    if (files != null) {
-      for (file <- files if file.isFile) {
-        try {
-          if (file.delete()) {
-            OpenComputers.log.debug(s"Deleted stale native library '${file.getName}'.")
+    def clean(dir: File): Unit = {
+      if (!dir.isDirectory) {
+        return
+      }
+
+      val files = dir.listFiles(filter)
+
+      if (files != null) {
+        for (file <- files if file.isFile) {
+          try {
+            if (file.delete()) {
+              OpenComputers.log.debug(
+                s"Deleted stale native library '${file.getAbsolutePath}'."
+              )
+            }
+            else if (file.exists()) {
+              OpenComputers.log.debug(
+                s"Could not delete stale native library '${file.getAbsolutePath}'. It may still be in use."
+              )
+            }
           }
-          else if (file.exists()) {
-            // This is expected on Windows if another running JVM still has
-            // the native library loaded and therefore locked.
-            OpenComputers.log.debug(s"Could not delete stale native library '${file.getName}'. It may still be in use.")
+          catch {
+            case t: Throwable =>
+              OpenComputers.log.debug(
+                s"Could not delete stale native library '${file.getAbsolutePath}'.",
+                t
+              )
           }
-        }
-        catch {
-          case t: Throwable =>
-            OpenComputers.log.debug(s"Could not delete stale native library '${file.getName}'.", t)
         }
       }
     }
+
+    // Current location used by modern builds.
+    clean(nativeDir)
+
+    // Legacy location used by older builds: the Minecraft working directory.
+    clean(new File("."))
   }
+
 
   def isAvailable: Boolean = {
     // Force initialization of all.
