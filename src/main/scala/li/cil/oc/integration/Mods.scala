@@ -20,33 +20,21 @@ object Mods {
   // ----------------------------------------------------------------------- //
 
   def All: ArrayBuffer[ModBase] = knownMods.clone()
-  val AppliedEnergistics2 = new ClassBasedMod(IDs.AppliedEnergistics2, "appeng.api.storage.channels.IItemStorageChannel")
-  val CoFHCore = new SimpleMod(IDs.CoFHCore)
   val Create = new SimpleMod(IDs.Create)
-  val ThermalFoundation = new SimpleMod(IDs.ThermalFoundation)
   val ComputerCraft = new SimpleMod(IDs.ComputerCraft)
   val NeoForge = new SimpleMod(IDs.Forge)
-  val JustEnoughItems = new SimpleMod(IDs.JustEnoughItems)
   val Mekanism = new SimpleMod(IDs.Mekanism)
   val Minecraft = new SimpleMod(IDs.Minecraft)
   val OpenComputers = new SimpleMod(IDs.OpenComputers)
-  val TIS3D = new SimpleMod(IDs.TIS3D, version = "[0.9,)")
-  val ProjectRedTransmission = new SimpleMod((IDs.ProjectRedTransmission))
-  val DraconicEvolution = new SimpleMod(IDs.DraconicEvolution)
   val EnderStorage = new SimpleMod(IDs.EnderStorage)
 
   // ----------------------------------------------------------------------- //
 
   val Proxies = Array(
-    //integration.appeng.ModAppEng,
-    //integration.cofh.tileentity.ModCoFHBlockEntity,
     integration.create.ModCreate,
-    //integration.cofh.foundation.ModThermalFoundation,
     integration.neoforge.ModNeoForge,
-    //integration.tis3d.ModTIS3D,
     integration.mekanism.ModMekanism,
     integration.minecraft.ModMinecraft,
-    //integration.projectred.ModProjectRed,
     integration.computercraft.ModComputerCraft,
     integration.enderstorage.ModEnderStorage,
 
@@ -102,19 +90,12 @@ object Mods {
   // ----------------------------------------------------------------------- //
 
   object IDs {
-    final val AppliedEnergistics2 = "appliedenergistics2"
-    final val CoFHCore = "cofh_core"
     final val Create = "create"
-    final val ThermalFoundation = "thermal_foundation"
     final val ComputerCraft = "computercraft"
     final val Forge = "forge"
-    final val JustEnoughItems = "jei"
     final val Mekanism = "mekanism"
     final val Minecraft = "minecraft"
     final val OpenComputers = "opencomputers"
-    final val TIS3D = "tis3d"
-    final val ProjectRedTransmission = "projectred-transmission"
-    final val DraconicEvolution = "draconicevolution"
     final val EnderStorage = "enderstorage"
   }
 

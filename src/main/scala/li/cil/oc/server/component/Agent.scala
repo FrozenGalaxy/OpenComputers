@@ -40,7 +40,6 @@ trait Agent extends traits.LevelControl with traits.ContainerControl with traits
     val player = agent.player.asInstanceOf[Player]
     Player.updatePositionAndRotation(player, facing, side)
     // no need to set inventory, calling agent.Player already did that
-    //Player.setPlayerInventoryItems(player)
     player
   }
 

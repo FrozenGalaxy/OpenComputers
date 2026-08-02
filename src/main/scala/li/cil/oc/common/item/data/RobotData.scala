@@ -8,7 +8,7 @@ import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.ImmutableItemStack
 import li.cil.oc.common.datacomponents.{OCComponents, RobotChargeInfo}
-import li.cil.oc.integration.opencomputers.DriverScreen
+import li.cil.oc.integration.opencomputers.{DriverScreen, Item}
 import li.cil.oc.util.ExtendedDataComponentHolder._
 import li.cil.oc.util.ItemUtils
 import net.minecraft.core.HolderLookup
@@ -16,6 +16,7 @@ import net.minecraft.core.component.{DataComponentHolder, DataComponents}
 import net.minecraft.world.item.ItemStack
 
 import scala.io.Source
+import scala.jdk.CollectionConverters._
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
 import net.minecraft.network.chat.Component
@@ -106,15 +107,11 @@ class RobotData extends ItemData(Constants.BlockName.Robot) {
     // Forget all node addresses and so on. This is used when 'picking' a
     // robot in creative mode.
     val newInfo = new RobotData(stack)
-    // FIXME probably
-    // newInfo.components.foreach(cs => Option(api.Driver.driverFor(cs)) match {
-    //   case Some(driver) if driver == DriverScreen =>
-    //     val nbt = driver.dataTag(cs)
-    //     for (tagName <- nbt.getAllKeys.toArray) {
-    //       nbt.remove(tagName.asInstanceOf[String])
-    //     }
-    //   case _ =>
-    // })
+    newInfo.components.foreach(cs => Option(api.Driver.driverFor(cs)) match {
+      case Some(driver) if driver == DriverScreen =>
+        Item.updateDataTag(cs, nbt => nbt.getAllKeys.asScala.toSeq.foreach(nbt.remove))
+      case _ =>
+    })
     // Don't show energy info (because it's unreliable) but fill up the
     // internal buffer. This is for creative use only, anyway.
     newInfo.totalEnergy = 0

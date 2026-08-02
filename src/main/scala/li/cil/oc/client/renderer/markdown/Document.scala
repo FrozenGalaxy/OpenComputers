@@ -72,9 +72,6 @@ object Document {
   def render(graphics: GuiGraphics, document: Segment, x: Int, y: Int, maxWidth: Int, maxHeight: Int, yOffset: Int, renderer: Font, mouseX: Int, mouseY: Int): Option[InteractiveSegment] = {
     val window = Minecraft.getInstance.getWindow
     val stack = graphics.pose
-
-    RenderState.pushAttrib()
-
     RenderSystem.setShaderColor(1, 1, 1, 1)
     // Clip using the scissor test to not interfere with RenderType-maintained depth testing.
     GL11.glEnable(GL11.GL_SCISSOR_TEST)

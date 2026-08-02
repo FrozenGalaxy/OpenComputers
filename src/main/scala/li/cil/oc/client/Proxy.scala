@@ -23,7 +23,6 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 
 private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
   NeoForge.EVENT_BUS.addListener(CommandHandler.onRegisterCommands)
-  modBus.register(this)
   modBus.register(classOf[GuiTypes])
   modBus.register(ModelInitialization)
   modBus.register(NetSplitterModel)

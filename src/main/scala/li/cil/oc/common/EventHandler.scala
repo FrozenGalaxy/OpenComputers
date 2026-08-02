@@ -18,8 +18,6 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks
 
 import java.util.Calendar
 
-//import appeng.api.networking.IGridBlock
-//import appeng.api.util.AEPartLocation
 import li.cil.oc._
 import li.cil.oc.api.Network
 import li.cil.oc.api.detail.ItemInfo

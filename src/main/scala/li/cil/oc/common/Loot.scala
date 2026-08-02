@@ -29,14 +29,6 @@ import net.neoforged.neoforge.event.level.LevelEvent
 
 import scala.jdk.CollectionConverters._
 
-//class Loot extends WeightedRandomChestContent(api.Items.get(Constants.ItemName.Floppy).item(), api.Items.get(Constants.ItemName.Floppy).createItemStack(1).getDamageValue, 1, 1, Settings.get.lootProbability) {
-//  override def generateChestContent(random: Random, newInventory: IInventory) =
-//    Loot.randomDisk(random) match {
-//      case Some(disk) =>
-//        ChestGenHooks.generateStacks(random, disk, minStackSize, maxStackSize)
-//      case _ => Array.empty[ItemStack]
-//    }
-//}
 
 object Loot {
   //  val containers = Array(
@@ -92,9 +84,6 @@ object Loot {
   }
 
   def init(): Unit = {
-    //    for (container <- containers) {
-    //      ChestGenHooks.addItem(container, new Loot())
-    //    }
 
     val list = new java.util.Properties()
     val listStream = getClass.getResourceAsStream("/assets/" + Settings.resourceDomain + "/loot/loot.properties")

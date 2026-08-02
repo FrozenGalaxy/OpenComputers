@@ -29,12 +29,5 @@ object ExtendedBlock {
 
 //  implicit def extendedFluidBlock(block: LiquidBlock): ExtendedFluidBlock = new ExtendedFluidBlock(block)
 //
-//  class ExtendedFluidBlock(val block: LiquidBlock) {
-//    def drain(position: BlockPosition, action: FluidAction) = block.drain(position.world.get, position.toBlockPos, action)
-//
-//    def canDrain(position: BlockPosition) = block.canDrain(position.world.get, position.toBlockPos)
-//
-//    def getFilledPercentage(position: BlockPosition) = block.getFilledPercentage(position.world.get, position.toBlockPos)
-//  }
 
 }

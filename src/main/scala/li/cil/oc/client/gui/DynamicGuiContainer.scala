@@ -28,12 +28,10 @@ abstract class DynamicGuiContainer[C <: AbstractContainerMenu](container: C, inv
 
   override protected def renderLabels(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
     super.renderLabels(graphics, mouseX, mouseY)
-    RenderState.pushAttrib()
     drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
     for (slot <- 0 until menu.slots.size()) {
       drawSlotHighlight(graphics, menu.getSlot(slot))
     }
-    RenderState.popAttrib()
   }
 
   protected def drawSecondaryBackgroundLayer(graphics: GuiGraphics): Unit = {}

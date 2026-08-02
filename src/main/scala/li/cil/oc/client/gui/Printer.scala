@@ -43,7 +43,6 @@ class Printer(state: menu.Printer, playerInventory: Inventory, name: Component)
 
   override def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int) = {
     super.drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
-    RenderState.pushAttrib()
     if (isHovering(materialBar.x, materialBar.y, materialBar.width, materialBar.height, mouseX - leftPos, mouseY - topPos)) {
       val tooltip: java.util.List[Component] = java.util.List.of(Component.literal(inventoryContainer.amountMaterial + "/" + inventoryContainer.maxAmountMaterial))
       graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
@@ -52,7 +51,6 @@ class Printer(state: menu.Printer, playerInventory: Inventory, name: Component)
       val tooltip: java.util.List[Component] = java.util.List.of(Component.literal(inventoryContainer.amountInk + "/" + inventoryContainer.maxAmountInk))
       graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
-    RenderState.popAttrib()
   }
 
   override def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {

@@ -107,6 +107,11 @@ class Drone(val agent: entity.Drone) extends AbstractManagedEnvironment with Age
     result(agent.maxVelocity * 20) // per second
   }
 
+  // Compatibility alias for builds that accidentally exposed the typo'd callback name.
+  @Callback(doc = "function():number -- Alias for getMaxVelocity().")
+  def getV1elocity(context: Context, args: Arguments): Array[AnyRef] =
+    getMaxVelocity(context, args)
+
   @Callback(doc = "function():number -- Get the currently set acceleration.")
   def getAcceleration(context: Context, args: Arguments): Array[AnyRef] = {
     result(agent.targetAcceleration * 20) // per second

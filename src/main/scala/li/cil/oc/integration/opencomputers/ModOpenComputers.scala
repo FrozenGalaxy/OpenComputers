@@ -91,9 +91,6 @@ object ModOpenComputers extends ModProxy {
     api.IMC.registerProgramDiskLabel("opl-flash", "openloader", "Lua 5.2", "Lua 5.3", "LuaJ")
     api.IMC.registerProgramDiskLabel("oppm", "oppm", "Lua 5.2", "Lua 5.3", "LuaJ")
 
-    // ForgeChunkManager removed in NeoForge 1.21, chunk loading callback needs alternative approach
-    // ForgeChunkManager.setForcedChunkLoadingCallback(OpenComputers.ID, ChunkloaderUpgradeHandler)
-
     OpenComputers.proxy.modBus.addListener(EventHandler.onRegisterCapabilities)
     OpenComputers.proxy.modBus.addListener(ChunkloaderUpgradeHandler.onRegisterTicketControllers)
 

@@ -144,8 +144,6 @@ class Rack(state: menu.Rack, playerInventory: Inventory, name: Component)
 
   override def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
     super.drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
-    RenderState.pushAttrib()
-
     RenderSystem.setShaderColor(1, 1, 1, 1)
     RenderState.makeItBlend()
     RenderSystem.setShaderTexture(0, Textures.GUI.Rack)
@@ -232,8 +230,6 @@ class Rack(state: menu.Rack, playerInventory: Inventory, name: Component)
       tooltip.addAll(Localization.Rack.RelayModeTooltip.linesIterator.map(Component.literal).toList.asJava)
       graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
-
-    RenderState.popAttrib()
   }
 
   override def drawSecondaryBackgroundLayer(graphics: GuiGraphics): Unit = {

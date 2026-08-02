@@ -435,7 +435,6 @@ class Hologram(pos: BlockPos, state: BlockState, var tier: Int)
 
   // ----------------------------------------------------------------------- //
 
-  //this method removed in 1.18, but this method required by rendering so remove override
   def getViewDistance = scale / Settings.get.hologramMaxScaleByTier.max * Settings.get.hologramRenderDistance
 
   def getFadeStartDistanceSquared = scale / Settings.get.hologramMaxScaleByTier.max * Settings.get.hologramFadeStartDistance * Settings.get.hologramFadeStartDistance

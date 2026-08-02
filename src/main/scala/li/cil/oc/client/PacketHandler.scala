@@ -419,9 +419,6 @@ object PacketHandler extends CommonPacketHandler {
     if (!stack.isEmpty) {
       Loot.disksForClient += stack
     }
-    if(Mods.JustEnoughItems.isModAvailable) {
-      //ModJEI.addDiskAtRuntime(stack)
-    }
   }
 
   def onCyclingDisk(p: PacketParser): Any = {

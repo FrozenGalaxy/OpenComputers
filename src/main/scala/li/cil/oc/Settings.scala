@@ -259,7 +259,6 @@ class Settings(val config: Config) {
 
   private val valueInternal = 1000
 
-  val ratioAppliedEnergistics2 = valueAppliedEnergistics2 / valueInternal
   val ratioFactorization = valueFactorization / valueInternal
   val ratioGalacticraft = valueGalacticraft / valueInternal
   val ratioIndustrialCraft2 = valueIndustrialCraft2 / valueInternal

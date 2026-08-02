@@ -67,7 +67,7 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends AbstractManagedEnvir
   override def onConnect(node: Node): Unit = {
     super.onConnect(node)
     if (node == this.node) {
-      val restoredTicket = ChunkloaderUpgradeHandler.claimTicket(node.address)
+      val restoredTicket = ChunkloaderUpgradeHandler.claimTicket(node.address, host.getEnvironmentLevel)
       if (restoredTicket.isDefined) {
         if (!isDimensionAllowed) {
           host.getEnvironmentLevel match {
@@ -122,26 +122,25 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends AbstractManagedEnvir
     }
   }
 
-  @Deprecated
   private def isDimensionAllowed: Boolean = {
-    val id: Int = host.getEnvironmentLevel().dimension match {
-      case Level.OVERWORLD => 0
-      case Level.NETHER => -1
-      case Level.END => 1
-      case _ => throw new Error("deprecated")
+    // These settings are retained as legacy numeric dimension IDs for config
+    // compatibility. Modern/modded dimensions have no stable numeric ID.
+    val legacyId = host.getEnvironmentLevel().dimension match {
+      case Level.OVERWORLD => Some(0)
+      case Level.NETHER => Some(-1)
+      case Level.END => Some(1)
+      case _ => None
     }
     val whitelist = Settings.get.chunkloadDimensionWhitelist
     val blacklist = Settings.get.chunkloadDimensionBlacklist
-    if (!whitelist.isEmpty) {
-      if (!whitelist.contains(id))
-        return false
+
+    if (!whitelist.isEmpty && !legacyId.exists(whitelist.contains)) {
+      false
+    } else if (legacyId.exists(blacklist.contains)) {
+      false
+    } else {
+      true
     }
-    if (!blacklist.isEmpty) {
-      if (blacklist.contains(id)) {
-        return false
-      }
-    }
-    true
   }
 
   private def requestTicket(throwIfBlocked: Boolean = false): Unit = {
@@ -150,9 +149,7 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends AbstractManagedEnvir
         throw new Exception("this dimension is blacklisted")
       }
     } else {
-      // This ticket is a lie, but ChunkloaderUpgradeHandler won't crash or load it.
-      ticket = Some(new ChunkPos(0, 0))
-      ChunkloaderUpgradeHandler.updateLoadedChunk(this)
+      ChunkloaderUpgradeHandler.requestTicket(this)
     }
   }
 }

@@ -5,10 +5,6 @@ import li.cil.oc.Settings
 object Power {
   // Applied Energistics 2
 
-  def fromAE(value: Double) = value * Settings.get.ratioAppliedEnergistics2
-
-  def toAE(value: Double): Double = value / Settings.get.ratioAppliedEnergistics2
-
   // Factorization
 
   def fromCharge(value: Double) = value * Settings.get.ratioFactorization

@@ -27,7 +27,10 @@ object EventHandlerNeoForge {
     ).foreach { beType =>
       event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, beType.get().asInstanceOf[BlockEntityType[_]], (be: BlockEntity, side: Direction) => {
         be match {
-          case pa: PowerAcceptor if pa.canConnectPower(side) => new EnergyStorageImpl(pa, side): IEnergyStorage
+          // Match OC 1.12 Forge Energy semantics: expose the capability for every
+          // PowerAcceptor side and let IEnergyStorage.canReceive decide dynamically.
+          // This also makes the returned capability safe for NeoForge consumers to cache.
+          case pa: PowerAcceptor => new EnergyStorageImpl(pa, side): IEnergyStorage
           case _ => null
         }
       })

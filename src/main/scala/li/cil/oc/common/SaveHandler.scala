@@ -208,7 +208,6 @@ object SaveHandler {
     val file = new io.File(chunkPath, name)
     if (!file.exists()) return Array.empty[Byte]
     try {
-      // val bis = new io.BufferedInputStream(new GZIPInputStream(new io.FileInputStream(file)))
       val bis = new io.BufferedInputStream(new io.FileInputStream(file))
       val bos = new io.ByteArrayOutputStream
       val buffer = new Array[Byte](8 * 1024)

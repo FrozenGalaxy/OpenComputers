@@ -37,32 +37,6 @@ object RenderState {
     }
   }
 
-  def compilingDisplayList = {
-    if (GL11.glGetInteger(GL11.GL_LIST_INDEX) != 0) {
-      val mode = GL11.glGetInteger(GL11.GL_LIST_MODE)
-      mode == GL11.GL_COMPILE || mode == GL11.GL_COMPILE_AND_EXECUTE
-    }
-    else false
-  }
-
-  // pushAttrib/popAttrib currently breaks the RenderSystem because it doesn't
-  // accordingly pushes/pops its cache, so it gets into an illegal state...
-  // See https://gist.github.com/fnuecke/9a5b2499835fca9b52419277dc6239ca
-  def pushAttrib(): Unit = {
-//    RenderSystem.glPushAttrib(mask)
-  }
-
-  def popAttrib(): Unit = {
-//    RenderSystem.popAttrib()
-  }
-
-  def disableEntityLighting(): Unit = {
-    // RenderSystem.disableLighting() removed in 1.18.2
-  }
-
-  def enableEntityLighting(): Unit = {
-    // RenderSystem.enableLighting() removed in 1.18.2
-  }
 
   def makeItBlend(): Unit = {
     RenderSystem.enableBlend()

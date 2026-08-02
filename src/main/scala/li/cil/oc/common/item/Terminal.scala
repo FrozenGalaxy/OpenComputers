@@ -39,9 +39,6 @@ class Terminal(props: Properties) extends Item(props) with traits.SimpleItem wit
   }
 
   //@OnlyIn(Dist.CLIENT)
-  //override def getModelLocation(stack: ItemStack) = {
-  //  if (hasServer(stack)) Textures.Item.TerminalOn else Textures.Item.TerminalOff
-  //}
 
 
   override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {

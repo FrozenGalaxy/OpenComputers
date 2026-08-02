@@ -351,9 +351,6 @@ object Items extends ItemAPI {
     initSpecial()
 
     // Register aliases.
-    //for ((k, v) <- aliases) {
-    //  descriptors.getOrElseUpdate(k, descriptors(v))
-    //}
 
     // DeferredRegister listens at HIGHEST priority, so our LOW-priority listener
     // runs after all items are registered — safe to call ro.get() / createItemStack.

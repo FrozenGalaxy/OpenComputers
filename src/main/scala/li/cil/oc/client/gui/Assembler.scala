@@ -58,7 +58,6 @@ class Assembler(val state: menu.Assembler, playerInventory: Inventory, name: Com
   }
 
   override def drawSecondaryForegroundLayer(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
-    RenderState.pushAttrib()
     if (!inventoryContainer.isAssembling) {
       val message =
         if (!inventoryContainer.getSlot(0).hasItem) {
@@ -87,7 +86,6 @@ class Assembler(val state: menu.Assembler, playerInventory: Inventory, name: Com
       tooltip.add(Component.literal(Localization.Assembler.Progress(inventoryContainer.assemblyProgress, timeRemaining)))
       guiGraphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
-    RenderState.popAttrib()
   }
 
   private def formatTime(seconds: Int) = {

@@ -4,9 +4,7 @@ import li.cil.oc.Settings
 import li.cil.oc.integration.util.BundledRedstone
 import li.cil.oc.util.ExtendedNBT._
 import li.cil.oc.util.RotationHelper
-import li.cil.oc.integration.Mods
 import net.minecraft.core.HolderLookup
-//import mrtjp.projectred.api.IBundledTile
 import net.minecraft.core.Direction
 import java.util
 import net.minecraft.nbt.Tag

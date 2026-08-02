@@ -52,7 +52,6 @@ private[markdown] class RenderSegment(val parent: Segment, val title: String, va
     stack.scale(s, s, s)
 
     RenderSystem.enableBlend()
-    //RenderSystem.enableAlphaTest()
     // Disabled by text rendering above it (default state is disabled).
     RenderSystem.enableDepthTest()
 
@@ -69,8 +68,6 @@ private[markdown] class RenderSegment(val parent: Segment, val title: String, va
     imageRenderer.render(graphics, mouseX - x, mouseY - y)
 
     RenderSystem.disableBlend()
-    //RenderSystem.disableAlphaTest()
-    //RenderSystem.disableLighting()
 
     stack.popPose()
 

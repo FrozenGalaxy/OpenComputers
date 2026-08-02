@@ -72,14 +72,11 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
 
   override protected def drawBuffer(stack: PoseStack): Unit = {
     stack.translate(bufferX, bufferY, 0)
-    RenderState.disableEntityLighting()
     RenderState.makeItBlend()
     stack.scale(scale.toFloat, scale.toFloat, 1)
-    RenderState.pushAttrib()
     RenderSystem.depthMask(false)
     RenderSystem.setShaderColor(0.5f, 0.5f, 1f, 1f)
     TextBufferRenderCache.render(stack, bufferRenderer)
-    RenderState.popAttrib()
   }
 
   override protected def changeSize(w: Double, h: Double) = 2.0
@@ -89,7 +86,6 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
 
   override protected def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
     drawBufferLayer(graphics.pose)
-    RenderState.pushAttrib()
     if (isHovering(power.x, power.y, power.width, power.height, mouseX - leftPos, mouseY - topPos)) {
       val tooltip = new java.util.ArrayList[Component]
       val format = Localization.Computer.Power + ": %d%% (%d/%d)"
@@ -103,7 +99,6 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
       tooltip.addAll(asJavaCollection(if (inventoryContainer.isRunning) Localization.Computer.TurnOff.linesIterator.map(Component.literal).toIterable else Localization.Computer.TurnOn.linesIterator.map(Component.literal).toIterable))
       graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
-    RenderState.popAttrib()
   }
 
   override protected def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {

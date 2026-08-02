@@ -4,9 +4,9 @@ import li.cil.oc.OpenComputers
 import li.cil.oc.api.event.RobotMoveEvent
 import li.cil.oc.server.component.UpgradeChunkloader
 import li.cil.oc.util.BlockPosition
-import net.minecraft.resources.ResourceLocation
+import net.minecraft.resources.{ResourceKey, ResourceLocation}
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.world.level.ChunkPos
+import net.minecraft.world.level.{ChunkPos, Level}
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.common.world.chunk.{
   RegisterTicketControllersEvent,
@@ -20,7 +20,8 @@ import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.{immutable, mutable}
 
 object ChunkloaderUpgradeHandler {
-  private val restoredTickets = mutable.Map.empty[UUID, ChunkPos]
+  private case class RestoredTicket(dimension: ResourceKey[Level], pos: ChunkPos)
+  private val restoredTickets = mutable.Map.empty[UUID, RestoredTicket]
   var ticketController: TicketController = _
 
   private def parseAddress(addr: String): Option[UUID] = try {
@@ -29,7 +30,14 @@ object ChunkloaderUpgradeHandler {
     case _: RuntimeException => None
   }
 
-  def claimTicket(addr: String) = parseAddress(addr).flatMap(restoredTickets.remove)
+  def claimTicket(addr: String, level: Level): Option[ChunkPos] = parseAddress(addr).flatMap { owner =>
+    restoredTickets.get(owner) match {
+      case Some(ticket) if ticket.dimension == level.dimension =>
+        restoredTickets.remove(owner)
+        Some(ticket.pos)
+      case _ => None
+    }
+  }
 
   def onRegisterTicketControllers(event: RegisterTicketControllersEvent): Unit = {
     ticketController = new TicketController(
@@ -41,30 +49,29 @@ object ChunkloaderUpgradeHandler {
 
   private def validateTickets(world: ServerLevel, helper: TicketHelper): Unit = {
     for ((owner, ticketSet) <- helper.getEntityTickets) {
-      restoredTickets += owner -> null
       val tickets = ticketSet.ticking()
       if (tickets.size == 9) {
-        var (minX, minZ, maxX, maxZ) = (0, 0, 0, 0)
-        for (combinedPos <- tickets) {
-          val x = ChunkPos.getX(combinedPos)
-          val z = ChunkPos.getZ(combinedPos)
-          minX = minX min x
-          maxX = maxX max x
-          minZ = minZ min z
-          maxZ = maxZ max z
-        }
-        if (minX + 2 == maxX && minZ + 2 == maxZ) {
+        val positions = tickets.map(combinedPos => new ChunkPos(ChunkPos.getX(combinedPos), ChunkPos.getZ(combinedPos))).toSeq
+        val minX = positions.map(_.x).min
+        val maxX = positions.map(_.x).max
+        val minZ = positions.map(_.z).min
+        val maxZ = positions.map(_.z).max
+        val expected = (for (x <- minX to maxX; z <- minZ to maxZ) yield new ChunkPos(x, z)).toSet
+
+        if (maxX - minX == 2 && maxZ - minZ == 2 && positions.toSet == expected) {
           val x = minX + 1
           val z = minZ + 1
           OpenComputers.log.info(s"Restoring chunk loader ticket for upgrade at chunk ($x, $z) with address ${owner}.")
-          restoredTickets += owner -> new ChunkPos(x, z)
+          restoredTickets += owner -> RestoredTicket(world.dimension, new ChunkPos(x, z))
         } else {
           OpenComputers.log.warn(s"Chunk loader ticket for $owner loads an incorrect shape.")
           helper.removeAllTickets(owner)
+          restoredTickets.remove(owner)
         }
       } else {
         OpenComputers.log.warn(s"Chunk loader ticket for $owner loads ${tickets.size} chunks.")
         helper.removeAllTickets(owner)
+        restoredTickets.remove(owner)
       }
     }
   }
@@ -72,15 +79,19 @@ object ChunkloaderUpgradeHandler {
   @SubscribeEvent
   def onWorldSave(e: LevelEvent.Save): Unit = e.getLevel match {
     case level: ServerLevel =>
-      for ((owner, pos) <- restoredTickets) {
+      val orphaned = restoredTickets.collect {
+        case (owner, ticket) if ticket.dimension == level.dimension => owner -> ticket
+      }.toSeq
+      for ((owner, ticket) <- orphaned) {
         try {
-          OpenComputers.log.warn(s"A chunk loader ticket has been orphaned! Address: ${owner}, position: (${pos.x}, ${pos.z}). Removing...")
-          releaseTicket(level, owner.toString, pos)
+          OpenComputers.log.warn(s"A chunk loader ticket has been orphaned! Address: ${owner}, position: (${ticket.pos.x}, ${ticket.pos.z}) in ${ticket.dimension.location}. Removing...")
+          releaseTicket(level, owner.toString, ticket.pos)
         } catch {
           case err: Throwable => OpenComputers.log.error(err)
+        } finally {
+          restoredTickets.remove(owner)
         }
       }
-      restoredTickets.clear()
     case _ =>
   }
 
@@ -99,6 +110,19 @@ object ChunkloaderUpgradeHandler {
         ticketController.forceChunk(level, uuid, pos.x + x, pos.z + z, false, true)
       }
     case _ => OpenComputers.log.warn(s"Address '$addr' could not be parsed")
+  }
+
+  def requestTicket(loader: UpgradeChunkloader): Unit = {
+    (loader.host.getEnvironmentLevel, parseAddress(loader.node.address)) match {
+      case (level: ServerLevel, Some(owner)) if loader.ticket.isEmpty =>
+        val blockPos = BlockPosition(loader.host)
+        val centerChunk = new ChunkPos(blockPos.x >> 4, blockPos.z >> 4)
+        for (x <- -1 to 1; z <- -1 to 1) {
+          ticketController.forceChunk(level, owner, centerChunk.x + x, centerChunk.z + z, true, true)
+        }
+        loader.ticket = Some(centerChunk)
+      case _ =>
+    }
   }
 
   def updateLoadedChunk(loader: UpgradeChunkloader): Unit = {
