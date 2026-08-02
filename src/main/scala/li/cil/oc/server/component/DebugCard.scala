@@ -257,10 +257,9 @@ class DebugCard(host: EnvironmentHost) extends AbstractManagedEnvironment with D
       CommandMessages = None
       var value = 0
       for (command <- commands) {
-        // FIXME This method no longer returns the command's return value
-        ServerLifecycleHooks.getCurrentServer.getCommands.getDispatcher.execute(command.toString, source)
+        value = ServerLifecycleHooks.getCurrentServer.getCommands.getDispatcher.execute(command.toString, source)
       }
-      result(0, CommandMessages.orNull)
+      result(value, CommandMessages.orNull)
     }
   }
 
@@ -806,6 +805,11 @@ object DebugCard {
       val state = world.getBlockState(blockPos)
       result(state.hasBlockEntity)
     }
+
+    // OC1 compatibility alias for the pre-1.17 Minecraft terminology.
+    @Callback(doc = """function(x:number, y:number, z:number):number -- Alias for hasBlockEntity.""")
+    def hasTileEntity(context: Context, args: Arguments): Array[AnyRef] =
+      hasBlockEntity(context, args)
 
     @Callback(doc = """function(x:number, y:number, z:number):table -- Get the NBT of the block at the specified coordinates.""")
     def getTileNBT(context: Context, args: Arguments): Array[AnyRef] = {

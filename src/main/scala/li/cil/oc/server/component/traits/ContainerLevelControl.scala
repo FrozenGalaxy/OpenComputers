@@ -9,6 +9,8 @@ import li.cil.oc.util.InventoryUtils
 import li.cil.oc.util.ResultWrapper.result
 import li.cil.oc.util.StackOption._
 import net.minecraft.world.item.BlockItem
+import net.minecraft.core.component.DataComponents
+import net.minecraft.world.item.component.BlockItemStateProperties
 import net.minecraft.world.item.ItemStack
 import net.minecraft.core.Direction
 import net.neoforged.neoforge.common.NeoForge
@@ -18,7 +20,7 @@ import scala.collection.convert.ImplicitConversionsToScala._
 import net.minecraft.world.entity.item.ItemEntity
 
 trait ContainerLevelControl extends ContainerAware with LevelAware with SideRestricted {
-  @Callback(doc = "function(side:number):boolean -- Compare the block on the specified side with the one in the selected slot. Returns true if equal.")
+  @Callback(doc = "function(side:number[, fuzzy:boolean=false]):boolean -- Compare the block on the specified side with the one in the selected slot. Returns true if equal.")
   def compare(context: Context, args: Arguments): Array[AnyRef] = {
     val side = checkSideForAction(args, 0)
     stackInSlot(selectedSlot) match {
@@ -27,8 +29,15 @@ trait ContainerLevelControl extends ContainerAware with LevelAware with SideRest
           val blockPos = position.offset(side).toBlockPos
           val state = world.getBlockState(blockPos)
           val idMatches = item.getBlock == state.getBlock
-          args.optBoolean(1, false) // TODO
-          return result(idMatches)
+          val fuzzy = args.optBoolean(1, false)
+          if (fuzzy) return result(idMatches)
+
+          // In 1.12 the non-fuzzy comparison also compared the item's metadata to
+          // the placed block metadata. Modern Minecraft represents item-carried block
+          // state using the BLOCK_STATE data component, so apply that to the block's
+          // default state and compare it to the world state.
+          val itemState = stack.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY).apply(item.getBlock.defaultBlockState)
+          return result(idMatches && itemState == state)
         case _ =>
       }
       case _ =>

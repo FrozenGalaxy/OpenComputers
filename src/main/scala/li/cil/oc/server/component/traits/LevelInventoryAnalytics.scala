@@ -75,11 +75,16 @@ trait LevelInventoryAnalytics extends LevelAware with SideRestricted with Networ
   }
 
   @Callback(doc = """function(side:number, slot:number):table -- Get a description of the stack in the inventory on the specified side of the device.""")
-  def getItem(context: Context, args: Arguments): Array[AnyRef] = if (Settings.get.allowItemStackInspection) {
+  def getStackInSlot(context: Context, args: Arguments): Array[AnyRef] = if (Settings.get.allowItemStackInspection) {
     val facing = checkSideForAction(args, 0)
     withInventory(facing, inventory => result(inventory.getStackInSlot(args.checkSlot(inventory, 1))))
   }
   else result((), "not enabled in config")
+
+  // 1.21 compatibility alias; the underlying Minecraft method was renamed to getItem,
+  // but OpenComputers' public Lua API historically exposed getStackInSlot.
+  @Callback(doc = """function(side:number, slot:number):table -- Alias for getStackInSlot.""")
+  def getItem(context: Context, args: Arguments): Array[AnyRef] = getStackInSlot(context, args)
 
   @Callback(doc = """function(side:number):userdata -- Get a description of all stacks in the inventory on the specified side of the device.""")
   def getAllStacks(context: Context, args: Arguments): Array[AnyRef] = if (Settings.get.allowItemStackInspection) {
