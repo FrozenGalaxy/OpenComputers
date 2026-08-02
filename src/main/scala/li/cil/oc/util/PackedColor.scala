@@ -114,15 +114,15 @@ object PackedColor {
     override def loadData(holder: DataComponentHolder): Unit = {
       super.loadData(holder)
 
-      for(array <- holder.getComponent(OCComponents.PALETTE)) {
-        Array.copy(array, 0, palette, 0, array.length min palette.length)
+      for(colors <- holder.getComponent(OCComponents.PALETTE)) {
+        for ((color, index) <- colors.take(palette.length).zipWithIndex) palette(index) = color
       }
     }
 
     override def saveData(holder: MutableDataComponentHolder): Unit = {
       super.saveData(holder)
 
-      holder.setComponent(OCComponents.PALETTE, palette)
+      holder.setComponent(OCComponents.PALETTE, palette.toList)
     }
   }
 

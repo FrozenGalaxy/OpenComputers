@@ -17,7 +17,9 @@ case class TextBufferContents(width: Int,
                               colors: ShortArray)
 
 object TextBufferContents {
-  class ShortArray(array: Array[Short]) {
+  final class ShortArray(values: Array[Short]) {
+    private val array = values.clone()
+
     def this(array: Array[Array[Short]]) = this(array.flatten)
 
     def this(buf: ShortBuffer) = {
@@ -40,6 +42,13 @@ object TextBufferContents {
         val index = y * width + x
         if (index < array.length) array(index) else 0
       }
+
+    override def equals(other: Any): Boolean = other match {
+      case that: ShortArray => java.util.Arrays.equals(array, that.array)
+      case _ => false
+    }
+
+    override def hashCode(): Int = java.util.Arrays.hashCode(array)
   }
 
   object ShortArray {

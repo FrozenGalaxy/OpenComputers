@@ -836,6 +836,11 @@ class Machine(val host: MachineHost) extends AbstractManagedEnvironment with mac
         close()
       }
     }
+
+    // A newly assembled machine has other item data but no persisted machine
+    // component yet. Keep the state stack valid after the unconditional clear
+    // above so its first save cannot try to pause an empty stack.
+    if (state.isEmpty) state.push(Machine.State.Stopped)
   })
 
   override def saveData(holder: MutableDataComponentHolder): Unit = Machine.this.synchronized(state.synchronized {
@@ -862,7 +867,7 @@ class Machine(val host: MachineHost) extends AbstractManagedEnvironment with mac
     }
 
     holder.setComponent(OCComponents.MACHINE, MachineData(
-      state = state.toArray,
+      state = state.toList,
       users = _users.toSet,
       message = message,
       components = _components.map { case (k, v) => MachineData.Component(k, v) }.toList,

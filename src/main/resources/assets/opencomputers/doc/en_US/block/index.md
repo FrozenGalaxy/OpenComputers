@@ -14,8 +14,10 @@ Keep in mind that some of these may not be available, depending on the recipe se
 
 ### Input / Output
 * [Hologram Projector](hologram1.md)
+* [Holo Screen](holoscreen1.md)
 * [Keyboard](keyboard.md)
 * [Screen](screen1.md)
+* [Flatscreen](frontflatscreen1.md)
 
 ### Storage
 * [Disk Drive](diskdrive.md)

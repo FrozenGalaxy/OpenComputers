@@ -5,16 +5,14 @@ import li.cil.oc.api.ImmutableItemStack
 import li.cil.oc.common.Tier
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.util.ExtendedDataComponentHolder._
-import li.cil.oc.util.ExtendedNBT._
-import net.minecraft.core.HolderLookup
 import net.minecraft.core.component.DataComponentHolder
 import net.minecraft.world.item.ItemStack
 import net.neoforged.neoforge.common.MutableDataComponentHolder
 
 class TabletData extends ItemData(Constants.ItemName.Tablet) {
-  def this(stack: ItemStack, provider: HolderLookup.Provider = ItemData.defaultProvider) = {
+  def this(stack: ItemStack) = {
     this()
-    loadData(stack, provider)
+    loadData(stack)
   }
 
   var items = Array.fill[ItemStack](32)(ItemStack.EMPTY)

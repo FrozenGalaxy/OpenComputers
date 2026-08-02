@@ -173,7 +173,7 @@ class NetworkCard(val host: EnvironmentHost) extends AbstractManagedEnvironment 
 
   override def saveData(holder: MutableDataComponentHolder): Unit = {
     super.saveData(holder)
-    holder.setComponent(OCComponents.OPEN_PORTS, openPorts.toArray)
+    holder.setComponent(OCComponents.OPEN_PORTS, openPorts.toList)
     saveWakeMessage(holder)
   }
 

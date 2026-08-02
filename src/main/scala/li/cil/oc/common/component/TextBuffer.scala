@@ -494,12 +494,19 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
       }
     }
 
-    SaveHandler.scheduleSave(host.asInstanceOf[EnvironmentHost], new CompoundTag(), bufferPath, (tag: CompoundTag) => {
-      val storage = new CompoundStorage()
-      data.saveData(storage)
-      tag.merge(CompoundStorage.CODEC.encodeStart(NbtOps.INSTANCE, storage).getOrThrow().asInstanceOf[CompoundTag])
-      ()
-    })
+    host match {
+      // A tablet has no stable world position to reload auxiliary SaveHandler
+      // data from. Keep its display contents on the screen item itself.
+      case _: api.internal.Tablet => data.saveData(holder)
+      case environmentHost: EnvironmentHost =>
+        SaveHandler.scheduleSave(environmentHost, new CompoundTag(), bufferPath, (tag: CompoundTag) => {
+          val storage = new CompoundStorage()
+          data.saveData(storage)
+          tag.merge(CompoundStorage.CODEC.encodeStart(NbtOps.INSTANCE, storage).getOrThrow().asInstanceOf[CompoundTag])
+          ()
+        })
+      case _ =>
+    }
     holder.setComponent(OCComponents.IS_ON, isDisplaying)
     holder.setComponent(OCComponents.IS_POWERED, hasPower)
     holder.setComponent(OCComponents.MAX_VIDEO_MODE, MaximumVideoMode(maxResolution._1, maxResolution._2, maxDepth.ordinal))

@@ -11,7 +11,7 @@ import scala.collection.mutable
 import scala.jdk.OptionConverters._
 import scala.jdk.CollectionConverters._
 
-case class MachineData(state: Array[State.Value],
+case class MachineData(state: List[State.Value],
                        users: Set[String],
                        message: Option[String],
                        components: List[MachineData.Component],
@@ -24,10 +24,10 @@ case class MachineData(state: Array[State.Value],
 
 object MachineData {
   val CODEC: Codec[MachineData] = RecordCodecBuilder.create(inst => inst.group(
-    ScalaCodec.array(Codec.STRING)
-      .xmap[Array[State.Value]](
-        (v: Array[String]) => v.map(State.withName),
-        (i: Array[State.Value]) => i.map(_.toString)
+    ScalaCodec.list(Codec.STRING)
+      .xmap[List[State.Value]](
+        (v: List[String]) => v.map(State.withName),
+        (i: List[State.Value]) => i.map(_.toString)
       )
       .fieldOf("state")
       .forGetter(_.state),

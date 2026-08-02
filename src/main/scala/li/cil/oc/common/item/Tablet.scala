@@ -36,6 +36,7 @@ import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.common.MutableDataComponentHolder
 import net.neoforged.neoforge.common.extensions.IItemExtension
+import net.neoforged.neoforge.event.entity.player.PlayerEvent
 import net.neoforged.neoforge.event.level.LevelEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import net.neoforged.neoforge.server.ServerLifecycleHooks
@@ -105,7 +106,7 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
     val data = new TabletData(stack)
     traits.Chargeable.applyCharge(amount, data.energy, data.maxEnergy, used => if (!simulate) {
       data.energy += used
-      CustomData.update(DataComponents.CUSTOM_DATA, stack, tag => data.saveData(tag, ServerLifecycleHooks.getCurrentServer.registryAccess()))
+      data.saveData(stack)
     })
   }
 
@@ -209,9 +210,7 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
   override def setCharge(stack: ItemStack, amount: Double): Unit = {
     val data = new TabletData(stack)
     data.energy = (0.0 max amount) min maxCharge(stack)
-    CustomData.update(DataComponents.CUSTOM_DATA, stack, nbt => {
-      data.saveData(nbt, ServerLifecycleHooks.getCurrentServer.registryAccess())
-    })
+    data.saveData(stack)
   }
 }
 
@@ -254,35 +253,19 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
     RotationHelper.toGlobal(Direction.NORTH, facing, value)
 
   def readFromNBT(provider: HolderLookup.Provider): Unit = {
-    val data = ItemUtils.getTag(stack)
-    if (data != null) {
-      loadData(data, provider)
-      if (!getEnvironmentLevel.isClientSide) {
-        tablet.loadData(stack)
-        machine.loadData(stack)
-      }
+    loadData(stack)
+    if (!getEnvironmentLevel.isClientSide) {
+      tablet.loadData(stack)
+      machine.loadData(stack)
     }
   }
 
-  def writeToNBT(provider: HolderLookup.Provider, clearState: Boolean = true): Unit = {
-    CustomData.update(DataComponents.CUSTOM_DATA, stack, data => {
-      if (!getEnvironmentLevel.isClientSide) {
-        val component = new CompoundTag();
-        tablet.saveData(component, provider);
-        data.put(Settings.namespace + "component", component);
-
-        val dataTag = new CompoundTag();
-        machine.saveData(dataTag, provider)
-        data.put(Settings.namespace + "data", dataTag);
-
-        if (clearState) {
-          // Force tablets into stopped state to avoid errors when trying to
-          // load deleted machine states.
-          data.getCompound(Settings.namespace + "data").remove("state")
-        }
-      }
-      saveData(data, provider)
-    })
+  def writeToNBT(provider: HolderLookup.Provider): Unit = {
+    saveData(stack)
+    if (!getEnvironmentLevel.isClientSide) {
+      tablet.saveData(stack)
+      machine.saveData(stack)
+    }
   }
 
   readFromNBT(player.registryAccess())
@@ -494,6 +477,11 @@ object Tablet {
   }
 
   @SubscribeEvent
+  def onPlayerSave(e: PlayerEvent.SaveToFile): Unit = {
+    Server.save(e.getEntity)
+  }
+
+  @SubscribeEvent
   def onLevelUnload(e: LevelEvent.Unload): Unit = {
     Client.clear(e.getLevel.asInstanceOf[Level])
     Server.clear(e.getLevel.asInstanceOf[Level])
@@ -558,7 +546,7 @@ object Tablet {
         // Force re-load on world change, in case some components store a
         // reference to the world object.
         if (holder.level != wrapper.getEnvironmentLevel) {
-          wrapper.writeToNBT(holder.registryAccess(), clearState = false)
+          wrapper.writeToNBT(holder.registryAccess())
           wrapper.autoSave = false
           cache.invalidate(id)
           cache.cleanUp()
@@ -587,7 +575,6 @@ object Tablet {
         for (node <- tablet.machine.node.network.nodes) {
           node.remove()
         }
-        if (tablet.autoSave) tablet.writeToNBT(tablet.player.registryAccess())
         tablet.setChanged()
       }
     }
@@ -633,6 +620,14 @@ object Tablet {
   }
 
   object Server extends Cache {
+    def save(player: Player): Unit = {
+      cache.synchronized {
+        for (tablet <- cache.asMap.values if tablet.player == player) {
+          tablet.writeToNBT(player.registryAccess())
+        }
+      }
+    }
+
     def saveAll(level: Level): Unit = {
       cache.synchronized {
         for (tablet <- cache.asMap.values if tablet.getEnvironmentLevel == level) {

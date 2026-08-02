@@ -408,7 +408,7 @@ private object Migrators {
   }
 
   // network cards
-  register(OCComponents.OPEN_PORTS) { _.intArray("openPorts").andRemove }
+  register(OCComponents.OPEN_PORTS) { _.intArray("openPorts").map(v => Some(v.toList)).andRemove }
 
   register(OCComponents.WAKE_MESSAGE) { de =>
     composeAndRemove[WakeMessage] { by =>
@@ -559,7 +559,7 @@ private object Migrators {
         architecture.remove("node")
 
         MachineData(
-          state,
+          state.toList,
           users.toSet,
           message,
           components,
@@ -700,7 +700,7 @@ private object Migrators {
   register(OCComponents.COMPONENT_NODES) {
     _.array[Option[CompoundStorage]](oc -> "componentNodes") { de =>
       Some(Option.when(!de.tag.isEmpty) { new CompoundStorage(de.tag) })
-    }.andRemove
+    }.map(v => Some(v.toList)).andRemove
   }
 
   // file systems
@@ -738,7 +738,7 @@ private object Migrators {
   }
 
   // COLORS!!!
-  register(OCComponents.PALETTE) { _.intArray("palette").andRemove }
+  register(OCComponents.PALETTE) { _.intArray("palette").map(v => Some(v.toList)).andRemove }
   register(OCComponents.RENDER_COLOR) { de =>
     first(
       () => de.int(oc -> "renderColorRGB").map(i => Some(new ColorRGBA(i))).andRemove,

@@ -9,7 +9,6 @@ import li.cil.oc.api
 import li.cil.oc.api.ImmutableItemStack
 import li.cil.oc.common.datacomponents.{OCComponents, RobotChargeInfo}
 import li.cil.oc.integration.opencomputers.DriverScreen
-import li.cil.oc.util.ExtendedNBT._
 import li.cil.oc.util.ExtendedDataComponentHolder._
 import li.cil.oc.util.ItemUtils
 import net.minecraft.core.HolderLookup
@@ -40,9 +39,9 @@ object RobotData {
 }
 
 class RobotData extends ItemData(Constants.BlockName.Robot) {
-  def this(stack: ItemStack, provider: HolderLookup.Provider = ItemData.defaultProvider) = {
+  def this(stack: ItemStack) = {
     this()
-    loadData(stack, provider)
+    loadData(stack)
   }
 
   var name: Component = Component.empty()
@@ -120,7 +119,7 @@ class RobotData extends ItemData(Constants.BlockName.Robot) {
     // internal buffer. This is for creative use only, anyway.
     newInfo.totalEnergy = 0
     newInfo.robotEnergy = 50000
-    newInfo.saveData(stack, provider)
+    newInfo.saveData(stack)
     stack
   }
 }

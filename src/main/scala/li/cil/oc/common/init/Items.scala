@@ -568,7 +568,9 @@ object Items extends ItemAPI {
 
   def decorateCreativeTab(event: BuildCreativeModeTabContentsEvent, hasRedstoneCardT2: Boolean): Unit = {
     import Constants.{BlockName => B, ItemName => I}
-    val excluded = Set(B.Microcontroller, B.Print, B.Robot)
+    // Assembled devices are not usable without their component data. Their
+    // configured creative variants are added explicitly below.
+    val excluded = Set(B.Microcontroller, B.Print, B.Robot, I.Drone, I.Tablet)
 
     def accept(id: String, info: ItemInfo): Unit = {
       if (id != B.PowerConverter || !Settings.get.ignorePower) {

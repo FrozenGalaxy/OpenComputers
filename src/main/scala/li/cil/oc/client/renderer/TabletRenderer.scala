@@ -18,27 +18,37 @@ import net.neoforged.neoforge.client.event.RenderHandEvent
 object TabletRenderer {
   private val FrameBorder = 12
   private val BottomBorder = 20
+  private val SideFaceSize = 0.32f
+  private val OffhandFaceSize = 0.42f
+  private val CenterFaceSize = 0.65f
 
   @SubscribeEvent
   def onRenderHand(event: RenderHandEvent): Unit = {
     if (api.Items.get(event.getItemStack) != api.Items.get(Constants.ItemName.Tablet)) return
 
-    val buffer = Tablet.Client.get(event.getItemStack).flatMap(_.componentSlots.collectFirst {
+    val player = Minecraft.getInstance.player
+    val wrapper = Tablet.Client.get(event.getItemStack).orElse {
+      Option.when(player != null && Tablet.getId(event.getItemStack).nonEmpty) {
+        Tablet.Client.get(event.getItemStack, player)
+      }
+    }
+    val buffer = wrapper.flatMap(_.componentSlots.collectFirst {
       case Some(textBuffer: api.internal.TextBuffer) => textBuffer
     })
 
-    buffer.foreach { textBuffer =>
-      renderFirstPerson(
-        event.getPoseStack,
-        event.getMultiBufferSource,
-        event.getPackedLight,
-        event.getHand,
-        event.getInterpolatedPitch,
-        event.getEquipProgress,
-        event.getSwingProgress,
-        textBuffer)
-      event.setCanceled(true)
-    }
+    // Never expose the baked icon's fake screen in-hand. Until the client
+    // receives the authoritative buffer snapshot, render an empty tablet face;
+    // the same instance will begin drawing live text as soon as it is synced.
+    renderFirstPerson(
+      event.getPoseStack,
+      event.getMultiBufferSource,
+      event.getPackedLight,
+      event.getHand,
+      event.getInterpolatedPitch,
+      event.getEquipProgress,
+      event.getSwingProgress,
+      buffer)
+    event.setCanceled(true)
   }
 
   private def renderFirstPerson(stack: PoseStack,
@@ -48,7 +58,7 @@ object TabletRenderer {
                                 pitch: Float,
                                 equipProgress: Float,
                                 swingProgress: Float,
-                                textBuffer: api.internal.TextBuffer): Unit = {
+                                textBuffer: Option[api.internal.TextBuffer]): Unit = {
     val player = Minecraft.getInstance.player
     if (player == null) return
 
@@ -58,7 +68,8 @@ object TabletRenderer {
     }
     else {
       val arm = if (hand == InteractionHand.MAIN_HAND) player.getMainArm else player.getMainArm.getOpposite
-      renderAtSide(stack, renderBuffer, packedLight, arm, equipProgress, swingProgress, textBuffer)
+      val faceSize = if (hand == InteractionHand.OFF_HAND) OffhandFaceSize else SideFaceSize
+      renderAtSide(stack, renderBuffer, packedLight, arm, equipProgress, swingProgress, textBuffer, faceSize)
     }
     stack.popPose()
   }
@@ -69,7 +80,8 @@ object TabletRenderer {
                            arm: HumanoidArm,
                            equipProgress: Float,
                            swingProgress: Float,
-                           textBuffer: api.internal.TextBuffer): Unit = {
+                           textBuffer: Option[api.internal.TextBuffer],
+                           faceSize: Float): Unit = {
     val minecraft = Minecraft.getInstance
     val side = if (arm == HumanoidArm.RIGHT) 1f else -1f
 
@@ -91,7 +103,7 @@ object TabletRenderer {
       -0.3f * Mth.sin(swingProgress * Math.PI.toFloat))
     stack.mulPose(Axis.XP.rotationDegrees(swing * -45f))
     stack.mulPose(Axis.YP.rotationDegrees(side * swing * -30f))
-    renderTablet(stack, textBuffer)
+    renderTablet(stack, textBuffer, faceSize)
     stack.popPose()
   }
 
@@ -101,7 +113,7 @@ object TabletRenderer {
                              pitch: Float,
                              equipProgress: Float,
                              swingProgress: Float,
-                             textBuffer: api.internal.TextBuffer): Unit = {
+                             textBuffer: Option[api.internal.TextBuffer]): Unit = {
     val minecraft = Minecraft.getInstance
     val swingRoot = Mth.sqrt(swingProgress)
 
@@ -123,7 +135,7 @@ object TabletRenderer {
 
     stack.mulPose(Axis.XP.rotationDegrees(Mth.sin(swingRoot * Math.PI.toFloat) * 20f))
     stack.scale(2f, 2f, 2f)
-    renderTablet(stack, textBuffer)
+    renderTablet(stack, textBuffer, CenterFaceSize)
   }
 
   private def calculateMapTilt(pitch: Float): Float = {
@@ -178,9 +190,9 @@ object TabletRenderer {
     else playerRenderer.renderLeftHand(stack, renderBuffer, packedLight, minecraft.player)
   }
 
-  private def renderTablet(stack: PoseStack, textBuffer: api.internal.TextBuffer): Unit = {
-    val width = textBuffer.renderWidth
-    val height = textBuffer.renderHeight
+  private def renderTablet(stack: PoseStack, textBuffer: Option[api.internal.TextBuffer], faceSize: Float): Unit = {
+    val width = textBuffer.fold(160)(_.renderWidth)
+    val height = textBuffer.fold(90)(_.renderHeight)
     if (width <= 0 || height <= 0) return
 
     stack.pushPose()
@@ -188,17 +200,18 @@ object TabletRenderer {
     stack.mulPose(Axis.ZP.rotationDegrees(180f))
     stack.scale(0.5f, 0.5f, 0.5f)
 
-    val scale = 0.75f / Math.max(width + FrameBorder * 2, height + FrameBorder + BottomBorder)
+    val scale = faceSize / Math.max(width + FrameBorder * 2, height + FrameBorder + BottomBorder)
     stack.scale(scale, scale, -1f)
     stack.translate(-width * 0.5, -height * 0.5, 0)
 
-    renderFrame(stack, width, height, textBuffer.isRenderingEnabled)
+    val powered = textBuffer.exists(_.isRenderingEnabled)
+    renderFrame(stack, width, height, powered)
 
-    if (textBuffer.isRenderingEnabled) {
+    for (buffer <- textBuffer if buffer.isRenderingEnabled) {
       stack.translate(0, 0, 0.002f)
-      textBuffer match {
+      buffer match {
         case component: ComponentTextBuffer => component.renderText(stack)
-        case _ => textBuffer.renderText(stack)
+        case _ => buffer.renderText(stack)
       }
     }
 
@@ -212,7 +225,13 @@ object TabletRenderer {
       val builder = source.getBuffer(RenderTypes.FONT_QUAD)
       val matrix = stack.last.pose()
 
-      quad(builder, matrix, -FrameBorder, -FrameBorder, width + FrameBorder * 2, height + FrameBorder + BottomBorder, 0f, 0x252525)
+      val frameWidth = width + FrameBorder * 2
+      val frameHeight = height + FrameBorder + BottomBorder
+      quad(builder, matrix, -FrameBorder, -FrameBorder, frameWidth, frameHeight, 0f, 0x25262D)
+      quad(builder, matrix, -FrameBorder + 2, -FrameBorder + 2, frameWidth - 4, 2, 0.0005f, 0x4A4C57)
+      quad(builder, matrix, -FrameBorder + 2, -FrameBorder + 4, 2, frameHeight - 8, 0.0005f, 0x3A3C46)
+      quad(builder, matrix, -FrameBorder + 2, height + BottomBorder - 4, frameWidth - 4, 2, 0.0005f, 0x17181D)
+      quad(builder, matrix, width + FrameBorder - 4, -FrameBorder + 4, 2, frameHeight - 8, 0.0005f, 0x17181D)
       quad(builder, matrix, 0, 0, width, height, 0.001f, 0x000000)
       quad(builder, matrix, width - 8, height + 5, 5, 5, 0.001f, if (powered) 0x66DD55 else 0x333333)
       source.endBatch()

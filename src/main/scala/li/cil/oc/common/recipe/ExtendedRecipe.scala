@@ -151,7 +151,7 @@ object ExtendedRecipe {
       val inputs = getItems(inventory)
       for (stack <- inputs) {
         if (api.Items.get(stack) == print) {
-          data.loadData(stack, provider)
+          data.loadData(stack)
         }
       }
 
@@ -183,7 +183,7 @@ object ExtendedRecipe {
       }
 
       // Finally apply modified data.
-      data.saveData(craftedStack, provider)
+      data.saveData(craftedStack)
     }
 
     // EEPROM copying.
@@ -251,7 +251,7 @@ object ExtendedRecipe {
 
     override def components_=(value: Array[ItemStack]): Unit = data.components = value
 
-    override def save(stack: ItemStack, provider: HolderLookup.Provider): Unit = data.saveData(stack, provider)
+    override def save(stack: ItemStack, provider: HolderLookup.Provider): Unit = data.saveData(stack)
   }
 
   private class DroneDataWrapper(val stack: ItemStack) extends ItemDataWrapper {
@@ -261,7 +261,7 @@ object ExtendedRecipe {
 
     override def components_=(value: Array[ItemStack]): Unit = data.components = value
 
-    override def save(stack: ItemStack, provider: HolderLookup.Provider): Unit = data.saveData(stack, provider)
+    override def save(stack: ItemStack, provider: HolderLookup.Provider): Unit = data.saveData(stack)
   }
 
   private class RobotDataWrapper(val stack: ItemStack) extends ItemDataWrapper {
@@ -271,7 +271,7 @@ object ExtendedRecipe {
 
     override def components_=(value: Array[ItemStack]): Unit = data.components = value
 
-    override def save(stack: ItemStack, provider: HolderLookup.Provider): Unit = data.saveData(stack, provider)
+    override def save(stack: ItemStack, provider: HolderLookup.Provider): Unit = data.saveData(stack)
   }
 
   private class TabletDataWrapper(val stack: ItemStack) extends ItemDataWrapper {
@@ -287,7 +287,7 @@ object ExtendedRecipe {
 
     override def save(stack: ItemStack, provider: HolderLookup.Provider): Unit = {
       data.items = _components.clone()
-      data.saveData(stack, provider)
+      data.saveData(stack)
     }
   }
 

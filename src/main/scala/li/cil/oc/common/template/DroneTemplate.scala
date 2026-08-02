@@ -10,11 +10,8 @@ import li.cil.oc.common.item.data.DroneData
 import li.cil.oc.common.item.data.MicrocontrollerData
 import li.cil.oc.common.item.data.RobotData
 import li.cil.oc.util.ItemUtils
-import net.minecraft.core.component.DataComponents
 import net.minecraft.world.Container
 import net.minecraft.world.item.ItemStack
-import net.minecraft.world.item.component.CustomData
-import net.neoforged.neoforge.server.ServerLifecycleHooks
 
 import scala.collection.JavaConverters.asJavaIterable
 import scala.collection.convert.ImplicitConversionsToJava._
@@ -43,7 +40,7 @@ object DroneTemplate extends Template {
     data.components = items.drop(1).filter(!_.isEmpty).toArray
     data.storedEnergy = Settings.get.bufferDrone.toInt
     val stack = api.Items.get(Constants.ItemName.Drone).createItemStack(1)
-    CustomData.update(DataComponents.CUSTOM_DATA, stack, nbt => data.saveData(nbt, ServerLifecycleHooks.getCurrentServer.registryAccess()))
+    data.saveData(stack)
     val energy = Settings.get.droneBaseCost + complexity(inventory) * Settings.get.droneComplexityCost
 
     Array(stack, Double.box(energy))

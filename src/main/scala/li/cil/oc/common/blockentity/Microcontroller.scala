@@ -237,7 +237,7 @@ class Microcontroller(pos: BlockPos, state: BlockState)
         node.saveData(storage)
         Some(storage)
       case _ => None
-    })
+    }.toList)
   }
 
   override def loadComponentsCommon(holder: DataComponentHolder): Unit = {
