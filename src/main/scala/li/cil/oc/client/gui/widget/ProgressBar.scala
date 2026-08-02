@@ -31,10 +31,10 @@ class ProgressBar(val x: Int, val y: Int) extends Widget {
       val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
 
       val matrix = graphics.pose.last.pose
-      r.addVertex(matrix, tx, ty, owner.windowZ).setUv(u0, v0)
-      r.addVertex(matrix, tx, ty + height, owner.windowZ).setUv(u0, v1)
-      r.addVertex(matrix, tx + w, ty + height, owner.windowZ).setUv(u1, v1)
-      r.addVertex(matrix, tx + w, ty, owner.windowZ).setUv(u1, v0)
+      r.addVertex(matrix, tx.toFloat, ty.toFloat, owner.windowZ).setUv(u0, v0)
+      r.addVertex(matrix, tx.toFloat, (ty + height).toFloat, owner.windowZ).setUv(u0, v1)
+      r.addVertex(matrix, (tx + w).toFloat, (ty + height).toFloat, owner.windowZ).setUv(u1, v1)
+      r.addVertex(matrix, (tx + w).toFloat, ty.toFloat, owner.windowZ).setUv(u1, v0)
 
       BufferUploader.drawWithShader(r.buildOrThrow())
     }

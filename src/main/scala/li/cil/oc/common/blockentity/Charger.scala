@@ -261,7 +261,7 @@ class Charger(pos: BlockPos, state: BlockState)
     // Only update list when we have to, keeps pointless block updates to a minimum.
 
     val newConnectors = robots ++ drones ++ chargeablePlayers
-    if (connectors.size != newConnectors.length || (connectors.nonEmpty && (connectors -- newConnectors).nonEmpty)) {
+    if (connectors.size != newConnectors.length || (connectors.nonEmpty && connectors.exists(c => !newConnectors.contains(c)))) {
       connectors.clear()
       connectors ++= newConnectors
       getLevel.updateNeighborsAt(getBlockPos, getBlockState.getBlock)

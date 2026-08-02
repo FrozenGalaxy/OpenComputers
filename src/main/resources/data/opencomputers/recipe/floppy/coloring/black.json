@@ -9,7 +9,11 @@
     }
   ],
   "result": {
-    "item": "opencomputers:floppy",
-    "nbt": "{\"oc:color\": 15}"
+    "id": "opencomputers:floppy",
+    "components": {
+      "minecraft:custom_data": {
+        "oc:color": 15
+      }
+    }
   }
 }

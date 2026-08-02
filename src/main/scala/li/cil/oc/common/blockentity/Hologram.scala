@@ -24,7 +24,7 @@ import net.neoforged.api.distmarker.Dist
 import net.neoforged.api.distmarker.OnlyIn
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
 class Hologram(pos: BlockPos, state: BlockState, var tier: Int) 
@@ -49,7 +49,7 @@ class Hologram(pos: BlockPos, state: BlockState, var tier: Int)
     DeviceAttribute.Width -> colors.length.toString
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
 

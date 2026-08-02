@@ -1,5 +1,7 @@
 package li.cil.oc.common.datacomponents
 
+import li.cil.oc.api.ImmutableFluidStack
+
 import com.mojang.serialization.Codec
 import li.cil.oc.api.ImmutableItemStack
 import li.cil.oc.api.network.Visibility
@@ -108,7 +110,7 @@ object OCComponents {
   val TUNNEL: Type[String] = persistent("tunnel", Codec.STRING)
   val STRENGTH: Type[Double] = persistent("strength", ScalaCodec.DOUBLE)
   val HEAD_POS: Type[Int] = persistent("head_position", ScalaCodec.INT)
-  val TANK: Type[FluidStack] = persistent("tank", FluidStack.CODEC)
+  val TANK: Type[ImmutableFluidStack] = persistent("tank", ImmutableFluidStack.CODEC)
   val FUEL_INVENTORY: Type[ImmutableItemStack] = persistent("fuel_inventory", ImmutableItemStack.OPTIONAL_CODEC)
   val FUEL_TICKS_REMAINING: Type[Int] = persistent("fuel_ticks_remaining", ScalaCodec.INT)
   val RENDER_COLOR: Type[ColorRGBA] = persistentShared("render_color", ColorRGBA.CODEC, ScalaStreamCodec.COLOR_RGBA)

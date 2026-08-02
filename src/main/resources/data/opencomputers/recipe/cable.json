@@ -14,7 +14,7 @@
     }
   },
   "result": {
-    "item": "opencomputers:cable",
-    "count": 4
+    "count": 4,
+    "id": "opencomputers:cable"
   }
 }

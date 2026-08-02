@@ -3,9 +3,9 @@ package li.cil.oc.client.renderer.block
 import li.cil.oc.{Constants, Settings, api}
 import li.cil.oc.common.datacomponents.OCComponents
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.block.BlockModelShaper
 import net.minecraft.client.resources.model.{BakedModel, ModelResourceLocation}
 import net.minecraft.core.component.DataComponents
-import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.{DyeColor, Item, ItemStack}
 import net.minecraft.world.level.ItemLike
@@ -29,20 +29,28 @@ object ModelInitialization {
   final val RobotAfterimageBlockLocation = loc(Constants.BlockName.RobotAfterimage,   "")
   final val RackBlockLocation            = loc(Constants.BlockName.Rack,              "")
 
-  private def loc(name: String, variant: String) =
-    new ModelResourceLocation(ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, name), variant)
+  private def loc(name: String, variant: String): ModelResourceLocation = {
+    val id = ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, name)
+    if (variant == "inventory") ModelResourceLocation.inventory(id)
+    else new ModelResourceLocation(id, variant)
+  }
 
   private val modelRemappings = mutable.Map.empty[ModelResourceLocation, ModelResourceLocation]
 
   // Called from ClientProxy.preInit().
+  // Model remappings are intentionally NOT built here: on modern NeoForge the
+  // model bake/reload may already be running while common setup work executes.
   def preInit(): Unit = {
+    registerItemColors()
+  }
+
+  private def rebuildModelRemappings(): Unit = {
+    modelRemappings.clear()
     registerBlockRemapping(Constants.BlockName.Cable,             CableBlockLocation,           CableItemLocation)
     registerBlockRemapping(Constants.BlockName.NetSplitter,       NetSplitterBlockLocation,     NetSplitterItemLocation)
     registerBlockRemapping(Constants.BlockName.Print,             PrintBlockLocation,           PrintItemLocation)
     registerBlockRemapping(Constants.BlockName.Robot,             RobotBlockLocation,           RobotItemLocation)
     registerBlockRemapping(Constants.BlockName.RobotAfterimage,   RobotAfterimageBlockLocation, null)
-
-    registerItemColors()
   }
 
   // Item models are loaded from assets on modern NeoForge.
@@ -60,7 +68,7 @@ object ModelInitialization {
             val color =
               Option(stack.get(OCComponents.DISK_COLOR.get())).getOrElse {
                 if (stack.has(DataComponents.CUSTOM_DATA) && stack.get(DataComponents.CUSTOM_DATA).contains(Settings.namespace + "color")) {
-                  val legacyColor = stack.get(DataComponents.CUSTOM_DATA).getUnsafe.getInt(Settings.namespace + "color")
+                  val legacyColor = stack.get(DataComponents.CUSTOM_DATA).copyTag().getInt(Settings.namespace + "color")
                   DyeColor.byId(legacyColor max 0 min 15)
                 }
                 else DyeColor.GRAY
@@ -88,14 +96,6 @@ object ModelInitialization {
     val descriptor = api.Items.get(blockName)
     if (descriptor == null) return
 
-    if (itemLocation != null) {
-      val stack = descriptor.createItemStack(1)
-      if (!stack.isEmpty) {
-        val shaper = Minecraft.getInstance.getItemRenderer.getItemModelShaper
-        shaper.register(stack.getItem, itemLocation)
-      }
-    }
-
     if (blockLocation != null) {
       val block = descriptor.block()
       if (block != null)
@@ -105,29 +105,19 @@ object ModelInitialization {
     }
   }
 
-  private def stateToModelLocation(state: BlockState): ModelResourceLocation = {
-    import scala.jdk.CollectionConverters._
-
-    val blockKey = BuiltInRegistries.BLOCK.getKey(state.getBlock)
-
-    val variant = state.getValues.entrySet().asScala.toSeq
-      .sortBy(_.getKey.getName)
-      .map(e => s"${e.getKey.getName}=${ModelInitializationHelper.getPropertyName(e.getKey, e.getValue)}")
-      .mkString(",")
-
-    new ModelResourceLocation(blockKey, if (variant.isEmpty) "normal" else variant)
-  }
+  private def stateToModelLocation(state: BlockState): ModelResourceLocation =
+    BlockModelShaper.stateToModelLocation(state)
 
   // ── Event handlers ─────────────────────────────────────────────────────────
 
   @SubscribeEvent
   def onModifyBakingResult(e: ModelEvent.ModifyBakingResult): Unit = {
+    rebuildModelRemappings()
     val registry = e.getModels
 
     registry.put(CableBlockLocation,           CableModel)
     registry.put(CableItemLocation,            CableModel)
     registry.put(NetSplitterBlockLocation,     NetSplitterModel)
-    registry.put(NetSplitterItemLocation,      NetSplitterModel)
     registry.put(PrintBlockLocation,           PrintModel)
     registry.put(PrintItemLocation,            PrintModel)
     registry.put(RobotBlockLocation,           NullModel)

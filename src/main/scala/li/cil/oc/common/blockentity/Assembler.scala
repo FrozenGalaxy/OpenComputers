@@ -31,7 +31,7 @@ import net.neoforged.api.distmarker.OnlyIn
 import net.minecraft.network.chat
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 
 class Assembler(pos: BlockPos, state: BlockState) 
   extends BlockEntity(BlockEntityTypes.ASSEMBLER.get(), pos, state) with traits.Environment with traits.PowerAcceptor
@@ -56,7 +56,7 @@ class Assembler(pos: BlockPos, state: BlockState)
     DeviceAttribute.Product -> "Factorizer R1D1"
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
 

@@ -75,7 +75,7 @@ abstract class TextureFontRenderer {
     val sLength = ExtendedUnicodeHelper.length(s)
 
     stack.pushPose()
-    stack.translate(x, y, 0)
+    stack.translate(x.toFloat, y.toFloat, 0f)
     stack.scale(0.5f, 0.5f, 1)
 
     RenderSystem.depthMask(false)

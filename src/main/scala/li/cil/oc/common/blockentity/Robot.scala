@@ -45,7 +45,6 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.entity
 import net.minecraft.world.entity.player.{Player => PlayerEntity}
 import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.level.material.FlowingFluid
 import net.minecraft.world.level.block.Block
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
@@ -134,6 +133,13 @@ class Robot(pos: BlockPos, state: BlockState)
   var renderingErrored = false
 
   override def componentCount: Int = info.components.length
+
+  // ComponentInventory normally stores its backing inventory in COMPONENTS.
+  // Robots are special: RobotData.info.components already owns COMPONENTS for
+  // the immutable installed-hardware list. The robot's ordinary backing
+  // inventory (tool/container/main inventory) therefore has to use CONTENTS,
+  // otherwise saving the proxy overwrites the CPU/EEPROM/etc. list.
+  override def component = OCComponents.CONTENTS.get()
 
   override def getComponentInSlot(index: Int): ManagedEnvironment = if (componentSlots.length > index) componentSlots(index).orNull else null
 
@@ -262,7 +268,7 @@ class Robot(pos: BlockPos, state: BlockState)
                 getLevel.playLocalSound(newPosition.getX + 0.5, newPosition.getY + 0.5, newPosition.getZ + 0.5, SoundEvents.WATER_AMBIENT, SoundSource.BLOCKS,
                   getLevel.random.nextFloat * 0.25f + 0.75f, getLevel.random.nextFloat * 1.0f + 0.5f, false)
               }
-              if (!block.isInstanceOf[FlowingFluid]) {
+              if (state.getFluidState.isEmpty) {
                 getLevel.levelEvent(2001, newPosition, Block.getId(state))
               }
             }
@@ -463,8 +469,8 @@ class Robot(pos: BlockPos, state: BlockState)
   }
 
   override def loadComponentsCommon(holder: DataComponentHolder): Unit = {
-    updateInventorySize()
     info.loadData(holder)
+    updateInventorySize()
 
     if(inventorySize > 0) {
       selectedSlot = holder.getComponent(OCComponents.SELECTED_SLOT) getOrElse 0 max 0 min mainInventory.getContainerSize - 1

@@ -48,7 +48,7 @@ private[markdown] class RenderSegment(val parent: Segment, val title: String, va
     val stack = graphics.pose
 
     stack.pushPose()
-    stack.translate(x + xOffset, y + yOffset, 0)
+    stack.translate((x + xOffset).toFloat, (y + yOffset).toFloat, 0f)
     stack.scale(s, s, s)
 
     RenderSystem.enableBlend()

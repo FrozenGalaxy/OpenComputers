@@ -22,7 +22,7 @@ import net.minecraft.world.item.Item.TooltipContext
 import net.minecraft.world.level.{BlockGetter => IBlockReader}
 import net.minecraft.world.level.{Level => World}
 
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 class DiskDrive(props: Properties) extends SimpleBlock(props) with traits.GUI {
   protected override def createBlockStateDefinition(builder: StateContainer.Builder[Block, BlockState]) =
@@ -33,7 +33,7 @@ class DiskDrive(props: Properties) extends SimpleBlock(props) with traits.GUI {
   override protected def tooltipTail(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], flag: ITooltipFlag): Unit = {
     super.tooltipTail(stack, context, tooltip, flag)
     if (Mods.ComputerCraft.isModAvailable) {
-      for (curr <- Tooltip.get(getClass.getSimpleName + ".CC")) tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
+      for (curr <- Tooltip.get(getClass.getSimpleName + ".CC").asScala) tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }
 

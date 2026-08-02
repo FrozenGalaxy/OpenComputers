@@ -30,7 +30,7 @@ import net.minecraft.world.phys.{HitResult => RayTraceResult}
 import net.minecraft.world.phys.shapes.{VoxelShape, CollisionContext => ISelectionContext, Shapes => VoxelShapes}
 
 import java.util
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 class RobotProxy(props: Properties) extends RedstoneAware(props) with traits.StateAware with traits.Tickable {
   val shape = VoxelShapes.box(0.1, 0.1, 0.1, 0.9, 0.9, 0.9)
@@ -73,7 +73,7 @@ class RobotProxy(props: Properties) extends RedstoneAware(props) with traits.Sta
   }
 
   override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
-    for (curr <- Tooltip.get("robot")) {
+    for (curr <- Tooltip.get("robot").asScala) {
       tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }
@@ -84,7 +84,7 @@ class RobotProxy(props: Properties) extends RedstoneAware(props) with traits.Sta
       val info = new RobotData(stack)
       val components = info.containers ++ info.components
       if (components.length > 0) {
-        for (curr <- Tooltip.get("server.Components")) {
+        for (curr <- Tooltip.get("server.Components").asScala) {
           tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
         }
         for (component <- components if !component.isEmpty) {
@@ -100,15 +100,15 @@ class RobotProxy(props: Properties) extends RedstoneAware(props) with traits.Sta
         val xp = stack.get(DataComponents.CUSTOM_DATA).getUnsafe.getDouble(Settings.namespace + "xp")
         val level = Math.min((Math.pow(xp - Settings.get.baseXpToLevel, 1 / Settings.get.exponentialXpGrowth) / Settings.get.constantXpGrowth).toInt, 30)
         if (level > 0) {
-          for (curr <- Tooltip.get(getDescriptionId + "_level", level)) {
+          for (curr <- Tooltip.get(getDescriptionId + "_level", level).asScala) {
             tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
           }
         }
       }
       if (stack.get(DataComponents.CUSTOM_DATA).contains(Settings.namespace + "storedEnergy")) {
-        val energy = stack.get(DataComponents.CUSTOM_DATA).getUnsafe.getInt(Settings.namespace + "storedEnergy")
+        val energy = stack.get(DataComponents.CUSTOM_DATA).copyTag().getInt(Settings.namespace + "storedEnergy")
         if (energy > 0) {
-          for (curr <- Tooltip.get(getDescriptionId + "_storedenergy", energy)) {
+          for (curr <- Tooltip.get(getDescriptionId + "_storedenergy", energy).asScala) {
             tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
           }
         }
@@ -194,9 +194,18 @@ class RobotProxy(props: Properties) extends RedstoneAware(props) with traits.Sta
       case Some((robot, owner, uuid)) =>
         robot.ownerName = owner
         robot.ownerUUID = agent.Player.determineUUID(Option(uuid))
+
+        // The BlockEntity is already live by the time setPlacedBy runs, so
+        // clearRemoved()/validate may have connected the robot using its empty
+        // default component layout. Rebuild those environments from the actual
+        // assembled robot ItemStack now that its CPU/EEPROM/upgrades are known.
+        robot.disconnectComponents()
         robot.info.loadData(stack)
         robot.bot.node.changeBuffer(robot.info.robotEnergy - robot.bot.node.localBuffer)
         robot.updateInventorySize()
+        robot.connectComponents()
+        robot.machine.onHostChanged()
+
       case _ =>
     }
   }

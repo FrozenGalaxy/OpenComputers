@@ -33,7 +33,7 @@ import net.neoforged.api.distmarker.OnlyIn
 import net.neoforged.neoforge.common.MutableDataComponentHolder
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 
 class Case(pos: BlockPos, state: BlockState, var tier: Int)
   extends BlockEntity(BlockEntityTypes.CASE.get(), pos, state) with traits.PowerAcceptor with traits.Computer
@@ -63,7 +63,7 @@ class Case(pos: BlockPos, state: BlockState, var tier: Int)
     DeviceAttribute.Capacity -> getContainerSize.toString
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
 

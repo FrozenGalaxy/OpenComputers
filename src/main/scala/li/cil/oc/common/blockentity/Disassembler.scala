@@ -22,7 +22,7 @@ import net.neoforged.api.distmarker.{Dist, OnlyIn}
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
 import java.util
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -62,7 +62,7 @@ class Disassembler(pos: BlockPos, state: BlockState)
     DeviceAttribute.Product -> "Break.3R-100"
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
 

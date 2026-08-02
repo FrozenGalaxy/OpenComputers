@@ -2,7 +2,6 @@ package li.cil.oc.common.recipe;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -16,7 +15,7 @@ public class ExtendedShapelessRecipe implements CraftingRecipe {
     private final ShapelessRecipe wrapped;
 
     public ExtendedShapelessRecipe(ShapelessRecipe wrapped) {
-        this.wrapped = ExtendedRecipe.patchRecipe(wrapped);
+        this.wrapped = wrapped;
     }
 
     @Override

@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.event.{ClientTickEvent, RenderPlayerEvent}
 import net.neoforged.bus.api.EventPriority
 import net.neoforged.bus.api.SubscribeEvent
 
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
 object PetRenderer {
@@ -154,7 +154,7 @@ object PetRenderer {
   @SubscribeEvent
   def tickStart(e: ClientTickEvent.Pre) = {
     petLocations.cleanUp()
-    for (pet <- petLocations.asMap.values) {
+    for (pet <- petLocations.asMap.values().asScala) {
       pet.update()
     }
   }

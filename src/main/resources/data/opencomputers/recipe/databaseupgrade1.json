@@ -23,6 +23,6 @@
     }
   },
   "result": {
-    "item": "opencomputers:databaseupgrade1"
+    "id": "opencomputers:databaseupgrade1"
   }
 }

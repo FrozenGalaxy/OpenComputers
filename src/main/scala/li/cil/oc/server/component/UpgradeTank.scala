@@ -2,6 +2,7 @@ package li.cil.oc.server.component
 
 import li.cil.oc.Constants
 import li.cil.oc.api.Network
+import li.cil.oc.api.ImmutableFluidStack
 import li.cil.oc.api.driver.DeviceInfo
 import li.cil.oc.api.driver.DeviceInfo.{DeviceAttribute, DeviceClass}
 import li.cil.oc.api.network.{EnvironmentHost, Visibility}
@@ -36,12 +37,12 @@ class UpgradeTank(val owner: EnvironmentHost, val capacity: Int) extends Abstrac
 
   override def loadData(holder: DataComponentHolder): Unit = {
     super.loadData(holder)
-    tank.setFluid(holder.getComponent(OCComponents.TANK) getOrElse FluidStack.EMPTY)
+    tank.setFluid(holder.getComponent(OCComponents.TANK).map(_.mutableCopy()).getOrElse(FluidStack.EMPTY))
   }
 
   override def saveData(holder: MutableDataComponentHolder): Unit = {
     super.saveData(holder)
-    holder.setComponent(OCComponents.TANK, tank.getFluid)
+    holder.setComponent(OCComponents.TANK, ImmutableFluidStack.copyOf(tank.getFluid))
   }
 
   // ----------------------------------------------------------------------- //

@@ -23,7 +23,7 @@
     }
   },
   "result": {
-    "item": "opencomputers:transposer",
-    "count": 4
+    "count": 4,
+    "id": "opencomputers:transposer"
   }
 }

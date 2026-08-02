@@ -32,10 +32,10 @@ class Relay(state: menu.Relay, playerInventory: Inventory, name: Component)
     val h = tabPosition.getHeight
     val t = Tesselator.getInstance
     val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
-    r.addVertex(stack.last.pose(), x, y + h, 0).setUv(0, 1)
-    r.addVertex(stack.last.pose(), x + w, y + h, 0).setUv(1, 1)
-    r.addVertex(stack.last.pose(), x + w, y, 0).setUv(1, 0)
-    r.addVertex(stack.last.pose(), x, y, 0).setUv(0, 0)
+    r.addVertex(stack.last.pose(), x.toFloat, (y + h).toFloat, 0f).setUv(0f, 1f)
+    r.addVertex(stack.last.pose(), (x + w).toFloat, (y + h).toFloat, 0f).setUv(1f, 1f)
+    r.addVertex(stack.last.pose(), (x + w).toFloat, y.toFloat, 0f).setUv(1f, 0f)
+    r.addVertex(stack.last.pose(), x.toFloat, y.toFloat, 0f).setUv(0f, 0f)
     BufferUploader.drawWithShader(r.buildOrThrow())
   }
 
@@ -80,10 +80,10 @@ class Relay(state: menu.Relay, playerInventory: Inventory, name: Component)
       format.format(20f / inventoryContainer.relayDelay),
       108, 20, 0x404040)
     graphics.drawString(font,
-      inventoryContainer.packetsPerCycleAvg + " / " + inventoryContainer.relayAmount,
+      s"${inventoryContainer.packetsPerCycleAvg} / ${inventoryContainer.relayAmount}",
       108, 39, thresholdBasedColor(inventoryContainer.packetsPerCycleAvg, math.ceil(inventoryContainer.relayAmount / 2f).toInt, inventoryContainer.relayAmount))
     graphics.drawString(font,
-      inventoryContainer.queueSize + " / " + inventoryContainer.maxQueueSize,
+      s"${inventoryContainer.queueSize} / ${inventoryContainer.maxQueueSize}",
       108, 58, thresholdBasedColor(inventoryContainer.queueSize, inventoryContainer.maxQueueSize / 2, inventoryContainer.maxQueueSize))
   }
 

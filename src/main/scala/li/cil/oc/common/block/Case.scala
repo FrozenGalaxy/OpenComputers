@@ -25,7 +25,7 @@ import net.minecraft.world.level.block.state.{BlockState, StateDefinition => Sta
 import net.minecraft.world.level.material.FluidState
 
 import java.util
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 class Case(props: Properties, val tier: Int) extends RedstoneAware(props) with traits.PowerAcceptor with traits.StateAware with traits.GUI with traits.Tickable {
   override def codec(): MapCodec[Case] = CODEC
@@ -36,7 +36,7 @@ class Case(props: Properties, val tier: Int) extends RedstoneAware(props) with t
   // ----------------------------------------------------------------------- //
 
   override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
-    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase, slots)) {
+    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase, slots).asScala) {
       tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }

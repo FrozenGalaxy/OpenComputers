@@ -197,8 +197,8 @@ class HologramRenderer extends BlockEntityRenderer[Hologram] {
 
     // colorsByTier uses 0xBBGGRR packing (chosen for 1.12.2's little-endian glColorPointer).
     // Extract in the correct order: R = bits 0-7, G = bits 8-15, B = bits 16-23.
-    def vertex(x: Float, y: Float, z: Float, r: Int, g: Int, b: Int): Unit =
-      builder.addVertex(x, y, z).setColor(r, g, b, 255)
+    def vertex(x: Int, y: Int, z: Int, r: Int, g: Int, b: Int): Unit =
+      builder.addVertex(x.toFloat, y.toFloat, z.toFloat).setColor(r, g, b, 255)
 
     hologram.visibleQuads = 0
 

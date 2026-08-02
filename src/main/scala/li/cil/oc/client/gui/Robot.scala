@@ -105,7 +105,7 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
 
   override def drawBuffer(stack: PoseStack): Unit = {
     if (buffer != null) {
-      stack.translate(bufferX, bufferY, 0)
+      stack.translate(bufferX.toFloat, bufferY.toFloat, 0f)
       stack.pushPose()
       stack.translate(-3, -3, 0)
       RenderSystem.setShaderColor(1, 1, 1, 1)
@@ -255,10 +255,10 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
 
       val t = Tesselator.getInstance
       val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
-      r.addVertex(stack.last.pose(), x, y, 0).setUv(0, offsetV)
-      r.addVertex(stack.last.pose(), x, y + selectionSize, 0).setUv(0, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), x + selectionSize, y + selectionSize, 0).setUv(1, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), x + selectionSize, y, 0).setUv(1, offsetV)
+      r.addVertex(stack.last.pose(), x.toFloat, y.toFloat, 0f).setUv(0f, offsetV)
+      r.addVertex(stack.last.pose(), x.toFloat, (y + selectionSize).toFloat, 0f).setUv(0f, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, (y + selectionSize).toFloat, 0f).setUv(1f, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, y.toFloat, 0f).setUv(1f, offsetV)
       BufferUploader.drawWithShader(r.buildOrThrow())
     }
   }

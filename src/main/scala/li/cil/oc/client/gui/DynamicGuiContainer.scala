@@ -46,7 +46,7 @@ abstract class DynamicGuiContainer[C <: AbstractContainerMenu](container: C, inv
   protected def drawInventorySlots(graphics: GuiGraphics): Unit = {
     val stack = graphics.pose()
     stack.pushPose()
-    stack.translate(leftPos, topPos, 0)
+    stack.translate(leftPos.toFloat, topPos.toFloat, 0f)
     RenderSystem.disableDepthTest()
     RenderSystem.enableBlend()
     RenderSystem.defaultBlendFunc()

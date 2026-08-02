@@ -36,7 +36,11 @@ public final class ImmutableItemStack implements DataComponentHolder {
     public static final ImmutableItemStack EMPTY = new ImmutableItemStack(ItemStack.EMPTY);
 
     private ImmutableItemStack(@NonNull ItemStack stack) {
-        this.stack = stack;
+        // Data component values must be immutable and have stable equals/hashCode.
+        // Keeping a live ItemStack reference here allowed robot component stacks
+        // (including their persisted node address) to mutate underneath the
+        // DataComponentMap without Minecraft seeing a component change.
+        this.stack = stack.copy();
     }
 
     private ItemStack getStackUnsafe() {

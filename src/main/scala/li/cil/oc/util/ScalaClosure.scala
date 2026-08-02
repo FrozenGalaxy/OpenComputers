@@ -44,7 +44,7 @@ object ScalaClosure {
       case value: java.lang.Character => LuaValue.valueOf(String.valueOf(value))
       case value: java.lang.Short => LuaValue.valueOf(value.shortValue)
       case value: java.lang.Integer => LuaValue.valueOf(value.intValue)
-      case value: java.lang.Long => LuaValue.valueOf(value.longValue)
+      case value: java.lang.Long => LuaValue.valueOf(value.longValue.toDouble)
       case value: java.lang.Float => LuaValue.valueOf(value.floatValue)
       case value: java.lang.Double => LuaValue.valueOf(value.doubleValue)
       case value: java.lang.String => LuaValue.valueOf(value)

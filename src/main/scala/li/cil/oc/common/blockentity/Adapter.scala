@@ -32,7 +32,7 @@ import net.minecraft.nbt.Tag
 import net.minecraft.world.level.block.state.BlockState
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
 class Adapter(pos: BlockPos, state: BlockState)
@@ -55,7 +55,7 @@ class Adapter(pos: BlockPos, state: BlockState)
     DeviceAttribute.Product -> "Multiplug Ext.1"
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
 

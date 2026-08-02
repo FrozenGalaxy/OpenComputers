@@ -32,7 +32,7 @@ import net.minecraft.world.level.{Level => World}
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.api.distmarker.OnlyIn
 
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 abstract class SimpleBlock(props: Properties) extends ContainerBlock(props) {
   override protected def codec(): com.mojang.serialization.MapCodec[_ <: SimpleBlock] = com.mojang.serialization.MapCodec.unit(this)
@@ -69,7 +69,7 @@ abstract class SimpleBlock(props: Properties) extends ContainerBlock(props) {
   }
 
   protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[Component], flag: ITooltipFlag): Unit = {
-    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase)) {
+    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase).asScala) {
       tooltip.add(Component.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }

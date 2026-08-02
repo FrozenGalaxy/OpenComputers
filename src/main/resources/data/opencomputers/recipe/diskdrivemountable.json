@@ -23,6 +23,6 @@
     }
   },
   "result": {
-    "item": "opencomputers:diskdrivemountable"
+    "id": "opencomputers:diskdrivemountable"
   }
 }

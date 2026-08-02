@@ -238,5 +238,5 @@ class Rack(state: menu.Rack, playerInventory: Inventory, name: Component)
   }
 
   private def drawRect(graphics: GuiGraphics, x: Int, y: Int, w: Int, h: Int, u: Int, v: Int): Unit =
-    graphics.blit(Textures.GUI.Rack, x, y, u, v, w, h, 256, 256)
+    graphics.blit(Textures.GUI.Rack, x, y, u.toFloat, v.toFloat, w, h, 256, 256)
 }

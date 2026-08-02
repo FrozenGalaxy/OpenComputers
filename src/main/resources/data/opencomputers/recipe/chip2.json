@@ -17,7 +17,7 @@
     }
   },
   "result": {
-    "item": "opencomputers:chip2",
-    "count": 4
+    "count": 4,
+    "id": "opencomputers:chip2"
   }
 }

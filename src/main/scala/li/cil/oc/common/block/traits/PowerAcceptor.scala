@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.world.item.Item.TooltipContext
 import net.minecraft.world.level.BlockGetter
 
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 trait PowerAcceptor extends SimpleBlock {
   def energyThroughput: Double
@@ -18,7 +18,7 @@ trait PowerAcceptor extends SimpleBlock {
 
   override protected def tooltipTail(stack: ItemStack, context: TooltipContext, tooltip: util.List[Component], advanced: TooltipFlag): Unit = {
     super.tooltipTail(stack, context, tooltip, advanced)
-    for (curr <- Tooltip.extended("poweracceptor", energyThroughput.toInt)) {
+    for (curr <- Tooltip.extended("poweracceptor", energyThroughput.toInt).asScala) {
       tooltip.add(Component.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }

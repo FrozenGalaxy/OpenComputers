@@ -8,6 +8,7 @@ import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.registries.{DeferredRegister, DeferredHolder}
 import li.cil.oc.integration.opencomputers.ModOpenComputers
+import li.cil.oc.common.openprinter.OpenPrinter
 
 object CreativeTab {
   val CREATIVE_TABS: DeferredRegister[CreativeModeTab] =
@@ -24,6 +25,7 @@ object CreativeTab {
   def onBuildContents(event: BuildCreativeModeTabContentsEvent): Unit = {
     if (event.getTabKey == MAIN.getKey) {
       Items.decorateCreativeTab(event, ModOpenComputers.hasRedstoneCardT2)
+      OpenPrinter.addCreativeItems(event)
     } else if (event.getTabKey == CreativeModeTabs.TOOLS_AND_UTILITIES) {
       event.accept(Items.createChargedHoverBoots())
     }

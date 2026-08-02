@@ -17,7 +17,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.level.block.state.BlockState
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 
 class Capacitor(blockEntityType: BlockEntityType[_], pos: BlockPos, state: BlockState)
   extends BlockEntity(blockEntityType, pos, state) with traits.Environment with DeviceInfo with IBlockEntityExtension {
@@ -37,7 +37,7 @@ class Capacitor(blockEntityType: BlockEntityType[_], pos: BlockPos, state: Block
     DeviceAttribute.Capacity -> maxCapacity.toString
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
 

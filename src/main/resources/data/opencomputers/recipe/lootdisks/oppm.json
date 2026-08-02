@@ -9,15 +9,15 @@
     }
   ],
   "result": {
-    "item": "opencomputers:floppy",
-    "nbt": {
-      "oc:data": {
-        "oc:fs.label": "oppm"
-      },
-      "oc:lootFactory": "opencomputers:oppm",
-      "oc:color": 9,
-      "display": {
-        "Name": "{\"text\":\"OPPM (Package Manager)\"}"
+    "id": "opencomputers:floppy",
+    "components": {
+      "minecraft:custom_name": "{\"text\":\"OPPM (Package Manager)\"}",
+      "minecraft:custom_data": {
+        "oc:data": {
+          "oc:fs.label": "oppm"
+        },
+        "oc:lootFactory": "opencomputers:oppm",
+        "oc:color": 9
       }
     }
   }

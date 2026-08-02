@@ -1,5 +1,7 @@
 package li.cil.oc.common.datacomponents
 
+import li.cil.oc.api.ImmutableFluidStack
+
 import cats.NonEmptyTraverse.ops.toAllNonEmptyTraverseOps
 import li.cil.oc.Settings
 import li.cil.oc.api.ImmutableItemStack
@@ -813,7 +815,7 @@ private object Migrators {
   register(OCComponents.LEASHED_ENTITIES) { _.stringList("leashedEntities").andRemove.map(v => v.map(UUID.fromString)) }
 
   // tank upgrade
-  register(OCComponents.TANK) { de => FluidStack.parse(de.provider, de.tag).toScala }
+  register(OCComponents.TANK) { de => FluidStack.parse(de.provider, de.tag).toScala.map(ImmutableFluidStack.copyOf) }
 
   // generator upgrade
   register(OCComponents.FUEL_INVENTORY) { _.itemStack("inventory").andRemove }

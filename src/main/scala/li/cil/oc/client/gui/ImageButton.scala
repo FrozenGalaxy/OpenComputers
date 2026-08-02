@@ -67,10 +67,10 @@ class ImageButton(xPos: Int, yPos: Int, w: Int, h: Int,
         RenderSystem.enableDepthTest()
 
         val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
-        r.addVertex(graphics.pose().last.pose(), x0, y1, z).setUv(ru0, rv1)
-        r.addVertex(graphics.pose().last.pose(), x1, y1, z).setUv(ru1, rv1)
-        r.addVertex(graphics.pose().last.pose(), x1, y0, z).setUv(ru1, rv0)
-        r.addVertex(graphics.pose().last.pose(), x0, y0, z).setUv(ru0, rv0)
+        r.addVertex(graphics.pose().last.pose(), x0.toFloat, y1.toFloat, z.toFloat).setUv(ru0, rv1)
+        r.addVertex(graphics.pose().last.pose(), x1.toFloat, y1.toFloat, z.toFloat).setUv(ru1, rv1)
+        r.addVertex(graphics.pose().last.pose(), x1.toFloat, y0.toFloat, z.toFloat).setUv(ru1, rv0)
+        r.addVertex(graphics.pose().last.pose(), x0.toFloat, y0.toFloat, z.toFloat).setUv(ru0, rv0)
         BufferUploader.drawWithShader(r.buildOrThrow())
         RenderSystem.disableBlend()
       } else {
@@ -82,10 +82,10 @@ class ImageButton(xPos: Int, yPos: Int, w: Int, h: Int,
           RenderSystem.defaultBlendFunc()
 
           val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR)
-          r.addVertex(graphics.pose().last.pose(), x0, y1, z).setColor(1f, 1f, 1f, alpha)
-          r.addVertex(graphics.pose().last.pose(), x1, y1, z).setColor(1f, 1f, 1f, alpha)
-          r.addVertex(graphics.pose().last.pose(), x1, y0, z).setColor(1f, 1f, 1f, alpha)
-          r.addVertex(graphics.pose().last.pose(), x0, y0, z).setColor(1f, 1f, 1f, alpha)
+          r.addVertex(graphics.pose().last.pose(), x0.toFloat, y1.toFloat, z.toFloat).setColor(1f, 1f, 1f, alpha)
+          r.addVertex(graphics.pose().last.pose(), x1.toFloat, y1.toFloat, z.toFloat).setColor(1f, 1f, 1f, alpha)
+          r.addVertex(graphics.pose().last.pose(), x1.toFloat, y0.toFloat, z.toFloat).setColor(1f, 1f, 1f, alpha)
+          r.addVertex(graphics.pose().last.pose(), x0.toFloat, y0.toFloat, z.toFloat).setColor(1f, 1f, 1f, alpha)
           BufferUploader.drawWithShader(r.buildOrThrow())
           RenderSystem.disableBlend()
         }

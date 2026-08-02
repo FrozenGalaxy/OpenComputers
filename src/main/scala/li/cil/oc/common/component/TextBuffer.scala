@@ -544,9 +544,19 @@ object TextBuffer {
   }
 
   def registerClientBuffer(t: TextBuffer): Unit = {
+    val level = t.host.getEnvironmentLevel
+    if (level == null || Strings.isNullOrEmpty(t.proxy.nodeAddress)) return
+
+    // Re-applying component data during chunk/menu synchronization must not
+    // leave duplicate/stale client buffer registrations behind.
+    ClientComponentTracker.remove(level, t)
+    ClientComponentTracker.add(level, t.proxy.nodeAddress, t)
+
+    if (!clientBuffers.contains(t)) {
+      clientBuffers += t
+    }
+
     ClientPacketSender.sendTextBufferInit(t.proxy.nodeAddress)
-    ClientComponentTracker.add(t.host.getEnvironmentLevel, t.proxy.nodeAddress, t)
-    clientBuffers += t
   }
 
   abstract class Proxy {

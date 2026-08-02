@@ -69,10 +69,10 @@ object NanomachinesHandler {
     private def drawRect(stack: PoseStack, r: VertexConsumer, x: Int, y: Int, w: Int, h: Int, tw: Int, th: Int, fill: Float = 1): Unit = {
       val sx = 1f / tw
       val sy = 1f / th
-      r.addVertex(stack.last.pose, x, y + h, 0).setUv(0, h * sy)
-      r.addVertex(stack.last.pose, x + w, y + h, 0).setUv(w * sx, h * sy)
-      r.addVertex(stack.last.pose, x + w, y + h * (1 - fill), 0).setUv(w * sx, 1 - fill)
-      r.addVertex(stack.last.pose, x, y + h * (1 - fill), 0).setUv(0, 1 - fill)
+      r.addVertex(stack.last.pose, x.toFloat, (y + h).toFloat, 0f).setUv(0f, h * sy)
+      r.addVertex(stack.last.pose, (x + w).toFloat, (y + h).toFloat, 0f).setUv(w * sx, h * sy)
+      r.addVertex(stack.last.pose, (x + w).toFloat, y.toFloat + h * (1 - fill), 0f).setUv(w * sx, 1 - fill)
+      r.addVertex(stack.last.pose, x.toFloat, y.toFloat + h * (1 - fill), 0f).setUv(0f, 1 - fill)
     }
   }
 

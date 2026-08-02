@@ -35,7 +35,7 @@ import net.minecraft.world.level.{Level => World}
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.api.distmarker.OnlyIn
 
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 class Screen(props: Properties, val tier: Int) extends RedstoneAware(props) with traits.Tickable {
   protected override def createBlockStateDefinition(builder: StateContainer.Builder[Block, BlockState]) =
@@ -46,7 +46,7 @@ class Screen(props: Properties, val tier: Int) extends RedstoneAware(props) with
   override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
     val (w, h) = Settings.screenResolutionsByTier(tier)
     val depth = PackedColor.Depth.bits(Settings.screenDepthsByTier(tier))
-    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase, w, h, depth)) {
+    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase, w, h, depth).asScala) {
       tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }

@@ -71,7 +71,7 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
   }
 
   override protected def drawBuffer(stack: PoseStack): Unit = {
-    stack.translate(bufferX, bufferY, 0)
+    stack.translate(bufferX.toFloat, bufferY.toFloat, 0f)
     RenderState.makeItBlend()
     stack.scale(scale.toFloat, scale.toFloat, 1)
     RenderSystem.depthMask(false)
@@ -96,7 +96,7 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
     }
     if (powerButton.isMouseOver(mouseX, mouseY)) {
       val tooltip = new java.util.ArrayList[Component]
-      tooltip.addAll(asJavaCollection(if (inventoryContainer.isRunning) Localization.Computer.TurnOff.linesIterator.map(Component.literal).toIterable else Localization.Computer.TurnOn.linesIterator.map(Component.literal).toIterable))
+      tooltip.addAll(asJavaCollection(if (inventoryContainer.isRunning) Localization.Computer.TurnOff.linesIterator.map(Component.literal).toSeq else Localization.Computer.TurnOn.linesIterator.map(Component.literal).toSeq))
       graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
   }
@@ -128,10 +128,10 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
 
       val t = Tesselator.getInstance
       val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
-      r.addVertex(stack.last.pose(), x, y, 0).setUv(0, offsetV)
-      r.addVertex(stack.last.pose(), x, y + selectionSize, 0).setUv(0, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), x + selectionSize, y + selectionSize, 0).setUv(1, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), x + selectionSize, y, 0).setUv(1, offsetV)
+      r.addVertex(stack.last.pose(), x.toFloat, y.toFloat, 0f).setUv(0f, offsetV)
+      r.addVertex(stack.last.pose(), x.toFloat, (y + selectionSize).toFloat, 0f).setUv(0f, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, (y + selectionSize).toFloat, 0f).setUv(1f, offsetV + selectionStepV)
+      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, y.toFloat, 0f).setUv(1f, offsetV)
       BufferUploader.drawWithShader(r.buildOrThrow())
     }
   }

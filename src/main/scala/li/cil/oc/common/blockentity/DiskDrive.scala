@@ -33,7 +33,7 @@ import net.neoforged.api.distmarker.Dist
 import net.neoforged.api.distmarker.OnlyIn
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 
 class DiskDrive(pos: BlockPos, state: BlockState) 
   extends BlockEntity(BlockEntityTypes.DISK_DRIVE.get(), pos, state) with traits.Environment
@@ -55,7 +55,7 @@ class DiskDrive(pos: BlockPos, state: BlockState)
     DeviceAttribute.Product -> "Spinner 520p1"
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
   // Environment

@@ -18,6 +18,10 @@ import static net.minecraft.core.component.DataComponents.CUSTOM_DATA;
 public class NbtComponentHolder implements DataComponentHolder {
     protected static final String COMPONENTS_TAG = "opencomputers:components";
 
+    public static boolean hasComponents(@NonNull CompoundTag tag) {
+        return tag.get(COMPONENTS_TAG) instanceof CompoundTag;
+    }
+
     protected final PatchedDataComponentMap components = new PatchedDataComponentMap(DataComponentMap.EMPTY);
     private final @Nullable CompoundTag tag;
 

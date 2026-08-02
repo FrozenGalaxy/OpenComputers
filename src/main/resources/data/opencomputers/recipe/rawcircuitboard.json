@@ -12,7 +12,7 @@
     }
   ],
   "result": {
-    "item": "opencomputers:rawcircuitboard",
-    "count": 8
+    "count": 8,
+    "id": "opencomputers:rawcircuitboard"
   }
 }

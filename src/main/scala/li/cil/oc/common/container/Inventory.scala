@@ -63,8 +63,20 @@ trait Inventory extends SimpleInventory with Persistable {
   // ----------------------------------------------------------------------- //
 
   def loadFrom(value: Iterable[ImmutableItemStack]): Unit = {
-    for (item <- value; i <- 0 until (value.size max items.length)) {
-      items(i) = item.mutableCopy()
+    // Restore serialized inventory entries one-to-one by slot.
+    //
+    // The previous port accidentally used a nested for-comprehension here,
+    // producing a Cartesian product: every saved stack was written to every
+    // slot in turn. That destroys slot-sensitive inventories such as robots
+    // (floppy/tool/main inventory and dynamic component positions).
+    val saved = value.iterator
+    var slot = 0
+
+    while (slot < items.length) {
+      items(slot) =
+        if (saved.hasNext) saved.next().mutableCopy()
+        else ItemStack.EMPTY
+      slot += 1
     }
   }
 

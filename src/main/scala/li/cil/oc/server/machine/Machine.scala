@@ -343,7 +343,7 @@ class Machine(val host: MachineHost) extends AbstractManagedEnvironment with mac
       case arg: java.lang.String => arg
       case arg: Array[Byte] => arg
       case arg: CompoundTag => arg
-      case arg: java.util.HashMap[AnyRef, AnyRef] => arg.asScala
+      case arg: java.util.HashMap[_, _] => arg.asScala
       case arg =>
         OpenComputers.log.warn("Trying to push signal with an unsupported argument of type " + arg.getClass.getName)
         null
@@ -859,6 +859,22 @@ class Machine(val host: MachineHost) extends AbstractManagedEnvironment with mac
 
     // Make sure the component list is up-to-date.
     processAddedComponents()
+
+    // Do not persist stale component bookkeeping. During modern BlockEntity
+    // reconstruction transient component environments may briefly exist while
+    // inventories/networks are being rebuilt. If one of those addresses made
+    // it into _components, carrying it across saves produces phantom
+    // component_removed events (most visibly for robot screens) on every load.
+    if (node.network != null) {
+      _components.synchronized {
+        _components.filterInPlace { case (address, name) =>
+          node.network.node(address) match {
+            case component: Component => component.name == name
+            case _ => false
+          }
+        }
+      }
+    }
 
     for(fs <- tmp) {
       val lvl = host.getEnvironmentLevel

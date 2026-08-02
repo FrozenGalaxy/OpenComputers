@@ -17,7 +17,7 @@ import net.minecraft.world.item.Item.TooltipContext
 import net.minecraft.world.level.block.entity.{BlockEntity, BlockEntityType}
 import net.minecraft.world.level.{BlockGetter => IBlockReader}
 
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 class Hologram(props: Properties, val tier: Int) extends SimpleBlock(props) with traits.Tickable {
   val shape = VoxelShapes.box(0, 0, 0, 1, 0.5, 1)
@@ -29,7 +29,7 @@ class Hologram(props: Properties, val tier: Int) extends SimpleBlock(props) with
   // ----------------------------------------------------------------------- //
 
   override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
-    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase() + tier)) {
+    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase() + tier).asScala) {
       tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }

@@ -20,8 +20,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 0}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 0
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -39,8 +41,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 1}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 1
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -58,8 +62,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 2}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 2
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -77,8 +83,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 3}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 3
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -96,8 +104,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 4}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 4
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -115,8 +125,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 5}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 5
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -134,8 +146,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 6}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 6
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -153,8 +167,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 7}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 7
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -172,8 +188,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 8}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 8
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -191,8 +209,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 9}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 9
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -210,8 +230,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 10}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 10
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -229,8 +251,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 11}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 11
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -248,8 +272,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 12}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 12
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -267,8 +293,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 13}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 13
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -286,8 +314,10 @@
               ],
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 14}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 14
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"
@@ -296,8 +326,10 @@
               "type": "minecraft:item",
               "functions": [
                 {
-                  "function": "set_nbt",
-                  "tag": "{\"Damage\": 15}"
+                  "function": "minecraft:set_components",
+                  "components": {
+                    "minecraft:damage": 15
+                  }
                 }
               ],
               "name": "opencomputers:chameliumblock"

@@ -6,8 +6,7 @@ import li.cil.oc.client.Textures
 import li.cil.oc.client.{PacketSender => ClientPacketSender}
 import li.cil.oc.common.menu
 
-import scala.collection.JavaConverters.asJavaCollection
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 import net.minecraft.world.entity.player.Inventory
 import net.minecraft.network.chat.Component
 import net.minecraft.client.gui.components.Button
@@ -36,13 +35,14 @@ class Case(state: menu.Case, playerInventory: Inventory, name: Component)
     super.drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
     if (powerButton.isMouseOver(mouseX, mouseY)) {
       val tooltip = new java.util.ArrayList[Component]
-      tooltip.addAll(asJavaCollection(
+      tooltip.addAll(
         (if (inventoryContainer.isRunning) Localization.Computer.TurnOff
         else Localization.Computer.TurnOn)
           .linesIterator
           .map(Component.literal)
-          .toIterable
-      ))
+          .toSeq
+          .asJava
+      )
       graphics.renderComponentTooltip(font, tooltip, mouseX - leftPos, mouseY - topPos)
     }
   }

@@ -21,7 +21,7 @@ import net.minecraft.client.renderer.blockentity.{BlockEntityRenderer => TileEnt
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 import net.minecraft.world.item.{BlockItem, ItemDisplayContext, ItemStack, Items}
 import net.minecraft.core.{Direction, Vec3i}
-import net.minecraft.world.phys.Vec3
+import net.minecraft.world.phys.{AABB, Vec3}
 import net.minecraft.ChatFormatting
 import net.minecraft.client.gui.Font
 import net.neoforged.neoforge.common.NeoForge
@@ -46,6 +46,11 @@ object RobotRenderer extends BlockEntityRendererProvider[blockentity.RobotProxy]
 }
 
 class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
+  // Robot rendering extends outside the proxy block's normal one-block bounds
+  // while hovering and moving, so use an expanded culling box.
+  override def getRenderBoundingBox(entity: blockentity.RobotProxy): AABB =
+    new AABB(entity.getBlockPos).inflate(0.5)
+
   private val mountPoints = new Array[RobotRenderEvent.MountPoint](7)
 
   private val slotNameMapping = Map(
@@ -249,7 +254,7 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
     matrix.translate(0.5, 0.5, 0.5)
 
     if (robot.proxy != proxy) {
-      matrix.translate(robot.proxy.x - proxy.x, robot.proxy.y - proxy.y, robot.proxy.z - proxy.z)
+      matrix.translate((robot.proxy.x - proxy.x).toDouble, (robot.proxy.y - proxy.y).toDouble, (robot.proxy.z - proxy.z).toDouble)
     }
 
     if (robot.isAnimatingMove) {
@@ -398,7 +403,7 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
 
       font.drawInBatch(
         (if (EventHandler.isItTime) ChatFormatting.OBFUSCATED.toString else "") + name,
-        -halfWidth, 0f,
+        -halfWidth.toFloat, 0f,
         -1,
         false,
         matrix.last.pose(),

@@ -192,7 +192,7 @@ class Relay(pos: BlockPos, state: BlockState)
   // ----------------------------------------------------------------------- //
 
   override protected def createNode(plug: Plug): Connector = api.Network.newNode(plug, Visibility.Network).
-    withConnector(math.round(Settings.get.bufferAccessPoint)).
+    withConnector(math.round(Settings.get.bufferAccessPoint).toDouble).
     create()
 
   override protected def onPlugConnect(plug: Plug, node: Node): Unit = {

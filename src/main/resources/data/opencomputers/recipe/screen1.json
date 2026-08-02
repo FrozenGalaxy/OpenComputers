@@ -20,7 +20,7 @@
     }
   },
   "result": {
-    "item": "opencomputers:screen1",
-    "count": 4
+    "count": 4,
+    "id": "opencomputers:screen1"
   }
 }

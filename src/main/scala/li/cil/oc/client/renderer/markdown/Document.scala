@@ -77,9 +77,9 @@ object Document {
     GL11.glEnable(GL11.GL_SCISSOR_TEST)
     val (x0, y0, x1, y1) = {
       val scale = window.getGuiScale
-      val bottomLeft = new Vector4f(x, y + maxHeight, 0, 1)
+      val bottomLeft = new Vector4f(x.toFloat, (y + maxHeight).toFloat, 0f, 1f)
       bottomLeft.mul(stack.last.pose)
-      val topRight = new Vector4f(x + maxWidth, y, 0, 1)
+      val topRight = new Vector4f((x + maxWidth).toFloat, y.toFloat, 0f, 1f)
       topRight.mul(stack.last.pose)
       ((bottomLeft.x * scale).floor.asInstanceOf[Int],
         (window.getHeight - bottomLeft.y * scale).floor.asInstanceOf[Int],

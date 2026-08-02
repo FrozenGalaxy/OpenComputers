@@ -36,7 +36,7 @@ object RobotData {
       Array.empty[String]
   }
 
-  def randomName = if (names.length > 0) names((math.random * names.length).toInt) else "Robot"
+  def randomName = if (names.length > 0) names((math.random() * names.length).toInt) else "Robot"
 }
 
 class RobotData extends ItemData(Constants.BlockName.Robot) {

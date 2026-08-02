@@ -9,15 +9,15 @@
     }
   ],
   "result": {
-    "item": "opencomputers:floppy",
-    "nbt": {
-      "oc:data": {
-        "oc:fs.label": "openos"
-      },
-      "oc:lootFactory": "opencomputers:openos",
-      "oc:color": 13,
-      "display": {
-        "Name": "{\"text\":\"OpenOS (Operating System)\"}"
+    "id": "opencomputers:floppy",
+    "components": {
+      "minecraft:custom_name": "{\"text\":\"OpenOS (Operating System)\"}",
+      "minecraft:custom_data": {
+        "oc:data": {
+          "oc:fs.label": "openos"
+        },
+        "oc:lootFactory": "opencomputers:openos",
+        "oc:color": 13
       }
     }
   }

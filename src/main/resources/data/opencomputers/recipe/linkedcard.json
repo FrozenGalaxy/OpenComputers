@@ -20,7 +20,7 @@
     }
   },
   "result": {
-    "item": "opencomputers:linkedcard",
-    "count": 2
+    "count": 2,
+    "id": "opencomputers:linkedcard"
   }
 }

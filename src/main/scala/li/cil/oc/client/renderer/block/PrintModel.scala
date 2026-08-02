@@ -27,7 +27,7 @@ import net.minecraft.client.renderer.RenderType
 import net.neoforged.neoforge.client.ChunkRenderTypeSet
 import net.neoforged.neoforge.client.model.data.{ModelData, ModelProperty}
 
-import scala.collection.JavaConverters.bufferAsJavaList
+import scala.jdk.CollectionConverters._
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.io.Source
@@ -145,7 +145,7 @@ object PrintModel extends SmartBlockModelBase {
         val texture = resolveTexture(Settings.resourceDomain + ":block/white")
         faces ++= bakeQuads(makeBox(bounds.minVec, bounds.maxVec), Array.fill(6)(texture), Color.rgbValues(DyeColor.LIME))
       }
-      bufferAsJavaList(faces)
+      faces.asJava
     }
   }
 

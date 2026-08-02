@@ -18,7 +18,7 @@
     }
   ],
   "result": {
-    "item": "opencomputers:netheritesilicon",
-    "count": 12
+    "count": 12,
+    "id": "opencomputers:netheritesilicon"
   }
 }

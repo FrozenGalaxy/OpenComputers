@@ -67,18 +67,14 @@ trait BaseBlockEntity extends net.minecraft.world.level.block.entity.BlockEntity
 
   // ----------------------------------------------------------------------- //
 
-  @deprecatedOverriding("use loadComponentsForServer()", since = "NeoForge 1.21+")
   def loadForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {}
 
-  @deprecatedOverriding("use saveComponentsForServer()", since = "NeoForge 1.21+")
   def saveForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     nbt.putBoolean(IsServerDataTag, true)
   }
 
-  @deprecatedOverriding("use loadComponentsForClient()", since = "NeoForge 1.21+")
   def loadForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {}
 
-  @deprecatedOverriding("use saveComponentsForClient()", since = "NeoForge 1.21+")
   def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     nbt.putBoolean(IsServerDataTag, false)
   }
@@ -111,8 +107,19 @@ trait BaseBlockEntity extends net.minecraft.world.level.block.entity.BlockEntity
     // persistent block entity components are only available directly when
     // loading on the server.
     val holder: DataComponentHolder =
-      if (isServer) Persistable.holder(this)
+      if (isServer) {
+        // OC's data components are persistent block-entity state, not merely
+        // item-transfer components. Once a block has been saved to disk, read
+        // the serialized component patch from its NBT. For a freshly placed
+        // block there is no NBT snapshot yet, so fall back to the component
+        // map Minecraft applied from the placing ItemStack.
+        if (NbtComponentHolder.hasComponents(tag))
+          new NbtComponentHolder(tag, registries)
+        else
+          Persistable.holder(this)
+      }
       else new NbtComponentHolder(tag, registries)
+
     loadComponentsCommon(holder)
 
     if(isServer) {
@@ -126,17 +133,28 @@ trait BaseBlockEntity extends net.minecraft.world.level.block.entity.BlockEntity
     super.saveAdditional(nbt, provider)
     save(nbt, provider)
 
-    val holder = Persistable.holder(this)
-    try {
+    if (isServer) {
+      // Data components on a BlockEntity are not automatically chunk-persistent.
+      // Serialize OC's persistent component snapshot into the block entity NBT.
+      val holder = new MutableNbtComponentHolder()
       saveComponentsCommon(holder)
+      saveComponentsForServer(holder)
+      holder.save(nbt, provider)
 
-      if (isServer) {
-        saveComponentsForServer(holder)
-      } else {
+      // Keep the live BlockEntity component map in sync as well. Minecraft
+      // uses this map when transferring block state to an ItemStack.
+      val liveHolder = Persistable.holder(this)
+      try liveHolder.applyComponents(holder.getComponents)
+      finally liveHolder.close()
+    }
+    else {
+      val holder = Persistable.holder(this)
+      try {
+        saveComponentsCommon(holder)
         saveComponentsForClient(holder)
+      } finally {
+        holder.close()
       }
-    } finally {
-      holder.asInstanceOf[AutoCloseable].close()
     }
   }
 

@@ -534,7 +534,7 @@ object PacketSender {
     val pb = new SimplePacketBuilder(PacketType.PowerState)
 
     pb.writeTileEntity(t)
-    pb.writeDouble(math.round(t.globalBuffer))
+    pb.writeDouble(math.round(t.globalBuffer).toDouble)
     pb.writeDouble(t.globalBufferSize)
 
     pb.sendToPlayersNearTileEntity(t)

@@ -9,7 +9,9 @@
     }
   ],
   "result": {
-    "item": "opencomputers:chameliumblock",
-    "nbt": "{\"Damage\": 2}"
+    "id": "opencomputers:chameliumblock",
+    "components": {
+      "minecraft:damage": 2
+    }
   }
 }

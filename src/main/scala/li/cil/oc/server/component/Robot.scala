@@ -8,7 +8,6 @@ import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.driver.DeviceInfo
-import li.cil.oc.api.fs.FileSystem
 import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
@@ -168,7 +167,7 @@ class Robot(val agent: blockentity.Robot) extends AbstractManagedEnvironment wit
 
     for(rom <- romRobot;
         tag <- holder.getComponent(OCComponents.ROBOT_ROM_FILESYSTEM_DATA)) {
-      rom.asInstanceOf[FileSystem].loadData(tag)
+      rom.asInstanceOf[li.cil.oc.server.component.FileSystem].fileSystem.loadData(tag)
     }
   }
 
@@ -177,7 +176,7 @@ class Robot(val agent: blockentity.Robot) extends AbstractManagedEnvironment wit
 
     for(rom <- romRobot) {
       val tag = new CompoundTag()
-      rom.asInstanceOf[FileSystem].saveData(tag)
+      rom.asInstanceOf[li.cil.oc.server.component.FileSystem].fileSystem.saveData(tag)
       holder.setComponent(OCComponents.ROBOT_ROM_FILESYSTEM_DATA, tag)
     }
   }

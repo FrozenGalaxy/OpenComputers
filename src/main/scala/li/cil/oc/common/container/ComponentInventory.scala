@@ -57,6 +57,12 @@ trait ComponentInventory extends Inventory with network.Environment {
   // ----------------------------------------------------------------------- //
 
   def connectComponents(): Unit = {
+    // Managed component environments are allowed to query their host's world
+    // during construction/load (e.g. TextBuffer, Trading Upgrade). Block
+    // entities are deserialized before Minecraft attaches their Level, so
+    // defer component construction until the host is actually live.
+    if (host.getEnvironmentLevel == null) return
+
     for (slot <- 0 until getContainerSize if slot >= 0 && slot < componentSlots.length) {
       val stack = getItem(slot)
       if (!stack.isEmpty && componentSlots(slot).isEmpty && isComponentSlot(slot, stack)) {
@@ -66,6 +72,12 @@ trait ComponentInventory extends Inventory with network.Environment {
               case Some(component) =>
                 applyLifecycleState(component, Lifecycle.LifecycleState.Constructing)
                 try {
+                  // Restore node identity first. Old OC treated oc:node as part
+                  // of the component inventory contract; in the Data Component
+                  // port the equivalent is OCComponents.ADDRESS on the stack.
+                  // Do this explicitly so a component override cannot
+                  // accidentally regenerate its address by omitting super.
+                  if (component.node != null) component.node.loadData(stack)
                   component.loadData(stack)
                 }
                 catch {
@@ -144,6 +156,7 @@ trait ComponentInventory extends Inventory with network.Environment {
           componentSlots(slot) = Some(component)
           applyLifecycleState(component, Lifecycle.LifecycleState.Constructing)
           try {
+            if (component.node != null) component.node.loadData(stack)
             component.loadData(stack)
           } catch {
             case e: Throwable => OpenComputers.log.warn(s"An item component of type '${component.getClass.getName}' (provided by driver '${driver.getClass.getName}') threw an error while loading.", e)
@@ -196,6 +209,21 @@ trait ComponentInventory extends Inventory with network.Environment {
   protected def save(component: ManagedEnvironment, driver: ItemDriver, stack: ItemStack): Unit = {
     try {
       component.saveData(stack)
+
+      // Enforce node persistence at the inventory boundary. This is the modern
+      // equivalent of old OC's per-component oc:node tag: if an environment
+      // forgot to call super.saveData(), its address must still survive.
+      if (component.node != null) {
+        component.node.saveData(stack)
+
+        val persisted = stack.get(OCComponents.ADDRESS)
+        if (component.node.address != null &&
+            (persisted == null || persisted != component.node.address)) {
+          OpenComputers.log.error(
+            s"Failed to persist component node address for ${component.getClass.getName}: " +
+              s"node=${component.node.address}, stack=$persisted")
+        }
+      }
     } catch {
       case e: Throwable => OpenComputers.log.warn(s"An item component of type '${component.getClass.getName}' (provided by driver '${driver.getClass.getName}') threw an error while saving.", e)
     }

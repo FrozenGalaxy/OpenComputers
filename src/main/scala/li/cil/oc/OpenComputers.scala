@@ -7,6 +7,7 @@ import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.entity.EntityTypes
 import li.cil.oc.common.init.{Blocks, Items}
 import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.openprinter.OpenPrinter
 import li.cil.oc.common.recipe.Recipes
 import li.cil.oc.integration.Mods
 import li.cil.oc.server.loot.LootFunctions
@@ -23,7 +24,7 @@ import net.neoforged.neoforgespi.Environment
 import org.apache.logging.log4j.{LogManager, Logger}
 
 import java.nio.file.Paths
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 object OpenComputers {
   final val ID = "opencomputers"
@@ -70,6 +71,7 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   LootFunctions.init(modBus)
   EntityTypes.ENTITY_TYPES.register(modBus)
   MenuTypes.MENU.register(modBus)
+  OpenPrinter.init(modBus, modContainer)
   modBus.register(li.cil.oc.data.DataGenerators)
   modBus.register(CreativeTab)
   OpenComputers.instance = Some(this)
@@ -87,7 +89,7 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   def imc(e: InterModProcessEvent): Unit = {
     // Technically requires synchronization because IMC.sendTo doesn't check the loading stage.
     e.enqueueWork((() => {
-      InterModComms.getMessages(OpenComputers.ID).sequential.iterator.foreach(IMC.handleMessage)
+      InterModComms.getMessages(OpenComputers.ID).sequential.iterator().asScala.foreach(IMC.handleMessage)
     }): Runnable)
   }
 

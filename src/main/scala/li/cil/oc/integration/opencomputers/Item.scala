@@ -48,7 +48,6 @@ trait Item extends DriverItem {
 }
 
 object Item {
-  @deprecated
   def dataTag(stack: ItemStack): CompoundTag = {
     val nbt = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
     if (!nbt.contains(Settings.namespace + "data")) {
@@ -57,7 +56,6 @@ object Item {
     nbt.getCompound(Settings.namespace + "data")
   }
 
-  @deprecated
   def updateDataTag(stack: ItemStack, fn: Consumer[CompoundTag]): Unit = {
     CustomData.update(DataComponents.CUSTOM_DATA, stack, nbt => {
       if (!nbt.contains(Settings.namespace + "data")) {

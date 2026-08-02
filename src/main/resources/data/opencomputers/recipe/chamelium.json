@@ -20,7 +20,7 @@
     }
   },
   "result": {
-    "item": "opencomputers:chamelium",
-    "count": 16
+    "count": 16,
+    "id": "opencomputers:chamelium"
   }
 }

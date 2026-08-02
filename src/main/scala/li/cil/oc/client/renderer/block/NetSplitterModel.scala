@@ -32,15 +32,15 @@ object NetSplitterModel extends SmartBlockModelBase {
 
   override def getOverrides: ItemOverrides = ItemOverride
 
-  override def getQuads(state: BlockState, side: Direction, rand: RandomSource, data: ModelData, renderType: RenderType): util.List[BakedQuad] =
+  override def getQuads(state: BlockState, side: Direction, rand: RandomSource, data: ModelData, renderType: RenderType): util.List[BakedQuad] = {
+    val faces = mutable.ArrayBuffer.empty[BakedQuad]
+    faces ++= baseModel
     Option(data.get(NET_SPLITTER_PROPERTY)) match {
-      case Some(t) =>
-        val faces = mutable.ArrayBuffer.empty[BakedQuad]
-        faces ++= BaseModel
-        addSideQuads(faces, Direction.values().map(t.isSideOpen))
-        faces.asJava
-      case _ => super.getQuads(state, side, rand, data, renderType)
+      case Some(t) => addSideQuads(faces, Direction.values().map(t.isSideOpen))
+      case _ => addSideQuads(faces, Direction.values().map(_ => false))
     }
+    faces.asJava
+  }
 
   private def getSprite(location: ResourceLocation, atlas: Option[TextureAtlas]): TextureAtlasSprite = atlas match {
     case Some(atls) => atls.getSprite(location)
@@ -56,27 +56,30 @@ object NetSplitterModel extends SmartBlockModelBase {
     getSprite(Textures.Block.NetSplitterSide, atlas)
   )
 
-  protected def GenerateBaseModel(atlas: TextureAtlas) = {
+  protected def GenerateBaseModel(atlas: Option[TextureAtlas]) = {
     val faces = mutable.ArrayBuffer.empty[BakedQuad]
-    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  0/16f,  5/16f),  new Vec3(5/16f,  5/16f,  11/16f)), splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 0/16f,  5/16f),  new Vec3(16/16f, 5/16f,  11/16f)), splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  0/16f,  0/16f),  new Vec3(11/16f, 5/16f,  5/16f)),  splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  0/16f,  11/16f), new Vec3(11/16f, 5/16f,  16/16f)), splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  0/16f,  0/16f),  new Vec3(5/16f,  16/16f, 5/16f)),  splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 0/16f,  0/16f),  new Vec3(16/16f, 16/16f, 5/16f)),  splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  0/16f,  11/16f), new Vec3(5/16f,  16/16f, 16/16f)), splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 0/16f,  11/16f), new Vec3(16/16f, 16/16f, 16/16f)), splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  11/16f, 5/16f),  new Vec3(5/16f,  16/16f, 11/16f)), splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 11/16f, 5/16f),  new Vec3(16/16f, 16/16f, 11/16f)), splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  11/16f, 0/16f),  new Vec3(11/16f, 16/16f, 5/16f)),  splitterTexture(Some(atlas)), None)
-    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  11/16f, 11/16f), new Vec3(11/16f, 16/16f, 16/16f)), splitterTexture(Some(atlas)), None)
+    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  0/16f,  5/16f),  new Vec3(5/16f,  5/16f,  11/16f)), splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 0/16f,  5/16f),  new Vec3(16/16f, 5/16f,  11/16f)), splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  0/16f,  0/16f),  new Vec3(11/16f, 5/16f,  5/16f)),  splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  0/16f,  11/16f), new Vec3(11/16f, 5/16f,  16/16f)), splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  0/16f,  0/16f),  new Vec3(5/16f,  16/16f, 5/16f)),  splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 0/16f,  0/16f),  new Vec3(16/16f, 16/16f, 5/16f)),  splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  0/16f,  11/16f), new Vec3(5/16f,  16/16f, 16/16f)), splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 0/16f,  11/16f), new Vec3(16/16f, 16/16f, 16/16f)), splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(0/16f,  11/16f, 5/16f),  new Vec3(5/16f,  16/16f, 11/16f)), splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(11/16f, 11/16f, 5/16f),  new Vec3(16/16f, 16/16f, 11/16f)), splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  11/16f, 0/16f),  new Vec3(11/16f, 16/16f, 5/16f)),  splitterTexture(atlas), None)
+    faces ++= bakeQuads(makeBox(new Vec3(5/16f,  11/16f, 11/16f), new Vec3(11/16f, 16/16f, 16/16f)), splitterTexture(atlas), None)
     faces.toArray
   }
 
   protected var BaseModel = Array.empty[BakedQuad]
 
+  private def baseModel: Array[BakedQuad] =
+    if (BaseModel.nonEmpty) BaseModel else GenerateBaseModel(None)
+
   def initBaseModel(atlas: TextureAtlas): Unit = {
-    if (atlas.location().equals(InventoryMenu.BLOCK_ATLAS)) BaseModel = GenerateBaseModel(atlas)
+    if (atlas.location().equals(InventoryMenu.BLOCK_ATLAS)) BaseModel = GenerateBaseModel(Some(atlas))
   }
 
   @SubscribeEvent
@@ -107,7 +110,7 @@ object NetSplitterModel extends SmartBlockModelBase {
   object ItemModel extends SmartBlockModelBase {
     override def getQuads(state: BlockState, side: Direction, rand: RandomSource, data: ModelData, renderType: RenderType): util.List[BakedQuad] = {
       val faces = mutable.ArrayBuffer.empty[BakedQuad]
-      faces ++= BaseModel
+      faces ++= baseModel
       addSideQuads(faces, Direction.values().map(_ => false))
       faces.asJava
     }

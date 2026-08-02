@@ -20,7 +20,7 @@
     }
   },
   "result": {
-    "item": "opencomputers:transistor",
-    "count": 8
+    "count": 8,
+    "id": "opencomputers:transistor"
   }
 }

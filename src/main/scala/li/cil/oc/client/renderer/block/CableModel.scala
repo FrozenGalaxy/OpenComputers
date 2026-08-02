@@ -18,7 +18,7 @@ import net.minecraft.world.phys.Vec3
 import net.neoforged.neoforge.client.model.data.{ModelData, ModelProperty}
 
 import java.util
-import scala.collection.JavaConverters.bufferAsJavaList
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
 object CableModel extends SmartBlockModelBase {
@@ -57,7 +57,7 @@ object CableModel extends SmartBlockModelBase {
               faces ++= bakeQuads(Disconnected(side.get3DDataValue), cableCapTexture, None)
           }
         }
-        bufferAsJavaList(faces)
+        faces.asJava
       case _ => super.getQuads(state, side, rand)
     }
 
@@ -106,7 +106,7 @@ object CableModel extends SmartBlockModelBase {
         faces ++= bakeQuads(Connected(1)._2, cableTexture, Some(color))
         faces ++= bakeQuads(Connected(0)._1, cableCapTexture, None)
         faces ++= bakeQuads(Connected(1)._1, cableCapTexture, None)
-        bufferAsJavaList(faces)
+        faces.asJava
       }
     }
 

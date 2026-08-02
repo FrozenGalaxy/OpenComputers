@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["P P", " P "],
+  "key": { "P": { "item": "minecraft:paper" } },
+  "result": { "id": "opencomputers:folder", "count": 1 }
+}

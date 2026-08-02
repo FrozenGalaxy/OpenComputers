@@ -16,7 +16,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour.Properties
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.phys.shapes.{VoxelShape, CollisionContext => ISelectionContext, Shapes => VoxelShapes}
 
-import scala.collection.convert.ImplicitConversionsToScala._
+import scala.jdk.CollectionConverters._
 
 class FlatScreen(props: Properties, tier: Int, val isBack: Boolean) extends Screen(props, tier) {
   private val NorthShape = VoxelShapes.box(0, 0, 15.0 / 16.0, 1, 1, 1)
@@ -43,7 +43,7 @@ class FlatScreen(props: Properties, tier: Int, val isBack: Boolean) extends Scre
   override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
     val (w, h) = Settings.screenResolutionsByTier(tier)
     val depth = PackedColor.Depth.bits(Settings.screenDepthsByTier(tier))
-    for (curr <- Tooltip.get("screen", w, h, depth)) {
+    for (curr <- Tooltip.get("screen", w, h, depth).asScala) {
       tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }

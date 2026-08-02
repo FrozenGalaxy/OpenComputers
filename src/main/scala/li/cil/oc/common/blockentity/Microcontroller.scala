@@ -36,8 +36,7 @@ import net.neoforged.api.distmarker.OnlyIn
 import net.neoforged.neoforge.common.MutableDataComponentHolder
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
-import scala.collection.JavaConverters.asJavaIterable
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters._
 
 class Microcontroller(pos: BlockPos, state: BlockState)
   extends BlockEntity(BlockEntityTypes.MICROCONTROLLER.get(), pos, state)
@@ -75,7 +74,7 @@ class Microcontroller(pos: BlockPos, state: BlockState)
     DeviceAttribute.Capacity -> getContainerSize.toString
   )
 
-  override def getDeviceInfo: util.Map[String, String] = deviceInfo
+  override def getDeviceInfo: util.Map[String, String] = deviceInfo.asJava
 
   // ----------------------------------------------------------------------- //
 
@@ -103,7 +102,7 @@ class Microcontroller(pos: BlockPos, state: BlockState)
 
   // ----------------------------------------------------------------------- //
 
-  override def internalComponents(): java.lang.Iterable[ItemStack] = asJavaIterable(info.components)
+  override def internalComponents(): java.lang.Iterable[ItemStack] = info.components.toSeq.asJava
 
   override def componentSlot(address: String): Int = componentSlots.indexWhere(_.exists(env => env.node != null && env.node.address == address))
 

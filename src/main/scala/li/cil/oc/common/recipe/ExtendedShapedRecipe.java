@@ -14,7 +14,7 @@ public class ExtendedShapedRecipe implements CraftingRecipe {
     private final ShapedRecipe wrapped;
 
     public ExtendedShapedRecipe(ShapedRecipe wrapped) {
-        this.wrapped = ExtendedRecipe.patchRecipe(wrapped);
+        this.wrapped = wrapped;
     }
 
     @Override

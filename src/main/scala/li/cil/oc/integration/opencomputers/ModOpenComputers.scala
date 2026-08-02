@@ -1,5 +1,6 @@
 package li.cil.oc.integration.opencomputers
 
+import li.cil.oc.common.openprinter.OpenPrinter
 import li.cil.oc.Constants
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
@@ -335,6 +336,7 @@ object ModOpenComputers extends ModProxy {
     api.Manual.addProvider("item", ItemImageProvider)
     api.Manual.addProvider("block", BlockImageProvider)
     api.Manual.addProvider("oredict", TagImageProvider)
+    OpenPrinter.registerManual()
 
     api.Manual.addTab(new TextureTabIconRenderer(Textures.GUI.ManualHome), "oc:gui.Manual.Home", "%LANGUAGE%/index.md")
     api.Manual.addTab(new ItemStackTabIconRenderer(api.Items.get("case1").createItemStack(1)), "oc:gui.Manual.Blocks", "%LANGUAGE%/block/index.md")

@@ -109,7 +109,7 @@ class Manual extends screens.Screen(Component.empty()) with traits.Window {
     for ((tab, i) <- ManualAPI.tabs.zipWithIndex if i < maxTabsPerSide) {
       val button = renderables.get(i).asInstanceOf[ImageButton]
       stack.pushPose()
-      stack.translate(button.x + 5, button.y + 5, 0)
+      stack.translate((button.x + 5).toFloat, (button.y + 5).toFloat, 0f)
       tab.renderer.render(graphics)
       stack.popPose()
     }
