@@ -36,13 +36,26 @@ jobs:
       - name: Read publishing metadata
         id: metadata
         shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           echo "curseforge_project_id=$(sed -n 's/^curse_project_id=//p' gradle.properties)" >> "$GITHUB_OUTPUT"
           echo "minecraft_version=$(sed -n 's/^minecraft_version=//p' gradle.properties)" >> "$GITHUB_OUTPUT"
           echo "mod_id=$(sed -n 's/^mod_id=//p' gradle.properties)" >> "$GITHUB_OUTPUT"
+          echo "release_version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build release artifact
         run: ./gradlew build -Prelease_tag="${{ github.event.release.tag_name }}"
+
+      - name: Verify release artifact
+        shell: bash
+        run: |
+          artifact="build/libs/${{ steps.metadata.outputs.mod_id }}-${{ steps.metadata.outputs.release_version }}.jar"
+          if [[ ! -f "$artifact" ]]; then
+            echo "Expected release artifact not found: $artifact" >&2
+            find build/libs -maxdepth 1 -type f -printf '%f\n' | sort >&2
+            exit 1
+          fi
 
       - name: Prepare changelog
         id: changelog
@@ -73,7 +86,7 @@ jobs:
         with:
           curseforge-id: ${{ steps.metadata.outputs.curseforge_project_id }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: build/libs/${{ steps.metadata.outputs.mod_id }}-${{ github.event.release.tag_name }}.jar
+          files: build/libs/${{ steps.metadata.outputs.mod_id }}-${{ steps.metadata.outputs.release_version }}.jar
           name: OpenComputers ${{ github.event.release.tag_name }}
           version: ${{ github.event.release.tag_name }}
           version-type: ${{ github.event.release.prerelease && 'alpha' || 'release' }}
