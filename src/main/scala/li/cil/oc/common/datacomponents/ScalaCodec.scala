@@ -35,8 +35,11 @@ object ScalaCodec {
   def array[T: ClassTag](codec: Codec[T]): Codec[Array[T]] = Codec.list(codec).xmap(_.asScala.toArray, _.toList.asJava)
   def set[T](codec: Codec[T]): Codec[Set[T]] = Codec.list(codec).xmap(_.asScala.toSet, _.toList.asJava)
   def optionFieldOf[T](name: String, codec: Codec[T], lenient: Boolean = false): MapCodec[Option[T]] = Codec.optionalField(name, codec, lenient).xmap(_.toScala, _.toJava)
-  def pair[A, B](pair: (Codec[A], Codec[B])): Codec[(A, B)] = Codec.pair(pair._1, pair._2)
-    .xmap(p => p.getFirst -> p.getSecond, { case (a, b) => Pair.of(a, b) })
+  def pair[A, B](pair: (Codec[A], Codec[B])): Codec[(A, B)] =
+    RecordCodecBuilder.create(inst => inst.group(
+      pair._1.fieldOf("first").forGetter[(A, B)](_._1),
+      pair._2.fieldOf("second").forGetter[(A, B)](_._2)
+    ).apply(inst, (a, b) => a -> b))
 }
 
 object ScalaStreamCodec {
