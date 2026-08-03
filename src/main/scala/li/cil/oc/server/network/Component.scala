@@ -36,7 +36,7 @@ trait Component extends network.Component with Node {
         case (method, callback) => callback match {
           case component: ComponentCallback =>
             multi.environments.find {
-              case (_, environment) => environment.getClass == component.method.getDeclaringClass
+              case (_, environment) => component.method.getDeclaringClass.isAssignableFrom(environment.getClass)
             } match {
               case Some((_, environment)) => method -> Some(environment)
               case _ => method -> None

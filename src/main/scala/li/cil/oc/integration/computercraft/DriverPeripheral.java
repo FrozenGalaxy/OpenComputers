@@ -35,6 +35,14 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
     private static Set<Class<?>> blacklist;
 
     private boolean isBlacklisted(final Object o) {
+        // Create peripherals have native OC drivers. Wrapping Create's CC:T
+        // capability as well would expose duplicate components and duplicate
+        // every event when both computer mods are installed.
+        if (o.getClass().getName().startsWith(
+                "com.simibubi.create.compat.computercraft.implementation.peripherals.")) {
+            return true;
+        }
+
         if (o instanceof BlacklistedPeripheral) {
             return ((BlacklistedPeripheral) o).isPeripheralBlacklisted();
         }
