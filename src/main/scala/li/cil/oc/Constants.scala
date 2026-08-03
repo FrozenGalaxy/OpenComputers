@@ -124,6 +124,7 @@ object Constants {
     final val GraphicsCardTier2 = "graphicscard2"
     final val GraphicsCardTier3 = "graphicscard3"
     final val GraphicsCardTier4 = "graphicscard4"
+    final val QuadGraphicsCard = "quadgraphicscard"
     final val HDDTier1 = "hdd1"
     final val HDDTier2 = "hdd2"
     final val HDDTier3 = "hdd3"

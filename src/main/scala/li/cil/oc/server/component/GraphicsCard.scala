@@ -34,8 +34,8 @@ import scala.util.matching.Regex
 // saved, but before the computer was saved, leading to mismatching states in
 // the save file - a Bad Thing (TM).
 
-class GraphicsCard(val tier: Int) extends AbstractManagedEnvironment with DeviceInfo with component.traits.VideoRamDevice {
-  override val node = Network.newNode(this, Visibility.Neighbors).
+class GraphicsCard(val tier: Int, val vramScreens: Option[Double] = None, val visibility: Visibility = Visibility.Neighbors) extends AbstractManagedEnvironment with DeviceInfo with component.traits.VideoRamDevice {
+  override val node = Network.newNode(this, visibility).
     withComponent("gpu").
     withConnector().
     create()
@@ -76,7 +76,7 @@ class GraphicsCard(val tier: Int) extends AbstractManagedEnvironment with Device
   // a single bitblt can send a screen of data, which is n*set calls where set is writing an entire line
   // So for each tier, we multiple the set cost with the number of lines the screen may have
   final val bitbltCost: Double = Settings.get.bitbltCost * scala.math.pow(2, tier)
-  final val totalVRAM: Double = (maxResolution._1 * maxResolution._2) * Settings.get.vramSizes(0 max tier min (Settings.get.vramSizes.length - 1))
+  final val totalVRAM: Double = (maxResolution._1 * maxResolution._2) * vramScreens.getOrElse(Settings.get.vramSizes(0 max tier min (Settings.get.vramSizes.length - 1)))
 
   var budgetExhausted: Boolean = false // for especially expensive calls, bitblt
 

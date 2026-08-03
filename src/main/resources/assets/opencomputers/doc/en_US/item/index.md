@@ -23,6 +23,7 @@ Keep in mind that some of these may not be available, depending on the recipe se
 * [Data Card](datacard1.md)
 * [Debug Card](debugCard.md) (aka ami)
 * [Graphics Card](graphicscard1.md)
+* [Quad T2 Graphics Card](quadgraphicscard.md)
 * [Internet Card](internetcard.md)
 * [Linked Card](linkedcard.md)
 * [Network Card](lancard.md)
