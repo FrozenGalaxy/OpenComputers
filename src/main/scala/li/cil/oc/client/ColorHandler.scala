@@ -74,13 +74,16 @@ object ColorHandler {
 
     register((stack, tintIndex) =>
       if (tintIndex == 1) {
-        if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else 0x66DD55
-      } else 0xFFFFFF,
+        // Item tint colors are ARGB in modern Minecraft. Preserve full opacity;
+        // returning a 24-bit RGB value makes alpha = 0 and the layer invisible.
+        val rgb = if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else 0x66DD55
+        0xFF000000 | (rgb & 0x00FFFFFF)
+      } else 0xFFFFFFFF,
       api.Items.get(Constants.ItemName.HoverBoots).item())
   }
 
   def register(handler: (BlockState, BlockGetter, BlockPos, Int) => Int, blocks: Block*): Unit = {
-    Minecraft.getInstance.getBlockColors.register((state: BlockState, world: BlockAndTintGetter, pos: BlockPos, tintIndex: Int) => 
+    Minecraft.getInstance.getBlockColors.register((state: BlockState, world: BlockAndTintGetter, pos: BlockPos, tintIndex: Int) =>
       handler(state, world, pos, tintIndex), blocks: _*)
   }
 
