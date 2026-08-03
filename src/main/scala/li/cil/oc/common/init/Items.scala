@@ -172,12 +172,11 @@ object Items extends ItemAPI {
   private val registeredItems: ArrayBuffer[ItemStack] = mutable.ArrayBuffer.empty[ItemStack]
 
   override def registerFloppy(name: String, loc: ResourceLocation, color: DyeColor, factory: Callable[FileSystem], doRecipeCycling: Boolean): ItemStack = {
-    // NOTE: Do not also add this to `registeredItems`. Loot.registerLootDisk already
-    // adds the stack to `Loot.disksForClient`, which decorateCreativeTab consumes
-    // separately. Adding it here too caused floppy loot disks to be registered twice
-    // in the creative tab, crashing BuildCreativeModeTabContentsEvent with
-    // "Itemstack ... already exists in the tab's list".
-    Loot.registerLootDisk(name, loc, color, factory, doRecipeCycling).copy()
+    val stack = Loot.registerLootDisk(name, loc, color, factory, doRecipeCycling)
+
+    registeredItems += stack
+
+    stack.copy()
   }
 
   override def registerEEPROM(name: String, code: Array[Byte], data: Array[Byte], readonly: Boolean): ItemStack = {

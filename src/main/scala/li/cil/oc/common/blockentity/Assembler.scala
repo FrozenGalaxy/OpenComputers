@@ -171,7 +171,12 @@ class Assembler(pos: BlockPos, state: BlockState)
 
   override def saveForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForServer(nbt, provider)
-    nbt.setNewCompoundTag(OutputTag, _ => output.get.save(provider))
+    if (!output.isEmpty) {
+      nbt.setNewCompoundTag(OutputTag, _ => output.get.save(provider))
+    }
+    else {
+      nbt.remove(OutputTag)
+    }
     nbt.putDouble(TotalTag, totalRequiredEnergy)
     nbt.putDouble(RemainingTag, requiredEnergy)
   }

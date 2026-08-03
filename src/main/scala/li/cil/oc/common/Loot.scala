@@ -69,6 +69,7 @@ object Loot {
   def registerLootDisk(name: String, loc: ResourceLocation, color: DyeColor, factory: Callable[FileSystem], doRecipeCycling: Boolean): ItemStack = {
     val stack = Items.get(Constants.ItemName.Floppy).createItemStack(1)
     stack.set(OCComponents.LABEL, name)
+    stack.set(DataComponents.CUSTOM_NAME, Component.literal(name))
     stack.set(OCComponents.LOOT_DISK, loc)
     stack.set(OCComponents.DISK_COLOR, color)
 

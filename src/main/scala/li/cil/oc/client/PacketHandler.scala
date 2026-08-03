@@ -28,6 +28,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.sounds.{SoundEvent, SoundSource}
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import net.neoforged.neoforge.common.NeoForge
@@ -416,14 +417,17 @@ object PacketHandler extends CommonPacketHandler {
 
   def onLootDisk(p: PacketParser): Unit = {
     val stack = p.readItemStack()
-    if (!stack.isEmpty) {
+    if (!stack.isEmpty && !Loot.disksForClient.exists(ItemStack.isSameItemSameComponents(_, stack))) {
       Loot.disksForClient += stack
+      if (Mods.JustEnoughItems.isModAvailable) {
+        li.cil.oc.integration.jei.ModJEI.addDiskAtRuntime(stack)
+      }
     }
   }
 
   def onCyclingDisk(p: PacketParser): Any = {
     val stack = p.readItemStack()
-    if (!stack.isEmpty) {
+    if (!stack.isEmpty && !Loot.disksForCyclingClient.exists(ItemStack.isSameItemSameComponents(_, stack))) {
       Loot.disksForCyclingClient += stack
     }
   }

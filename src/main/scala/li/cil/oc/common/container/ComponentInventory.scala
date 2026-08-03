@@ -5,11 +5,10 @@ import li.cil.oc.api
 import li.cil.oc.api.{Driver, ImmutableItemStack, network}
 import li.cil.oc.api.driver.{DriverItem => ItemDriver}
 import li.cil.oc.api.network.EnvironmentHost
-import li.cil.oc.api.network.ManagedEnvironment
-import li.cil.oc.api.network.Node
+import li.cil.oc.api.network.{Component, ManagedEnvironment, Node, Visibility}
 import li.cil.oc.api.util.Lifecycle
 import li.cil.oc.common.datacomponents.OCComponents
-import li.cil.oc.integration.opencomputers.Item
+import li.cil.oc.integration.opencomputers.{DriverTablet, Item}
 import net.minecraft.core.HolderLookup
 import net.minecraft.core.component.DataComponentType
 import net.minecraft.world.item.ItemStack
@@ -77,8 +76,7 @@ trait ComponentInventory extends Inventory with network.Environment {
                   // port the equivalent is OCComponents.ADDRESS on the stack.
                   // Do this explicitly so a component override cannot
                   // accidentally regenerate its address by omitting super.
-                  if (component.node != null) component.node.loadData(stack)
-                  component.loadData(stack)
+                  load(component, driver, stack)
                 }
                 catch {
                   case e: Throwable => OpenComputers.log.warn(s"An item component of type '${component.getClass.getName}' (provided by driver '${driver.getClass.getName}') threw an error while loading.", e)
@@ -156,8 +154,7 @@ trait ComponentInventory extends Inventory with network.Environment {
           componentSlots(slot) = Some(component)
           applyLifecycleState(component, Lifecycle.LifecycleState.Constructing)
           try {
-            if (component.node != null) component.node.loadData(stack)
-            component.loadData(stack)
+            load(component, driver, stack)
           } catch {
             case e: Throwable => OpenComputers.log.warn(s"An item component of type '${component.getClass.getName}' (provided by driver '${driver.getClass.getName}') threw an error while loading.", e)
           }
@@ -206,23 +203,64 @@ trait ComponentInventory extends Inventory with network.Environment {
     }
   }
 
+  protected def load(component: ManagedEnvironment, driver: ItemDriver, stack: ItemStack): Unit = {
+    def loadFrom(persistenceStack: ItemStack): Unit = {
+      // Restore node identity first. Old OC treated oc:node as part of the
+      // component inventory contract; in the Data Component port the
+      // equivalent is OCComponents.ADDRESS on the persistence stack.
+      if (component.node != null) component.node.loadData(persistenceStack)
+      component.loadData(persistenceStack)
+    }
+
+    driver match {
+      case DriverTablet =>
+        // A tablet exposes its embedded filesystem as the component. Loading
+        // from the outer tablet stack would make the filesystem consume the
+        // tablet's own data components (including its battery state).
+        DriverTablet.withFileSystemStack(stack)(loadFrom)
+        // The embedded drive is normally a neighbor-visible component inside
+        // the tablet. In a charger it is a proxy component for the charger's
+        // whole network, so restore the driver's visibility override after
+        // loading the drive's persisted component state.
+        component.node match {
+          case node: Component => node.setVisibility(Visibility.Network)
+          case _ =>
+        }
+      case _ => loadFrom(stack)
+    }
+  }
+
   protected def save(component: ManagedEnvironment, driver: ItemDriver, stack: ItemStack): Unit = {
     try {
-      component.saveData(stack)
+      def saveTo(persistenceStack: ItemStack): Unit = {
+        component.saveData(persistenceStack)
 
-      // Enforce node persistence at the inventory boundary. This is the modern
-      // equivalent of old OC's per-component oc:node tag: if an environment
-      // forgot to call super.saveData(), its address must still survive.
-      if (component.node != null) {
-        component.node.saveData(stack)
+        // Enforce node persistence at the inventory boundary. This is the modern
+        // equivalent of old OC's per-component oc:node tag: if an environment
+        // forgot to call super.saveData(), its address must still survive.
+        if (component.node != null) {
+          component.node.saveData(persistenceStack)
 
-        val persisted = stack.get(OCComponents.ADDRESS)
-        if (component.node.address != null &&
-            (persisted == null || persisted != component.node.address)) {
-          OpenComputers.log.error(
-            s"Failed to persist component node address for ${component.getClass.getName}: " +
-              s"node=${component.node.address}, stack=$persisted")
+          val persisted = persistenceStack.get(OCComponents.ADDRESS)
+          if (component.node.address != null &&
+              (persisted == null || persisted != component.node.address)) {
+            OpenComputers.log.error(
+              s"Failed to persist component node address for ${component.getClass.getName}: " +
+                s"node=${component.node.address}, stack=$persisted")
+          }
         }
+      }
+
+      driver match {
+        case DriverTablet =>
+          // The environment represented by a tablet in a component slot is its
+          // embedded filesystem. Persist it into that nested disk ItemStack and
+          // then write the updated contents back to the tablet. Never serialize
+          // the filesystem node directly onto the outer tablet stack, because
+          // connector persistence uses OCComponents.CHARGE and would overwrite
+          // the tablet's battery.
+          DriverTablet.withFileSystemStack(stack)(saveTo)
+        case _ => saveTo(stack)
       }
     } catch {
       case e: Throwable => OpenComputers.log.warn(s"An item component of type '${component.getClass.getName}' (provided by driver '${driver.getClass.getName}') threw an error while saving.", e)

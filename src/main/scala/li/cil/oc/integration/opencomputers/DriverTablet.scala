@@ -25,19 +25,52 @@ object DriverTablet extends Item {
     else {
       Tablet.Server.cache.invalidate(Tablet.getOrCreateId(stack))
       val data = new TabletData(stack)
-      data.items.collectFirst {
-        case fs if !fs.isEmpty && DriverFileSystem.worksWith(fs) => fs
-      }.map(DriverFileSystem.createEnvironment(_, host)) match {
-        case Some(environment) => environment.node match {
-          case component: Component =>
-            component.setVisibility(Visibility.Network)
-            environment.saveData(stack)
-            environment
+      val index = fileSystemIndex(data)
+      if (index < 0) null
+      else {
+        val fsStack = data.items(index)
+        Option(DriverFileSystem.createEnvironment(fsStack, host)) match {
+          case Some(environment) => environment.node match {
+            case component: Component =>
+              component.setVisibility(Visibility.Network)
+              // Creating a filesystem environment may initialize data on the
+              // embedded disk stack (most importantly its address). Persist the
+              // modified embedded stack back into the tablet, but never save the
+              // filesystem environment itself onto the outer tablet stack.
+              data.items(index) = fsStack
+              data.saveData(stack)
+              environment
+            case _ => null
+          }
           case _ => null
         }
-        case _ => null
       }
     }
+
+
+  private def fileSystemIndex(data: TabletData): Int =
+    data.items.indexWhere(fs => !fs.isEmpty && DriverFileSystem.worksWith(fs))
+
+  /**
+   * Run persistence code against the filesystem ItemStack embedded in a tablet.
+   *
+   * A tablet is a proxy component: the environment exposed to the host is the
+   * tablet's internal filesystem, not the tablet item itself. Persisting that
+   * environment directly to the outer tablet would overwrite tablet-level data
+   * components such as CHARGE.
+   */
+  def withFileSystemStack(tabletStack: ItemStack)(f: ItemStack => Unit): Boolean = {
+    val data = new TabletData(tabletStack)
+    val index = fileSystemIndex(data)
+    if (index < 0) false
+    else {
+      val fsStack = data.items(index)
+      f(fsStack)
+      data.items(index) = fsStack
+      data.saveData(tabletStack)
+      true
+    }
+  }
 
   override def slot(stack: ItemStack) = Slot.Tablet
 

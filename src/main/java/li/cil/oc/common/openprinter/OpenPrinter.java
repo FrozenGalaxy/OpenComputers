@@ -172,7 +172,8 @@ public final class OpenPrinter {
         event.accept(COLOR_INK.get());
         event.accept(PAPER_SHREDS.get());
         event.accept(FOLDER.get());
-        if (!toolsDisk.isEmpty()) event.accept(toolsDisk.copy());
+        // The tools disk is registered through OpenComputers' public floppy API,
+        // which already adds it to the OpenComputers creative tab.
     }
 
     /**

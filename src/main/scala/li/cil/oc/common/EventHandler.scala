@@ -200,7 +200,9 @@ object EventHandler {
     PetRenderer.isInitialized = false
     PetRenderer.hidden.clear()
     Loot.disksForClient.clear()
+    Loot.disksForClient ++= Loot.globalDisks.map(_._1.copy())
     Loot.disksForCyclingClient.clear()
+    Loot.disksForCyclingClient ++= Loot.disksForCyclingServer.map(_.copy())
 
     client.Sound.startLoop(null, "computer_running", 0f, 0)
     scheduleServer(() => client.Sound.stopLoop(null))

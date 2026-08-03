@@ -136,7 +136,13 @@ trait BaseBlockEntity extends net.minecraft.world.level.block.entity.BlockEntity
     if (isServer) {
       // Data components on a BlockEntity are not automatically chunk-persistent.
       // Serialize OC's persistent component snapshot into the block entity NBT.
-      val holder = new MutableNbtComponentHolder()
+      // saveForServer may itself persist component-backed state into this NBT
+      // (notably TextBuffer, whose node address is required to reconnect the
+      // screen and locate its external buffer save). Seed this holder from the
+      // NBT we have already written instead of starting empty, otherwise this
+      // second component write replaces opencomputers:components and silently
+      // drops everything written by saveForServer.
+      val holder = new MutableNbtComponentHolder(nbt, provider)
       saveComponentsCommon(holder)
       saveComponentsForServer(holder)
       holder.save(nbt, provider)
@@ -185,7 +191,9 @@ trait BaseBlockEntity extends net.minecraft.world.level.block.entity.BlockEntity
       }
 
       try {
-        val holder = new MutableNbtComponentHolder()
+        // Preserve any component-backed state saveForClient already placed in
+        // the update NBT for the same reason as the server save path above.
+        val holder = new MutableNbtComponentHolder(nbt, provider)
         saveComponentsCommon(holder)
         saveComponentsForClient(holder)
         holder.save(nbt, provider)
