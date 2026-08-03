@@ -3,6 +3,7 @@ package li.cil.oc.server
 import java.io.InputStream
 import li.cil.oc.Localization
 import li.cil.oc.OpenComputers
+import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.internal.Server
 import li.cil.oc.api.machine.Machine
@@ -252,6 +253,7 @@ object PacketHandler extends CommonPacketHandler {
   def onClipboard(p: PacketParser): Unit = {
     val address = p.readUTF()
     val copy = p.readUTF()
+    if (copy.length > Settings.get.maxClipboardTextLength) return
     ComponentTracker.get(p.player.level, address) match {
       case Some(buffer: api.internal.TextBuffer) if canInteractWith(buffer, p.player) => buffer.clipboard(copy, p.player)
       case _ => // Invalid Packet
