@@ -14,7 +14,6 @@ import li.cil.oc.api.network.Component
 import li.cil.oc.common.blockentity.Relay
 import li.cil.oc.util.ResultWrapper._
 import net.minecraft.core.Direction
-import net.neoforged.neoforge.capabilities.ICapabilityProvider
 
 import scala.collection.JavaConverters.mapAsJavaMap
 import scala.collection.convert.ImplicitConversionsToJava._
@@ -102,7 +101,11 @@ class RelayPeripheral(val relay: Relay) extends IDynamicPeripheral {
 
   private val methodNames = methods.keys.toArray.sorted
 
-  override def getType = "modem"
+  override def getType = "opencomputers:relay"
+
+  override def getAdditionalTypes = java.util.Set.of("modem")
+
+  override def getTarget = relay
 
   override def attach(computer: IComputerAccess): Unit = {
     relay.computers += computer

@@ -6,6 +6,7 @@ import dan200.computercraft.api.lua.*;
 import dan200.computercraft.api.peripheral.IComputerAccess;
 import dan200.computercraft.api.peripheral.IDynamicPeripheral;
 import dan200.computercraft.api.peripheral.IPeripheral;
+import dan200.computercraft.api.peripheral.PeripheralCapability;
 import dan200.computercraft.api.peripheral.WorkMonitor;
 import li.cil.oc.OpenComputers;
 import li.cil.oc.Settings;
@@ -23,8 +24,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.neoforged.neoforge.capabilities.BlockCapability;
-import dan200.computercraft.api.peripheral.IPeripheral;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Array;
@@ -59,34 +58,12 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
         return false;
     }
 
-    @SuppressWarnings("unchecked")
-    private static BlockCapability<IPeripheral, Direction> getPeripheralCapability() {
-        // NeoForge 1.21.1: CC:T exposes its capability as a BlockCapability<IPeripheral, Direction>.
-        // Try to obtain it via reflection to avoid hard dependency.
-        try {
-            Class<?> clazz = Class.forName("dan200.computercraft.shared.Capabilities");
-            return (BlockCapability<IPeripheral, Direction>) clazz.getField("CAPABILITY_PERIPHERAL").get(null);
-        } catch (Exception e) {
-            // Fall back to the OC-registered one (PeripheralProvider)
-            return li.cil.oc.integration.computercraft.PeripheralProvider$.MODULE$.CAPABILITY_PERIPHERAL();
-        }
-    }
-
-    private static final BlockCapability<IPeripheral, Direction> PERIPHERAL_CAP = getPeripheralCapability();
-
     private IPeripheral findPeripheral(final Level world, final BlockPos pos, final Direction side) {
-        if (PERIPHERAL_CAP == null) return null;
-
-        // NeoForge 1.21.1: query capability from the level directly
-        final IPeripheral p = world.getCapability(PERIPHERAL_CAP, pos, side);
+        final IPeripheral p = world.getCapability(PeripheralCapability.get(), pos, side);
 
         if (p != null && !isBlacklisted(p)) {
             return p;
         }
-
-        final IPeripheral p2 = world.getCapability(PeripheralProvider.CAPABILITY_PERIPHERAL(), pos, side);
-        if (p2 != null && !isBlacklisted(p2)) return p2;
-
         return null;
     }
 

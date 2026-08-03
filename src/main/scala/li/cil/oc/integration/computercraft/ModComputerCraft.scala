@@ -7,12 +7,14 @@ import li.cil.oc.integration.Mods
 object ModComputerCraft extends ModProxy {
   override def getMod = Mods.ComputerCraft
 
+  override def preInitialize(): Unit = {
+    PeripheralProvider.register()
+  }
+
   override def initialize(): Unit = {
     Driver.add(DriverComputerCraftMedia)
     Driver.add(new DriverPeripheral())
 
     Driver.add(new ConverterLuaObject)
-
-    PeripheralProvider.register()
   }
 }
