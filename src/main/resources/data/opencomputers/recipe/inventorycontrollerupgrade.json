@@ -7,13 +7,13 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:ingots/gold"
+      "tag": "c:ingots/gold"
     },
     "d": {
       "item": "minecraft:dropper"
     },
     "p": {
-      "tag": "forge:pistons"
+      "item": "minecraft:piston"
     },
     "C": {
       "tag": "opencomputers:circuitchip2"

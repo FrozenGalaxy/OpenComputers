@@ -7,13 +7,13 @@
   ],
   "key": {
     "i": {
-      "tag": "forge:ingots/iron"
+      "tag": "c:ingots/iron"
     },
     "c": {
-      "tag": "forge:chests"
+      "tag": "c:chests"
     },
     "p": {
-      "tag": "forge:pistons"
+      "item": "minecraft:piston"
     },
     "C": {
       "tag": "opencomputers:circuitchip2"

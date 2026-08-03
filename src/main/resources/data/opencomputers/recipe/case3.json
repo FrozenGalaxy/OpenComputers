@@ -7,10 +7,10 @@
   ],
   "key": {
     "d": {
-      "tag": "forge:gems/diamond"
+      "tag": "c:gems/diamond"
     },
     "c": {
-      "tag": "forge:chests"
+      "tag": "c:chests"
     },
     "b": {
       "item": "minecraft:iron_bars"

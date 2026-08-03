@@ -10,7 +10,7 @@
       "tag": "minecraft:planks"
     },
     "c": {
-      "tag": "forge:chests"
+      "tag": "c:chests"
     },
     "h": {
       "item": "minecraft:hopper"
@@ -19,7 +19,7 @@
       "item": "minecraft:dropper"
     },
     "p": {
-      "tag": "forge:pistons"
+      "item": "minecraft:piston"
     },
     "C": {
       "tag": "opencomputers:circuitchip1"

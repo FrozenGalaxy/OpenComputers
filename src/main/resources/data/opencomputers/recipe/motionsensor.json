@@ -7,7 +7,7 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:ingots/gold"
+      "tag": "c:ingots/gold"
     },
     "d": {
       "item": "minecraft:daylight_detector"

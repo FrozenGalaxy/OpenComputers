@@ -7,13 +7,13 @@
   ],
   "key": {
     "i": {
-      "tag": "forge:ingots/iron"
+      "tag": "c:ingots/iron"
     },
     "g": {
-      "tag": "forge:glass"
+      "tag": "c:glass_blocks"
     },
     "l": {
-      "tag": "forge:storage_blocks/lapis"
+      "tag": "c:storage_blocks/lapis"
     },
     "C": {
       "tag": "opencomputers:circuitchip3"

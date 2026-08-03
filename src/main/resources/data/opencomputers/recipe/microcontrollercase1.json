@@ -7,13 +7,13 @@
   ],
   "key": {
     "i": {
-      "tag": "forge:nuggets/iron"
+      "tag": "c:nuggets/iron"
     },
     "r": {
-      "tag": "forge:dusts/redstone"
+      "tag": "c:dusts/redstone"
     },
     "c": {
-      "tag": "forge:chests"
+      "tag": "c:chests"
     },
     "C": {
       "tag": "opencomputers:circuitchip1"

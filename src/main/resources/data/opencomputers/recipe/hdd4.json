@@ -10,7 +10,7 @@
       "item": "minecraft:netherite_scrap"
     },
     "p": {
-      "tag": "forge:pistons"
+      "item": "minecraft:piston"
     },
     "D": {
       "tag": "opencomputers:materialdisk"

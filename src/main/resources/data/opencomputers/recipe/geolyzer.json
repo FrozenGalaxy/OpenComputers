@@ -7,7 +7,7 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:ingots/gold"
+      "tag": "c:ingots/gold"
     },
     "c": {
       "item": "minecraft:compass"

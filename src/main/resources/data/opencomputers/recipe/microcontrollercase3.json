@@ -10,10 +10,10 @@
       "tag": "opencomputers:chipdiamond"
     },
     "r": {
-      "tag": "forge:storage_blocks/redstone"
+      "tag": "c:storage_blocks/redstone"
     },
     "c": {
-      "tag": "forge:chests"
+      "tag": "c:chests"
     },
     "C": {
       "tag": "opencomputers:circuitchip4"

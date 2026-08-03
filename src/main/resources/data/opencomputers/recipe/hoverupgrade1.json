@@ -7,13 +7,13 @@
   ],
   "key": {
     "i": {
-      "tag": "forge:nuggets/iron"
+      "tag": "c:nuggets/iron"
     },
     "f": {
-      "tag": "forge:feathers"
+      "tag": "c:feathers"
     },
     "l": {
-      "tag": "forge:leather"
+      "tag": "c:leathers"
     },
     "C": {
       "tag": "opencomputers:circuitchip1"

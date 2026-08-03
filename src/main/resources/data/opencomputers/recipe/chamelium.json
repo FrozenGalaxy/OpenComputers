@@ -7,13 +7,13 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:gravel"
+      "tag": "c:gravels"
     },
     "c": {
       "item": "minecraft:coal"
     },
     "r": {
-      "tag": "forge:dusts/redstone"
+      "tag": "c:dusts/redstone"
     },
     "w": {
       "item": "minecraft:water_bucket"

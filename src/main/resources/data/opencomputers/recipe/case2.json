@@ -7,10 +7,10 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:ingots/gold"
+      "tag": "c:ingots/gold"
     },
     "c": {
-      "tag": "forge:chests"
+      "tag": "c:chests"
     },
     "b": {
       "item": "minecraft:iron_bars"

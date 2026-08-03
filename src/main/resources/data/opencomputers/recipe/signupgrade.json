@@ -7,13 +7,13 @@
   ],
   "key": {
     "s": {
-      "tag": "forge:rods/wooden"
+      "tag": "c:rods/wooden"
     },
     "b": {
-      "tag": "forge:dyes/black"
+      "tag": "c:dyes/black"
     },
     "i": {
-      "tag": "forge:ingots/iron"
+      "tag": "c:ingots/iron"
     },
     "p": {
       "item": "minecraft:sticky_piston"

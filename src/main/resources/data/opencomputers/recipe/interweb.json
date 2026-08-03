@@ -7,10 +7,10 @@
   ],
   "key": {
     "s": {
-      "tag": "forge:string"
+      "tag": "c:strings"
     },
     "e": {
-      "tag": "forge:ender_pearls"
+      "tag": "c:ender_pearls"
     }
   },
   "result": {

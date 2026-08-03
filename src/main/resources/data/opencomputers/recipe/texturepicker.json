@@ -7,28 +7,28 @@
   ],
   "key": {
     "D": {
-      "tag": "forge:dyes/black"
+      "tag": "c:dyes/black"
     },
     "R": {
-      "tag": "forge:dyes/red"
+      "tag": "c:dyes/red"
     },
     "G": {
-      "tag": "forge:dyes/green"
+      "tag": "c:dyes/green"
     },
     "B": {
-      "tag": "forge:dyes/blue"
+      "tag": "c:dyes/blue"
     },
     "P": {
-      "tag": "forge:dyes/purple"
+      "tag": "c:dyes/purple"
     },
     "Y": {
-      "tag": "forge:dyes/yellow"
+      "tag": "c:dyes/yellow"
     },
     "M": {
-      "tag": "forge:dyes/magenta"
+      "tag": "c:dyes/magenta"
     },
     "W": {
-      "tag": "forge:dyes/white"
+      "tag": "c:dyes/white"
     },
     "A": {
       "tag": "opencomputers:analyzer"

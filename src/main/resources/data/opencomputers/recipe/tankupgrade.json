@@ -19,7 +19,7 @@
       "item": "minecraft:dispenser"
     },
     "p": {
-      "tag": "forge:pistons"
+      "item": "minecraft:piston"
     },
     "C": {
       "tag": "opencomputers:circuitchip1"

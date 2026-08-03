@@ -10,10 +10,10 @@
       "item": "minecraft:glowstone"
     },
     "G": {
-      "tag": "forge:glass/tinted"
+      "tag": "c:glass_blocks/tinted"
     },
     "o": {
-      "tag": "forge:obsidian"
+      "tag": "c:obsidians/normal"
     },
     "C": {
       "tag": "opencomputers:circuitchip4"

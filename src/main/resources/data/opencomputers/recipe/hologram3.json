@@ -10,10 +10,10 @@
       "item": "minecraft:netherite_scrap"
     },
     "g": {
-      "tag": "forge:glass"
+      "tag": "c:glass_blocks"
     },
     "o": {
-      "tag": "forge:obsidian"
+      "tag": "c:obsidians/normal"
     },
     "b": {
       "item": "minecraft:blaze_powder"

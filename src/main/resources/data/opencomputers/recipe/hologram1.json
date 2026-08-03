@@ -10,13 +10,13 @@
       "tag": "opencomputers:chipdiamond"
     },
     "g": {
-      "tag": "forge:glass_panes"
+      "tag": "c:glass_panes"
     },
     "o": {
-      "tag": "forge:obsidian"
+      "tag": "c:obsidians/normal"
     },
     "G": {
-      "tag": "forge:dusts/glowstone"
+      "tag": "c:dusts/glowstone"
     },
     "C": {
       "tag": "opencomputers:circuitchip2"

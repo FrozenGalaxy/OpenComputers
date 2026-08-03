@@ -7,13 +7,13 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:ingots/gold"
+      "tag": "c:ingots/gold"
     },
     "s": {
-      "tag": "forge:glass"
+      "tag": "c:glass_blocks"
     },
     "o": {
-      "tag": "forge:obsidian"
+      "tag": "c:obsidians/normal"
     },
     "e": {
       "item": "minecraft:ender_eye"

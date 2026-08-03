@@ -7,7 +7,7 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:ingots/gold"
+      "tag": "c:ingots/gold"
     },
     "b": {
       "item": "minecraft:glass_bottle"
@@ -16,7 +16,7 @@
       "item": "minecraft:dispenser"
     },
     "p": {
-      "tag": "forge:pistons"
+      "item": "minecraft:piston"
     },
     "C": {
       "tag": "opencomputers:circuitchip2"

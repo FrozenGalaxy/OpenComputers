@@ -7,13 +7,13 @@
   ],
   "key": {
     "g": {
-      "tag": "forge:nuggets/gold"
+      "tag": "c:nuggets/gold"
     },
     "r": {
-      "tag": "forge:storage_blocks/redstone"
+      "tag": "c:storage_blocks/redstone"
     },
     "c": {
-      "tag": "forge:chests"
+      "tag": "c:chests"
     },
     "C": {
       "tag": "opencomputers:circuitchip3"

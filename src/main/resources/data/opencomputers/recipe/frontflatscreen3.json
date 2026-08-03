@@ -7,16 +7,16 @@
   ],
   "key": {
     "o": {
-      "tag": "forge:obsidian"
+      "tag": "c:obsidians/normal"
     },
     "g": {
-      "tag": "forge:dusts/glowstone"
+      "tag": "c:dusts/glowstone"
     },
     "c": {
       "tag": "opencomputers:circuitchip3"
     },
     "p": {
-      "tag": "forge:glass_panes"
+      "tag": "c:glass_panes"
     }
   },
   "result": {

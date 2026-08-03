@@ -6,10 +6,10 @@
   ],
   "key": {
     "e": {
-      "tag": "forge:ender_pearls"
+      "tag": "c:ender_pearls"
     },
     "r": {
-      "tag": "forge:storage_blocks/redstone"
+      "tag": "c:storage_blocks/redstone"
     },
     "C": {
       "tag": "opencomputers:circuitchip2"

@@ -7,19 +7,19 @@
   ],
   "key": {
     "c": {
-      "tag": "forge:dyes/red"
+      "tag": "c:dyes/red"
     },
     "p": {
-      "tag": "forge:dyes/green"
+      "tag": "c:dyes/green"
     },
     "y": {
-      "tag": "forge:dyes/blue"
+      "tag": "c:dyes/blue"
     },
     "g": {
-      "tag": "forge:ingots/gold"
+      "tag": "c:ingots/gold"
     },
     "G": {
-      "tag": "forge:glass"
+      "tag": "c:glass_blocks"
     },
     "C": {
       "tag": "opencomputers:circuitchip2"

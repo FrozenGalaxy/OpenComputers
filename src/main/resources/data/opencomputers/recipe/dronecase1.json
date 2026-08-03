@@ -10,7 +10,7 @@
       "item": "minecraft:compass"
     },
     "E": {
-      "tag": "forge:end_stones"
+      "tag": "c:end_stones"
     },
     "C": {
       "tag": "opencomputers:circuitchip1"

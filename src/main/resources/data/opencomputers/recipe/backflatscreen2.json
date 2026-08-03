@@ -10,19 +10,19 @@
       "tag": "opencomputers:chipdiamond"
     },
     "r": {
-      "tag": "forge:dyes/red"
+      "tag": "c:dyes/red"
     },
     "g": {
-      "tag": "forge:dyes/green"
+      "tag": "c:dyes/green"
     },
     "b": {
-      "tag": "forge:dyes/blue"
+      "tag": "c:dyes/blue"
     },
     "c": {
       "tag": "opencomputers:circuitchip2"
     },
     "p": {
-      "tag": "forge:glass_panes"
+      "tag": "c:glass_panes"
     }
   },
   "result": {

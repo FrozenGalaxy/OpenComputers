@@ -7,13 +7,13 @@
   ],
   "key": {
     "d": {
-      "tag": "forge:gems/diamond"
+      "tag": "c:gems/diamond"
     },
     "g": {
-      "tag": "forge:glass"
+      "tag": "c:glass_blocks"
     },
     "o": {
-      "tag": "forge:obsidian"
+      "tag": "c:obsidians/normal"
     },
     "b": {
       "item": "minecraft:blaze_powder"
