@@ -7,18 +7,21 @@ plugins {
 }
 
 group = mod_group_id
-// GitHub tags are the canonical release version. A tag named v1.9.2
-// produces OpenComputers-v1.9.2.jar and reports v1.9.2 in-game.
+
+// GitHub tags are the canonical release version.
+// Tags use a leading "v" (for example v1.9.2), but the actual
+// Gradle/mod/Maven version must not include that prefix.
+//
+// - GitHub tag v1.9.2      -> 1.9.2
+// - Jenkins build 154      -> 1.9.2-dev.154
+// - GitHub CI build 154    -> 1.9.2-dev.154
+// - Local build            -> 1.9.2-dev.local
 def githubTag = System.getenv('GITHUB_REF_TYPE') == 'tag'
-        ? System.getenv('GITHUB_REF_NAME')
+        ? System.getenv('GITHUB_REF_NAME')?.replaceFirst(/^v/, '')
         : null
 
 // Non-release builds identify the current development line plus the CI build.
 // Jenkins provides BUILD_NUMBER; GitHub Actions provides GITHUB_RUN_NUMBER.
-// - GitHub tag v1.9.2      -> v1.9.2
-// - Jenkins build 154      -> 1.9.1-dev.154
-// - GitHub CI build 154    -> 1.9.1-dev.154
-// - Local build            -> 1.9.1-dev.local
 def ciBuildNumber = findProperty('build_number') ?:
         System.getenv('BUILD_NUMBER') ?:
         System.getenv('GITHUB_RUN_NUMBER') ?:
@@ -32,6 +35,15 @@ base {
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+configurations {
+    embedded
+    requiredMods
+    compileClasspath.extendsFrom embedded
+    runtimeClasspath.extendsFrom embedded
+    runtimeClasspath.extendsFrom requiredMods
+    implementation.extendsFrom embedded
+}
 
 neoForge {
     version = project.neoforge_version
@@ -55,7 +67,7 @@ neoForge {
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
-            additionalRuntimeClasspathConfiguration.extendsFrom(configurations.runtimeClasspath)
+
         }
 
         client {
@@ -98,15 +110,6 @@ tasks.named('processResources', ProcessResources).configure {
     from('LICENSES') {
         into 'META-INF/licenses'
     }
-}
-
-configurations {
-    embedded
-    requiredMods
-    compileClasspath.extendsFrom embedded
-    runtimeClasspath.extendsFrom embedded
-    runtimeClasspath.extendsFrom requiredMods
-    implementation.extendsFrom embedded
 }
 
 repositories {
@@ -193,6 +196,14 @@ dependencies {
     embedded ":OC-LuaJ:20220907.1"
     embedded ":OC-JNLua-Natives:20220928.1"
 
+    // ModDevGradle 2.x only discovers actual mods from the normal runtime
+    // classpath on Minecraft 1.21.1. These are plain Java libraries that OC
+    // embeds into its release jar, so they must also be explicitly added to
+    // the development run's additional runtime classpath.
+    additionalRuntimeClasspath "com.typesafe:config:1.4.5"
+    additionalRuntimeClasspath ":OC-LuaJ:20220907.1"
+    additionalRuntimeClasspath ":OC-JNLua-Natives:20220928.1"
+
     def jeiSlug = "jei-${minecraft_version}"
 
     // Jade
@@ -218,7 +229,6 @@ dependencies {
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("com.tterrag.registrate:Registrate:${registrate_version}")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
-    implementation("io.github.llamalad7:mixinextras-forge:0.4.1")
 
     // AE2
     compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}:api")
@@ -229,8 +239,8 @@ dependencies {
     runtimeOnly("mekanism:Mekanism:${mekanism_version}:generators")
 
     // JEI
-    runtimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
     compileOnly("mezz.jei:${jeiSlug}-neoforge-api:${jei_version}")
+    runtimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
 
     // CodeChicken
     compileOnly("curse.maven:cb-multipart-258426:5292585")
