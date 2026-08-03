@@ -23,6 +23,7 @@ object Mods {
   val Create = new SimpleMod(IDs.Create)
   val ComputerCraft = new SimpleMod(IDs.ComputerCraft)
   val NeoForge = new SimpleMod(IDs.Forge)
+  val JustEnoughItems = new SimpleMod(IDs.JustEnoughItems)
   val Mekanism = new SimpleMod(IDs.Mekanism)
   val Minecraft = new SimpleMod(IDs.Minecraft)
   val OpenComputers = new SimpleMod(IDs.OpenComputers)
@@ -93,6 +94,7 @@ object Mods {
     final val Create = "create"
     final val ComputerCraft = "computercraft"
     final val Forge = "forge"
+    final val JustEnoughItems = "jei"
     final val Mekanism = "mekanism"
     final val Minecraft = "minecraft"
     final val OpenComputers = "opencomputers"
