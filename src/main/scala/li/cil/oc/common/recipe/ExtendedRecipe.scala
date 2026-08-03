@@ -42,10 +42,14 @@ object ExtendedRecipe {
   private lazy val navigationUpgrade = api.Items.get(Constants.ItemName.NavigationUpgrade)
   private lazy val linkedCard = api.Items.get(Constants.ItemName.LinkedCard)
   private lazy val floppy = api.Items.get(Constants.ItemName.Floppy)
-  private lazy val hdds = Array(
+  private lazy val drives = Array(
     api.Items.get(Constants.ItemName.HDDTier1),
     api.Items.get(Constants.ItemName.HDDTier2),
-    api.Items.get(Constants.ItemName.HDDTier3)
+    api.Items.get(Constants.ItemName.HDDTier3),
+    api.Items.get(Constants.ItemName.HDDTier4),
+    api.Items.get(Constants.ItemName.SSDTier1),
+    api.Items.get(Constants.ItemName.SSDTier2),
+    api.Items.get(Constants.ItemName.SSDTier3)
   )
   private lazy val cpus = Array(
     api.Items.get(Constants.ItemName.CPUTier1),
@@ -123,7 +127,7 @@ object ExtendedRecipe {
       LuaStateFactory.setDefaultArch(craftedStack)
     }
 
-    if (craftedItemName == floppy || hdds.contains(craftedItemName)) {
+    if (craftedItemName == floppy || drives.contains(craftedItemName)) {
       CustomData.update(DataComponents.CUSTOM_DATA, craftedStack, nbt => {
         if (recipe.canCraftInDimensions(1, 1)) {
           // Formatting / loot to normal disk conversion, only keep coloring.

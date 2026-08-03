@@ -41,7 +41,7 @@ object DriverFileSystem extends Item {
     if (host.getEnvironmentLevel != null && host.getEnvironmentLevel.isClientSide) null
     else stack.getItem match {
       case hdd: HardDiskDrive => createEnvironment(stack, hdd.kiloBytes * 1024, hdd.platterCount, host, hdd.tier + 2)
-      case ssd: SolidStateDrive => createEnvironment(stack, ssd.kiloBytes * 1048, 1, host, ssd.tier + 4)
+      case ssd: SolidStateDrive => createEnvironment(stack, ssd.kiloBytes * 1024, 1, host, ssd.tier + 4)
       case disk: FloppyDisk => createEnvironment(stack, Settings.get.floppySize * 1024, 1, host, 1)
       case _ => null
     }
@@ -84,7 +84,7 @@ object DriverFileSystem extends Item {
       else Some(Settings.resourceDomain + ":" + (if (isFloppy) "floppy_access" else "hdd_access"))
       val drive = new DriveData(stack)
       val environment = if (drive.isUnmanaged) {
-        new Drive(capacity max 0, platterCount, label, Option(host), sound, speed, drive.isLocked)
+        new Drive(capacity max 0, platterCount, label, Option(host), sound, speed, drive.isLocked, isSSD)
       }
       else {
         var fs = oc.api.FileSystem.fromSaveDirectory(address, capacity max 0, Settings.get.bufferChanges)
@@ -92,7 +92,13 @@ object DriverFileSystem extends Item {
           fs = oc.api.FileSystem.asReadOnly(fs)
           label = new ReadOnlyLabel(label.getLabel(ServerLifecycleHooks.getCurrentServer.registryAccess()))
         }
-        oc.api.FileSystem.asManagedEnvironment(fs, label, host, sound.orNull, speed)
+        if (isSSD) {
+          li.cil.oc.server.fs.FileSystem.asManagedEnvironment(fs, label, host, sound.orNull, speed,
+            Settings.get.ssdReadCost, Settings.get.ssdWriteCost)
+        }
+        else {
+          oc.api.FileSystem.asManagedEnvironment(fs, label, host, sound.orNull, speed)
+        }
       }
       if (environment != null && environment.node != null) {
         environment.node.asInstanceOf[oc.server.network.Node].address = address

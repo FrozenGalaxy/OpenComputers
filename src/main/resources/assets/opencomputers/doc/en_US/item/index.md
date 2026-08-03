@@ -67,6 +67,7 @@ Keep in mind that some of these may not be available, depending on the recipe se
 * [EEPROM](eeprom.md)
 * [Floppy](floppy.md)
 * [Hard Disk Drive](hdd1.md)
+* [Solid State Drive](ssd1.md)
 * [Memory (RAM)](ram1.md)
 
 ## Crafting

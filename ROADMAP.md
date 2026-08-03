@@ -13,7 +13,7 @@ project-level gaps; implementation notes belong in issues and pull requests.
 
 - [ ] Port advancements.
 - [ ] Add tier-four parts.
-- [ ] Finish solid-state drive support.
+- [x] Finish solid-state drive support.
 - [ ] Add an `/opencomputers` (or `/oc`) command for safe config reloads and
       administration.
 

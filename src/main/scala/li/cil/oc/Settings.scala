@@ -186,6 +186,8 @@ class Settings(val config: Config) {
   val hologramCost = config.getDouble("power.cost.hologram") max 0
   val hddReadCost = (config.getDouble("power.cost.hddRead") max 0) / 1024
   val hddWriteCost = (config.getDouble("power.cost.hddWrite") max 0) / 1024
+  val ssdReadCost = (config.getDouble("power.cost.ssdRead") max 0) / 1024
+  val ssdWriteCost = (config.getDouble("power.cost.ssdWrite") max 0) / 1024
   val gpuSetCost = (config.getDouble("power.cost.gpuSet") max 0) / Settings.basicScreenPixels
   val gpuFillCost = (config.getDouble("power.cost.gpuFill") max 0) / Settings.basicScreenPixels
   val gpuClearCost = (config.getDouble("power.cost.gpuClear") max 0) / Settings.basicScreenPixels

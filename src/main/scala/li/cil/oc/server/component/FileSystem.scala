@@ -24,7 +24,8 @@ import java.util
 import scala.collection.convert.ImplicitConversionsToJava._
 import scala.collection.mutable
 
-class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option[EnvironmentHost], val sound: Option[String], val speed: Int) extends AbstractManagedEnvironment with DeviceInfo {
+class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option[EnvironmentHost], val sound: Option[String], val speed: Int,
+                 val readEnergyCost: Double, val writeEnergyCost: Double) extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("filesystem", Visibility.Neighbors).
     withConnector().
@@ -182,7 +183,7 @@ class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option
               Array.copy(buffer, 0, bytes, 0, read)
               bytes
             }
-          if (!node.tryChangeBuffer(-Settings.get.hddReadCost * bytes.length)) {
+          if (!node.tryChangeBuffer(-readEnergyCost * bytes.length)) {
             throw new IOException("not enough energy")
           }
           diskActivity()
@@ -220,7 +221,7 @@ class FileSystem(val fileSystem: IFileSystem, var label: Label, val host: Option
     context.consumeCallBudget(writeCosts(speed))
     val handle = checkHandle(args, 0)
     val value = args.checkByteArray(1)
-    if (!node.tryChangeBuffer(-Settings.get.hddWriteCost * value.length)) {
+    if (!node.tryChangeBuffer(-writeEnergyCost * value.length)) {
       throw new IOException("not enough energy")
     }
     checkOwner(context.node.address, handle)
