@@ -76,6 +76,7 @@ class CompoundBlockEnvironment(val name: String, val environments: (String, Mana
   }
 
   override def saveData(holder: MutableDataComponentHolder): Unit = {
+    node.saveData(holder)
     holder.setComponent(OCComponents.COMPOUND_DRIVER, typeHash -> Map.from(environments.map {
       case (driver, environment) =>
         val storage = new CompoundStorage()
