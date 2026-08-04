@@ -74,7 +74,7 @@ object FileSystem extends api.detail.FileSystemAPI {
     // real classpath directory first; packaged mods fall through to the JAR
     // handling below.
     Option(System.getProperty("fml.modFolders")).iterator.
-      flatMap(_.split(";").iterator).
+      flatMap(_.split(java.util.regex.Pattern.quote(io.File.pathSeparator)).iterator).
       flatMap { entry =>
         entry.split("%%", 2) match {
           case Array(namespace, root) if namespace.split(",").contains(loc.getNamespace) =>
