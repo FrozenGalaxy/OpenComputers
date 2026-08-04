@@ -251,12 +251,21 @@ class HologramRenderer extends BlockEntityRenderer[Hologram] {
       }
     }
 
-    vbo.bind()
     try {
-      vbo.upload(builder.buildOrThrow())
+      // An empty hologram has no mesh. BufferBuilder.buildOrThrow rejects an
+      // empty buffer, which is the normal state of a newly placed projector.
+      if (hologram.visibleQuads > 0) {
+        vbo.bind()
+        try {
+          vbo.upload(builder.buildOrThrow())
+        }
+        finally {
+          VertexBuffer.unbind()
+        }
+      }
     }
     finally {
-      VertexBuffer.unbind()
+      byteBuffer.close()
     }
   }
 
