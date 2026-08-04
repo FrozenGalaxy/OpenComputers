@@ -68,6 +68,7 @@ class ModPluginOpenComputers extends IModPlugin {
     Seq(
       Constants.BlockName.Microcontroller,
       Constants.BlockName.Robot,
+      Constants.ItemName.EEPROM,
       Constants.ItemName.Drone,
       Constants.ItemName.Tablet
     ).map(itemFor).filter(_ != null).distinct.foreach(subtypeRegistry.registerSubtypeInterpreter(_, componentInterpreter))

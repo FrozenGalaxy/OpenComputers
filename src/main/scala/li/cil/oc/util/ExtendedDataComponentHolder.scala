@@ -32,8 +32,9 @@ class ExtendedMutableDataComponentHolder(holder: MutableDataComponentHolder) ext
 
     holder.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, (data: CustomData) => {
       data.update(tag => {
-        result = Migrator.perform(dataComponent, tag, ItemData.defaultProvider) collect {
-          case value => holder.set(dataComponent, value)
+        result = Migrator.perform(dataComponent, tag, ItemData.defaultProvider).map { value =>
+          holder.set(dataComponent, value)
+          value
         }
       })
       
