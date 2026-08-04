@@ -31,8 +31,8 @@ trait Window extends Screen {
     topPos = (height - imageHeight) / 2
   }
 
-  override def render(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
+  override def renderBackground(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
+    super.renderBackground(guiGraphics, mouseX, mouseY, dt)
     guiGraphics.blit(backgroundImage, leftPos, topPos, 0, 0, imageWidth, imageHeight, windowWidth, windowHeight)
-    super.render(guiGraphics, mouseX, mouseY, dt)
   }
 }

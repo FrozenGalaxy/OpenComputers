@@ -63,7 +63,6 @@ class Waypoint(val waypoint: blockentity.Waypoint) extends Screen(Component.empt
   }
 
   override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
-    renderBackground(graphics, mouseX, mouseY, dt)
     super.render(graphics, mouseX, mouseY, dt)
     RenderSystem.setShaderColor(1, 1, 1, 1)
     graphics.blit(Textures.GUI.Waypoint, leftPos, topPos, 0, 0, imageWidth, imageHeight)

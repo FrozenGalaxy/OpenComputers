@@ -23,7 +23,6 @@ abstract class CustomGuiContainer[C <: AbstractContainerMenu](val inventoryConta
   protected def add[T](list: util.List[T], value: Any): Boolean = list.add(value.asInstanceOf[T])
 
   override def render(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTicks: Float): Unit = {
-    this.renderBackground(guiGraphics, mouseX, mouseY, partialTicks)
     super.render(guiGraphics, mouseX, mouseY, partialTicks)
     this.renderTooltip(guiGraphics, mouseX, mouseY)
   }
