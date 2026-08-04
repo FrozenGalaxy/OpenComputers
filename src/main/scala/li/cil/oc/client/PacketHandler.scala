@@ -40,6 +40,7 @@ object PacketHandler extends CommonPacketHandler {
 
   def update(): Unit = {
     audioSessions.synchronized {
+      audioSessions.values.foreach(_.update())
       val finished = audioSessions.filter { case (_, s) => s.checkFinished && !s.loop }
       finished.foreach { case (handle, s) =>
         s.cleanup()

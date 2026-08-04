@@ -20,11 +20,12 @@ class AudioSession(
                     val pos: BlockPosition
                   ) {
   private val bufferStream = new ByteArrayOutputStream()
-  var loop: Boolean = false
+  @volatile var loop: Boolean = false
 
-  private var alSource: Int = -1
-  private var alBuffer: Int = -1
-  private var isPlayCalled: Boolean = false
+  @volatile private var alSource: Int = -1
+  @volatile private var alBuffer: Int = -1
+  @volatile private var isPlayCalled: Boolean = false
+  @volatile private var finished: Boolean = false
 
   def append(data: Array[Byte]): Unit = {
     if (!isPlayCalled) {
@@ -35,7 +36,12 @@ class AudioSession(
   def play(): Unit = {
     if (isPlayCalled) {
       if (alSource != -1) {
-        AL10.alSourcePlay(alSource)
+        Audio.runOnSoundEngine {
+          if (alSource != -1) {
+            finished = false
+            AL10.alSourcePlay(alSource)
+          }
+        }
       }
       return
     }
@@ -45,9 +51,7 @@ class AudioSession(
     if (pcmData.isEmpty) return
 
     val mc = Minecraft.getInstance
-    if (mc.getSoundManager == null || mc.getSoundManager.soundEngine == null) return
-
-    mc.getSoundManager.soundEngine.executor.execute(() => {
+    val queued = Audio.runOnSoundEngine {
       try {
         AL10.alGetError()
 
@@ -88,62 +92,78 @@ class AudioSession(
       } catch {
         case t: Throwable =>
           OpenComputers.log.error("Failed to play audio", t)
-          cleanup()
+          cleanupOnSoundThread()
       }
-    })
+    }
+    if (!queued) isPlayCalled = false
   }
 
   def pause(): Unit = {
     if (alSource != -1) {
-      Minecraft.getInstance.getSoundManager.soundEngine.executor.execute(() => {
+      Audio.runOnSoundEngine {
         if (alSource != -1 && AL10.alGetSourcei(alSource, AL10.AL_SOURCE_STATE) == AL10.AL_PLAYING) {
           AL10.alSourcePause(alSource)
         }
-      })
+      }
     }
   }
 
   def resume(): Unit = {
     if (alSource != -1) {
-      Minecraft.getInstance.getSoundManager.soundEngine.executor.execute(() => {
+      Audio.runOnSoundEngine {
         if (alSource != -1 && AL10.alGetSourcei(alSource, AL10.AL_SOURCE_STATE) == AL10.AL_PAUSED) {
+          finished = false
           AL10.alSourcePlay(alSource)
         }
-      })
+      }
     }
   }
 
   def stop(): Unit = {
     if (alSource != -1) {
-      Minecraft.getInstance.getSoundManager.soundEngine.executor.execute(() => {
+      Audio.runOnSoundEngine {
         if (alSource != -1) {
           AL10.alSourceStop(alSource)
         }
-      })
+      }
     }
   }
 
   def setLoopMode(newLoop: Boolean): Unit = {
     loop = newLoop
     if (alSource != -1) {
-      Minecraft.getInstance.getSoundManager.soundEngine.executor.execute(() => {
+      Audio.runOnSoundEngine {
         if (alSource != -1) {
           AL10.alSourcei(alSource, AL10.AL_LOOPING, if (loop) AL10.AL_TRUE else AL10.AL_FALSE)
         }
-      })
+      }
     }
   }
 
-  def checkFinished: Boolean = {
+  def update(): Unit = {
     if (isPlayCalled && alSource != -1) {
-      val state = AL10.alGetSourcei(alSource, AL10.AL_SOURCE_STATE)
-      state != AL10.AL_PLAYING && state != AL10.AL_PAUSED
-    } else {
-      false
+      Audio.runOnSoundEngine {
+        if (alSource != -1) {
+          val state = AL10.alGetSourcei(alSource, AL10.AL_SOURCE_STATE)
+          finished = state != AL10.AL_PLAYING && state != AL10.AL_PAUSED
+        }
+      }
     }
   }
+
+  def checkFinished: Boolean = finished
 
   def cleanup(): Unit = {
+    if (!Audio.runOnSoundEngine(cleanupOnSoundThread())) {
+      // The old source and buffer are no longer usable if the engine is not
+      // loaded. Forget them without making OpenAL calls on the client thread.
+      alSource = -1
+      alBuffer = -1
+      finished = true
+    }
+  }
+
+  private def cleanupOnSoundThread(): Unit = {
     if (alSource != -1) {
       try AL10.alDeleteSources(alSource) catch { case _: Throwable => }
       alSource = -1
@@ -152,5 +172,6 @@ class AudioSession(
       try AL10.alDeleteBuffers(alBuffer) catch { case _: Throwable => }
       alBuffer = -1
     }
+    finished = true
   }
 }

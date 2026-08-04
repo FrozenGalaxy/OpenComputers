@@ -38,6 +38,26 @@ object Audio {
   private def volume = Minecraft.getInstance.options.getSoundSourceVolume(SoundSource.BLOCKS)
 
   private var disableAudio = false
+
+  /**
+    * Run OpenAL work on Minecraft's sound thread, but only while its OpenAL
+    * context is ready. The sound executor is created before the sound engine
+    * is loaded, so checking for the executor alone is not sufficient.
+    */
+  def runOnSoundEngine(action: => Unit): Boolean = {
+    val mc = Minecraft.getInstance
+    if (mc == null || mc.getSoundManager == null || mc.getSoundManager.soundEngine == null) return false
+
+    val soundEngine = mc.getSoundManager.soundEngine
+    if (!soundEngine.loaded || soundEngine.executor == null) return false
+
+    soundEngine.executor.asInstanceOf[Executor].execute(() => {
+      // The engine may have been stopped for a resource reload after this
+      // task was submitted.
+      if (soundEngine.loaded) action
+    })
+    true
+  }
   
   def play(x: Float, y: Float, z: Float, pcm: Array[Byte], gain: Float): Unit = {
     if (pcm == null || pcm.isEmpty) return
