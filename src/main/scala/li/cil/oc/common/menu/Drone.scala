@@ -84,7 +84,7 @@ class Drone(id: Int, playerInventory: Inventory, droneInv: Container, val mainIn
   }
   def selectedSlot = selectedSlotData.get
 
-  def statusText: Component = ComponentSerialization.FLAT_CODEC.parse(NbtOps.INSTANCE, synchronizedData.get("statusText")).getOrThrow()
+  def statusText: Component = ComponentSerialization.FLAT_CODEC.parse(NbtOps.INSTANCE, synchronizedData.get("statusText")).result().orElse(Component.empty)
 
   override protected def detectCustomDataChanges(nbt: CompoundTag): Unit = {
     droneInv match {
