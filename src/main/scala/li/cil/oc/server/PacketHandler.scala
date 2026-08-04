@@ -395,6 +395,10 @@ object PacketHandler extends CommonPacketHandler {
       case entity: ServerPlayer =>
         ComponentTracker.get(p.player.level, address) match {
           case Some(buffer: TextBuffer) =>
+            buffer.host match {
+              case screen: Screen => screen.ensureServerBufferLoaded()
+              case _ =>
+            }
             if (buffer.host match {
               case screen: Screen if !screen.isOrigin => false
               case _ => true

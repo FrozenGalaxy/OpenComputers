@@ -249,7 +249,7 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
     if (height < 1) throw new IllegalArgumentException("height must be larger or equal to one")
     maxResolution = (width, height)
     fullyLitCost = computeFullyLitCost()
-    proxy.onBufferMaxResolutionChange(width, width)
+    proxy.onBufferMaxResolutionChange(width, height)
   }
 
   override def getMaximumWidth: Int = maxResolution._1

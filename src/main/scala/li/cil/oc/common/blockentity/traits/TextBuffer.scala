@@ -28,6 +28,7 @@ trait TextBuffer extends Environment with Tickable {
   def tier: Int
 
   override def updateEntity(): Unit = {
+    ensureServerBufferLoaded()
     super.updateEntity()
     if (isClient || isConnected) {
       buffer.update()
@@ -63,18 +64,39 @@ trait TextBuffer extends Environment with Tickable {
     buffer.loadData(nbt, provider)
   }
 
-  override protected def initialize(): Unit = {
-    super.initialize()
+  /**
+    * Consume deferred external buffer data as soon as this screen has a level.
+    *
+    * Block entity lifecycle ordering is not identical for every host around a
+    * screen (rack-mounted servers are reconstructed through the rack's item
+    * inventory). Do not rely on initialize() being the only opportunity to
+    * restore the buffer: exposing or saving the freshly constructed default
+    * buffer first would overwrite the real contents with a blank T1 buffer.
+    */
+  private[oc] def ensureServerBufferLoaded(): Unit = {
     if (isServer && getLevel != null && pendingServerBufferData != null) {
       val data = pendingServerBufferData
-      pendingServerBufferData = null
       loadServerBufferData(data, getLevel.registryAccess())
+      pendingServerBufferData = null
     }
   }
 
+  override def onLoad(): Unit = {
+    super.onLoad()
+    ensureServerBufferLoaded()
+  }
+
+  override protected def initialize(): Unit = {
+    super.initialize()
+    ensureServerBufferLoaded()
+  }
+
   override def saveForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    ensureServerBufferLoaded()
     super.saveForServer(nbt, provider)
-    buffer.saveData(nbt, provider)
+    // If the level is still unavailable, retain the existing auxiliary file
+    // instead of replacing it with the lazy buffer's blank default state.
+    if (pendingServerBufferData == null) buffer.saveData(nbt, provider)
   }
 
   override def loadForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {

@@ -4,6 +4,7 @@ import li.cil.oc.{Constants, api}
 import li.cil.oc.api.component.RackBusConnectable
 import li.cil.oc.api.driver.DeviceInfo
 import li.cil.oc.api.driver.DeviceInfo.{DeviceAttribute, DeviceClass}
+import li.cil.oc.api.Persistable
 import li.cil.oc.api.{Machine, internal}
 import li.cil.oc.api.internal.Rack
 import li.cil.oc.api.machine.MachineHost
@@ -15,7 +16,7 @@ import li.cil.oc.common.menu.MenuTypes
 import li.cil.oc.server.network.Connector
 import li.cil.oc.util.ExtendedDataComponentHolder._
 import net.minecraft.core.Direction
-import net.minecraft.core.component.DataComponentHolder
+import net.minecraft.core.component.{DataComponentHolder, DataComponentMap}
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
@@ -36,6 +37,7 @@ class Server(val rack: api.internal.Rack, val slot: Int) extends Environment wit
   var hadErrored = false
   var lastFileSystemAccess = 0L
   var lastNetworkActivity = 0L
+  private var pendingMachineData: DataComponentMap = null
 
   private final lazy val deviceInfo = Map(
     DeviceAttribute.Class -> DeviceClass.System,
@@ -68,11 +70,29 @@ class Server(val rack: api.internal.Rack, val slot: Int) extends Environment wit
   override def loadData(holder: DataComponentHolder): Unit = {
     super.loadData(holder)
     if(!rack.getEnvironmentLevel.isClientSide) {
-      machine.loadData(holder)
+      // Unlike a normal computer, a server is reconstructed as a component of
+      // its rack. Defer restoring its VM until the first live rack update so
+      // neighboring block entities (in particular a bound screen and its
+      // external buffer) have completed their own onLoad lifecycle.
+      pendingMachineData = holder.getComponents
+    }
+  }
+
+  private def loadPendingMachineData(): Unit = {
+    if (pendingMachineData != null) {
+      val data = pendingMachineData
+      pendingMachineData = null
+      machine.loadData(Persistable.holder(data))
     }
   }
 
   override def saveData(holder: MutableDataComponentHolder): Unit = {
+    if(!rack.getEnvironmentLevel.isClientSide) {
+      // Saving may happen before the rack receives its first update (for
+      // example when quitting immediately after loading). Never replace the
+      // deferred machine snapshot with a newly constructed stopped machine.
+      loadPendingMachineData()
+    }
     super.saveData(holder)
     if(!rack.getEnvironmentLevel.isClientSide) {
       machine.saveData(holder)
@@ -189,6 +209,7 @@ class Server(val rack: api.internal.Rack, val slot: Int) extends Environment wit
 
   override def update(): Unit = {
     if (!rack.getEnvironmentLevel.isClientSide) {
+      loadPendingMachineData()
       machine.update()
 
       val isRunning = machine.isRunning
@@ -217,4 +238,3 @@ class Server(val rack: api.internal.Rack, val slot: Int) extends Environment wit
 
   override def onAnalyze(player: Player, side: Direction, hitX: Float, hitY: Float, hitZ: Float) = Array(machine.node)
 }
-
