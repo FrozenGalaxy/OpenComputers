@@ -62,10 +62,7 @@ object Audio {
   def play(x: Float, y: Float, z: Float, pcm: Array[Byte], gain: Float): Unit = {
     if (pcm == null || pcm.isEmpty) return
 
-    val mc = Minecraft.getInstance
-    if (mc.getSoundManager == null || mc.getSoundManager.soundEngine == null) return
-
-    mc.getSoundManager.soundEngine.executor.execute(() => {
+    runOnSoundEngine {
       try {
         sources.synchronized {
           sources += new Source(x, y, z, ByteBuffer.wrap(pcm), gain)
@@ -74,7 +71,7 @@ object Audio {
         case e: OpenALException =>
           if (e.errorCode == AL10.AL_OUT_OF_MEMORY) disableAudio = true
       }
-    })
+    }
   }
   
   def play(x: Float, y: Float, z: Float, frequencyInHz: Int, durationInMilliseconds: Int): Unit = {
@@ -132,39 +129,34 @@ object Audio {
       // really does happen. I'm assuming this is due to too many sounds being
       // kept loaded, since from what I can see OC's releasing its audio
       // memory as it should.
-      val mc = Minecraft.getInstance
-      if (mc.getSoundManager != null && mc.getSoundManager.soundEngine != null && mc.getSoundManager.soundEngine.executor != null) {
-        mc.getSoundManager.soundEngine.executor.asInstanceOf[Executor].execute(() => {
-          try sources.synchronized(sources += new Source(x, y, z, data, gain)) catch {
-            case e: OpenALException =>
-              if (e.errorCode == AL10.AL_OUT_OF_MEMORY) {
-                // Well... let's just stop here.
-                OpenComputers.log.info("Couldn't play computer speaker sound because your sound card ran out of memory. Either your sound card is just really low-end, or there are just too many sounds in use already by other mods. Disabling computer speakers to avoid spamming your log file now.")
-                disableAudio = true
-              }
-              else {
-                OpenComputers.log.warn("Error playing computer speaker sound.", e)
-              }
-          }
-        })
+      runOnSoundEngine {
+        try sources.synchronized(sources += new Source(x, y, z, data, gain)) catch {
+          case e: OpenALException =>
+            if (e.errorCode == AL10.AL_OUT_OF_MEMORY) {
+              // Well... let's just stop here.
+              OpenComputers.log.info("Couldn't play computer speaker sound because your sound card ran out of memory. Either your sound card is just really low-end, or there are just too many sounds in use already by other mods. Disabling computer speakers to avoid spamming your log file now.")
+              disableAudio = true
+            }
+            else {
+              OpenComputers.log.warn("Error playing computer speaker sound.", e)
+            }
+        }
       }
     }
   }
 
   def update(): Unit = {
-    if (!disableAudio) {
-      val mc = Minecraft.getInstance
-      if (mc.getSoundManager != null && mc.getSoundManager.soundEngine != null && mc.getSoundManager.soundEngine.executor != null) {
-        mc.getSoundManager.soundEngine.executor.asInstanceOf[Executor].execute(() => {
-          sources.synchronized(sources --= sources.filter(_.checkFinished))
+    val hasSources = sources.synchronized(sources.nonEmpty)
+    if (!disableAudio && hasSources) {
+      runOnSoundEngine {
+        sources.synchronized(sources --= sources.filter(_.checkFinished))
 
-          // Clear error stack.
-          try AL10.alGetError() catch {
-            case _: UnsatisfiedLinkError =>
-              OpenComputers.log.warn("Negotiations with OpenAL broke down, disabling sounds.")
-              disableAudio = true
-          }
-        })
+        // Clear error stack.
+        try AL10.alGetError() catch {
+          case _: UnsatisfiedLinkError =>
+            OpenComputers.log.warn("Negotiations with OpenAL broke down, disabling sounds.")
+            disableAudio = true
+        }
       }
     }
     PacketHandler.update()
