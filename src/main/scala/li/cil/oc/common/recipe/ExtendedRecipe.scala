@@ -61,7 +61,7 @@ object ExtendedRecipe {
   private lazy val robot = api.Items.get(Constants.BlockName.Robot)
   private lazy val tablet = api.Items.get(Constants.ItemName.Tablet)
   private lazy val print = api.Items.get(Constants.BlockName.Print)
-  private val beaconBlocks = ItemTags.create(ResourceLocation.fromNamespaceAndPath("forge", "beacon_base_blocks"))
+  private val beaconBlocks = ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", "beacon_base_blocks"))
   
   private def initializeStaticResultData(recipe: Recipe[_], resultStack: ItemStack): Unit = {
     val resultItemName = api.Items.get(resultStack)
