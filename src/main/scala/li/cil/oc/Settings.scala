@@ -377,7 +377,6 @@ class Settings(val config: Config) {
   val geolyzerRange = config.getInt("misc.geolyzerRange")
   val geolyzerNoise = config.getDouble("misc.geolyzerNoise").toFloat max 0
   val disassembleAllTheThings = config.getBoolean("misc.disassembleAllTheThings")
-  val disassemblerBreakChance = config.getDouble("misc.disassemblerBreakChance") max 0 min 1
   val disassemblerInputBlacklist = config.getStringList("misc.disassemblerInputBlacklist")
   val hideOwnPet = config.getBoolean("misc.hideOwnSpecial")
   val allowItemStackInspection = config.getBoolean("misc.allowItemStackInspection")

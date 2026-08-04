@@ -101,9 +101,7 @@ class Disassembler(pos: BlockPos, state: BlockState)
         while (buffer >= Settings.get.disassemblerItemCost && queue.nonEmpty) {
           buffer -= Settings.get.disassemblerItemCost
           val stack = queue.remove(0)
-          if (disassembleNextInstantly || getLevel.random.nextDouble >= Settings.get.disassemblerBreakChance) {
-            drop(stack)
-          }
+          drop(stack)
         }
       }
       disassembleNextInstantly = queue.nonEmpty // If we have nothing left to do, stop being creative.

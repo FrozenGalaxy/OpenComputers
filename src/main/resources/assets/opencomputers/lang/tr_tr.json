@@ -261,7 +261,7 @@
     "oc:tooltip.debugcard": "Test etmeyi kolaylaştıran, dünyayı manüpile eden Yaratıcı mod aracı. Yetişkin denetimi altında kullanın.",
     "oc:tooltip.debugger": "OpenComputers'ın iç ağının hata ayıklama bilgisini toplamak için kullanılır. Sadece bir geliştirici isterse kullanınız.",
     "oc:tooltip.diamondchip": "Parıltılı bir elmasın naçiz bir parçası. Asla eskisi gibi olamayacak.",
-    "oc:tooltip.disassembler": "Nesneleri ihtiva ettiği parçalarına ayrıştırır. §lUyarı§7: ayrışan parçaların ayrışma sürecinde %%%s bozulma olasılığı vardır.",
+    "oc:tooltip.disassembler": "Nesneleri ihtiva ettiği parçalarına ayrıştırır.",
     "oc:tooltip.disk": "Daimi veri depolama cihazları yapılabilen ilkel veri saklama dairesi.",
     "oc:tooltip.diskdrive.CC": "ComputerCraft disketler §açalışır§7.",
     "oc:tooltip.diskdrive": "Disket okuma ve yazmaya yarar. Daha sonra disket takmak için robotlara da takılabilir.",

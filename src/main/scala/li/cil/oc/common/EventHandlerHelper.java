@@ -8,10 +8,16 @@ import li.cil.oc.common.capabilities.CapabilitySidedComponent;
 import li.cil.oc.common.blockentity.BlockEntityTypes;
 import li.cil.oc.common.item.traits.Chargeable;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Direction;
+import net.minecraft.world.Container;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.wrapper.InvWrapper;
+import net.neoforged.neoforge.items.wrapper.SidedInvWrapper;
 
 public final class EventHandlerHelper {
     public static void registerCapabilities(RegisterCapabilitiesEvent event) {
@@ -69,5 +75,20 @@ public final class EventHandlerHelper {
                 type,
                 (blockEntity, side) -> blockEntity instanceof Colored colored ? colored : null
         );
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                type,
+                (blockEntity, side) -> itemHandler(blockEntity, side)
+        );
+    }
+
+    private static IItemHandler itemHandler(BlockEntity blockEntity, Direction side) {
+        if (!(blockEntity instanceof Container inventory)) {
+            return null;
+        }
+        if (inventory instanceof WorldlyContainer sidedInventory && side != null) {
+            return new SidedInvWrapper(sidedInventory, side);
+        }
+        return new InvWrapper(inventory);
     }
 }

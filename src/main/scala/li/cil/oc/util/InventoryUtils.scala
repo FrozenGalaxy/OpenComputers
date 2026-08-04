@@ -50,10 +50,16 @@ object InventoryUtils {
       Option(world.getCapability(Capabilities.ItemHandler.BLOCK, pos, side)) match {
         case Some(handler) => Some(BlockInventorySource(position, side, handler))
         case _ =>
-          world.getEntitiesOfClass(classOf[Entity], position.bounds)
-            .filter(e => e.isAlive && e.getCapability(Capabilities.ItemHandler.ENTITY) != null)
-            .map(a => EntityInventorySource(a, side, a.getCapability(Capabilities.ItemHandler.ENTITY)))
-            .find(a => a != null && a.inventory != null)
+          world.getBlockEntity(pos) match {
+            // Some inventories do not expose NeoForge's item-handler capability.
+            // Preserve vanilla Container support instead of silently skipping them.
+            case inventory: Container => Some(BlockInventorySource(position, side, asItemHandler(inventory, side)))
+            case _ =>
+              world.getEntitiesOfClass(classOf[Entity], position.bounds)
+                .filter(e => e.isAlive && e.getCapability(Capabilities.ItemHandler.ENTITY) != null)
+                .map(a => EntityInventorySource(a, side, a.getCapability(Capabilities.ItemHandler.ENTITY)))
+                .find(a => a != null && a.inventory != null)
+          }
       }
     case _ => None
   }
