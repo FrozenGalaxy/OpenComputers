@@ -312,7 +312,7 @@ object Items extends ItemAPI {
       safeGetStack(Constants.ItemName.NavigationUpgrade),
       safeGetStack(Constants.ItemName.Analyzer),
 
-      safeGetStack(Constants.ItemName.GraphicsCardTier2),
+      safeGetStack(Constants.ItemName.GraphicsCardTier3),
       safeGetStack(Constants.ItemName.RedstoneCardTier2),
       safeGetStack(Constants.ItemName.WirelessNetworkCardTier2),
 

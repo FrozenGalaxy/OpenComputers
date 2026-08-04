@@ -223,6 +223,10 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
   lazy val machine: api.machine.Machine = if (getEnvironmentLevel.isClientSide) null else Machine.create(this)
 
   val data = new TabletData()
+  // Allow T3 tablets to have 8-bit color since they use a T3 screen. For
+  // balance/ergonomic reasons, tablets are always limited to T2 resolution of
+  // 80x25.
+  lazy val colorDepth = if (data.tier >= Tier.Three) api.internal.TextBuffer.ColorDepth.EightBit else api.internal.TextBuffer.ColorDepth.FourBit
 
   val tablet: TabletComponent = if (getEnvironmentLevel.isClientSide) null else new TabletComponent(this)
 
@@ -292,7 +296,7 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
     }
     else node.host match {
       case buffer: api.internal.TextBuffer =>
-        buffer.setMaximumColorDepth(api.internal.TextBuffer.ColorDepth.FourBit)
+        buffer.setMaximumColorDepth(colorDepth)
         buffer.setMaximumResolution(80, 25)
       case _ =>
     }
@@ -394,7 +398,7 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
       connectComponents()
       componentSlots collect {
         case Some(buffer: api.internal.TextBuffer) =>
-          buffer.setMaximumColorDepth(api.internal.TextBuffer.ColorDepth.FourBit)
+          buffer.setMaximumColorDepth(colorDepth)
           buffer.setMaximumResolution(80, 25)
       }
 
