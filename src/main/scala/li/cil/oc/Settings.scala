@@ -377,6 +377,7 @@ class Settings(val config: Config) {
   val geolyzerRange = config.getInt("misc.geolyzerRange")
   val geolyzerNoise = config.getDouble("misc.geolyzerNoise").toFloat max 0
   val disassembleAllTheThings = config.getBoolean("misc.disassembleAllTheThings")
+  val disassemblerBreakChance = config.getDouble("misc.disassemblerBreakChance") max 0 min 1
   val disassemblerInputBlacklist = config.getStringList("misc.disassemblerInputBlacklist")
   val hideOwnPet = config.getBoolean("misc.hideOwnSpecial")
   val allowItemStackInspection = config.getBoolean("misc.allowItemStackInspection")
@@ -617,18 +618,21 @@ object Settings {
     // Upgrading to version 1.8.0, changed meaning of limitFlightHeight value,
     VersionRange.createFromVersionSpec("[0.0, 1.8.0)") -> Array(
       "computer.robot.limitFlightHeight"
+    ),
+    // Item loss was made opt-in in config schema 1.9.4.
+    VersionRange.createFromVersionSpec("[0.0, 1.9.4)") -> Array(
+      "misc.disassemblerBreakChance"
     )
   )
   private val fileringRulesPatchVersion = VersionRange.createFromVersionSpec("[0.0, 1.8.3)")
 
-  // Checks the config version (i.e. the version of the mod the config was
-  // created by) against the current version to see if some hard changes
-  // were made. If so, the new default values are copied over.
+  // Checks the saved config schema against the bundled schema to see if some
+  // hard changes were made. If so, the new default values are copied over.
   private def patchConfig(config: Config, defaults: Config) = {
-    val modVersion = new DefaultArtifactVersion(OpenComputers.Version)
     val configVersion = new DefaultArtifactVersion(if (config.hasPath(prefix + "version")) config.getString(prefix + "version") else "0.0.0")
+    val currentConfigVersion = new DefaultArtifactVersion(defaults.getString(prefix + "version"))
     var patched = config
-    if (configVersion.compareTo(modVersion) != 0) {
+    if (configVersion.compareTo(currentConfigVersion) != 0) {
       OpenComputers.log.info(s"Updating config from version '${configVersion}' to '${defaults.getString(prefix + "version")}'.")
       patched = patched.withValue(prefix + "version", defaults.getValue(prefix + "version"))
       for ((version, paths) <- configPatches if version.containsVersion(configVersion)) {

@@ -269,6 +269,7 @@
     "oc:tooltip.debugger": "OCの内部ネットワークグリッドにデバッグ情報を出力するために使用できます。開発者に指示された場合のみ使用してください。",
     "oc:tooltip.diamondchip": "かつて輝いていたダイヤモンドの小さな破片。もう二度と同じ姿には戻りません。",
     "oc:tooltip.disassembler": "アイテムを元のコンポーネントに分解します。",
+    "oc:tooltip.disassembler.loss": "アイテムを元のコンポーネントに分解します。§l警告§7: 返却されるアイテムは %s%% の確率で壊れます！",
     "oc:tooltip.disk": "永続的なストレージデバイスを構築するために使用できる原始的な媒体。",
     "oc:tooltip.diskdrive.CC": "ComputerCraft のフロッピーが§f対応§7しています。",
     "oc:tooltip.diskdrive": "フロッピーの読み書きを可能にします。ロボットに取り付けて後からフロッピーを挿入できるようにすることもできます。",

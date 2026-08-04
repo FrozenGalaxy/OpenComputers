@@ -87,6 +87,7 @@ class Disassembler(pos: BlockPos, state: BlockState)
       if (queue.isEmpty) {
         val instant = disassembleNextInstantly // Is reset via removeItem
         disassemble(removeItem(0, 1), instant)
+        disassembleNextInstantly = instant && queue.nonEmpty
         setActive(queue.nonEmpty)
       }
       else {
@@ -101,10 +102,12 @@ class Disassembler(pos: BlockPos, state: BlockState)
         while (buffer >= Settings.get.disassemblerItemCost && queue.nonEmpty) {
           buffer -= Settings.get.disassemblerItemCost
           val stack = queue.remove(0)
-          drop(stack)
+          if (disassembleNextInstantly || getLevel.random.nextDouble >= Settings.get.disassemblerBreakChance) {
+            drop(stack)
+          }
         }
+        if (queue.isEmpty) disassembleNextInstantly = false
       }
-      disassembleNextInstantly = queue.nonEmpty // If we have nothing left to do, stop being creative.
     }
   }
 

@@ -22,7 +22,9 @@ import scala.jdk.CollectionConverters._
 
 class Disassembler(props: Properties) extends SimpleBlock(props) with traits.PowerAcceptor with traits.StateAware with traits.GUI with traits.Tickable {
   override protected def tooltipBody(stack: ItemStack, context: TooltipContext, tooltip: util.List[ITextComponent], advanced: ITooltipFlag): Unit = {
-    for (curr <- Tooltip.get(getClass.getSimpleName.toLowerCase).asScala) {
+    val chance = Settings.get.disassemblerBreakChance
+    val lines = if (chance > 0) Tooltip.get("disassembler.loss", (chance * 100).toInt.toString) else Tooltip.get("disassembler")
+    for (curr <- lines.asScala) {
       tooltip.add(ITextComponent.literal(curr).setStyle(Tooltip.DefaultStyle))
     }
   }

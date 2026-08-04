@@ -307,6 +307,7 @@
   "oc:tooltip.debugger": "Can be used to output debug information on OC's internal network grid. Only use if so instructed by a dev.",
   "oc:tooltip.diamondchip": "A small piece of a once radiant diamond. It will never be the same again.",
   "oc:tooltip.disassembler": "Separates items into their original components.",
+  "oc:tooltip.disassembler.loss": "Separates items into their original components. §lWarning§7: returned items have a %s%% chance of breaking in the process!",
   "oc:tooltip.disk": "Primitive medium that can be used to build persistent storage devices.",
   "oc:tooltip.diskdrive.CC": "ComputerCraft floppies are §asupported§7.",
   "oc:tooltip.diskdrive": "Allows reading and writing floppies. Can be installed in robots to allow inserting floppies later on.",
