@@ -7,7 +7,7 @@ import li.cil.oc.api.ImmutableItemStack
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.common.item.data.PrintData
 import li.cil.oc.server.component.DebugCard.AccessContext
-import net.minecraft.core.component.DataComponentType
+import net.minecraft.core.component.{DataComponentPatch, DataComponentType}
 import net.minecraft.core.registries.Registries
 import net.minecraft.core.{BlockPos, Direction, UUIDUtil}
 import net.minecraft.nbt.CompoundTag
@@ -85,6 +85,8 @@ object OCComponents {
   val SOURCE_MAP_ITEM: Type[ImmutableItemStack] = persistent("source_map_item", ImmutableItemStack.OPTIONAL_CODEC)
   val KEYS: Type[List[String]] = persistentShared("keys", ScalaCodec.list(Codec.STRING), ScalaStreamCodec.list(ByteBufCodecs.STRING_UTF8))
   val TERMINAL_REFERENCE: Type[TerminalReference] = persistent("terminal_reference", TerminalReference.CODEC)
+  val TERMINAL_SERVER_BUFFER: Type[DataComponentPatch] = persistentShared("terminal_server_buffer", DataComponentPatch.CODEC, DataComponentPatch.STREAM_CODEC)
+  val TERMINAL_SERVER_KEYBOARD: Type[DataComponentPatch] = persistentShared("terminal_server_keyboard", DataComponentPatch.CODEC, DataComponentPatch.STREAM_CODEC)
   val TEXT_BUFFER: Type[TextBufferContents] = persistent("text_buffer", TextBufferContents.CODEC)
   val IS_ON: Type[Boolean] = persistentShared("is_on", ScalaCodec.BOOL, ScalaStreamCodec.BOOL)
   val IS_RUNNING: Type[Boolean] = persistentShared("is_running", ScalaCodec.BOOL, ScalaStreamCodec.BOOL)

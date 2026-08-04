@@ -7,6 +7,7 @@ import li.cil.oc.api.network._
 import li.cil.oc.api.util.StateAware
 import li.cil.oc.client.renderer.block.ServerRackModel
 import li.cil.oc.common.blockentity.traits.RedstoneChangedEventArgs
+import li.cil.oc.common.component.TerminalServer
 import li.cil.oc.common.datacomponents.{CompoundStorage, OCComponents}
 import li.cil.oc.common.{Slot, menu}
 import li.cil.oc.integration.opencomputers.DriverRedstoneCard
@@ -419,6 +420,18 @@ class Rack(pos: BlockPos, state: BlockState)
 
       updateComponents()
     }
+    else {
+      // A terminal's input packets are routed directly by its virtual screen
+      // address, but its display changes are flushed from TerminalServer.update.
+      // Keep that one mountable ticking while the rack's outer network is not
+      // connected; otherwise input continues to work while display updates
+      // accumulate until the next full snapshot. On the client this also keeps
+      // initialization retries alive during world loading.
+      componentSlots.foreach {
+        case Some(terminal: TerminalServer) => terminal.update()
+        case _ =>
+      }
+    }
   }
 
   // ----------------------------------------------------------------------- //
@@ -445,6 +458,19 @@ class Rack(pos: BlockPos, state: BlockState)
         Direction.SOUTH
       case Some(other) => other
     }.toList).toList)
+  }
+
+  override def saveForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    // Inventory.saveForServer writes mountable ItemStacks to chunk NBT before
+    // saveComponentsForServer normally flushes their live environments. Only
+    // the terminal server needs its nested virtual screen/keyboard snapshot at
+    // this earlier point. Do not flush rack-mounted Servers here: doing so can
+    // disturb their machine lifecycle and saved running state.
+    componentSlots.zip(items).foreach {
+      case (Some(terminal: TerminalServer), stack) if !stack.isEmpty => terminal.saveData(stack)
+      case _ =>
+    }
+    super.saveForServer(nbt, provider)
   }
 
   override def loadComponentsForClient(holder: DataComponentHolder): Unit = {

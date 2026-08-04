@@ -21,7 +21,7 @@ import li.cil.oc.api.util.Lifecycle
 import li.cil.oc.api.util.StateAware
 import li.cil.oc.api.util.StateAware.State
 import li.cil.oc.common.Tier
-import li.cil.oc.common.datacomponents.{OCComponents, TerminalReference}
+import li.cil.oc.common.datacomponents.{CompoundStorage, OCComponents, TerminalReference}
 import li.cil.oc.common.item
 import li.cil.oc.util.ExtendedNBT._
 import li.cil.oc.util.ExtendedDataComponentHolder._
@@ -147,7 +147,7 @@ class TerminalServer(val rack: api.internal.Rack, val slot: Int) extends Environ
   override def getConnectableAt(index: Int): RackBusConnectable = null
 
   override def onActivate(player: Player, hand: InteractionHand, heldItem: ItemStack, hitX: Float, hitY: Float): Boolean = {
-    if (api.Items.get(heldItem) == api.Items.get(Constants.ItemName.Terminal)) {
+    if (player.isCrouching && api.Items.get(heldItem) == api.Items.get(Constants.ItemName.Terminal)) {
       if (!getEnvironmentLevel.isClientSide) {
         val key = UUID.randomUUID().toString
         
@@ -172,24 +172,38 @@ class TerminalServer(val rack: api.internal.Rack, val slot: Int) extends Environ
   // ----------------------------------------------------------------------- //
   // Persistable
 
-  private final val BufferTag = Settings.namespace + "buffer"
-  private final val KeyboardTag = Settings.namespace + "keyboard"
-  private final val KeysTag = Settings.namespace + "keys"
-
   override def loadData(holder: DataComponentHolder): Unit = {
     if (!rack.getEnvironmentLevel.isClientSide) {
       node.loadData(holder)
     }
-    buffer.loadData(holder)
-    keyboard.loadData(holder)
+    holder.getComponent(OCComponents.TERMINAL_SERVER_BUFFER) match {
+      case Some(data) => buffer.loadData(new CompoundStorage().andApply(data))
+      // Compatibility with terminal servers saved by the initial 1.21 port,
+      // which flattened all three environments into the mountable's holder.
+      case _ => buffer.loadData(holder)
+    }
+    holder.getComponent(OCComponents.TERMINAL_SERVER_KEYBOARD) match {
+      case Some(data) => keyboard.loadData(new CompoundStorage().andApply(data))
+      case _ => keyboard.loadData(holder)
+    }
     keys.clear()
     keys ++= holder.getOrDefault(OCComponents.KEYS, List.empty)
   }
 
   override def saveData(holder: MutableDataComponentHolder): Unit = {
     node.saveData(holder)
-    buffer.saveData(holder)
-    keyboard.saveData(holder)
+
+    // The terminal server, its virtual screen, and its virtual keyboard each
+    // have their own node. Keep their component data isolated so their shared
+    // ADDRESS component cannot overwrite the other two node identities.
+    val bufferData = new CompoundStorage()
+    buffer.saveData(bufferData)
+    holder.setComponent(OCComponents.TERMINAL_SERVER_BUFFER, bufferData.toPatch)
+
+    val keyboardData = new CompoundStorage()
+    keyboard.saveData(keyboardData)
+    holder.setComponent(OCComponents.TERMINAL_SERVER_KEYBOARD, keyboardData.toPatch)
+
     holder.set(OCComponents.KEYS, keys.toList)
   }
 

@@ -7,6 +7,7 @@ import li.cil.oc.Localization
 import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.client.{Textures, gui}
+import li.cil.oc.common.blockentity
 import li.cil.oc.common.component
 import li.cil.oc.common.blockentity.traits.BaseBlockEntity
 import li.cil.oc.common.datacomponents.{OCComponents, TerminalReference}
@@ -19,16 +20,26 @@ import net.neoforged.api.distmarker.OnlyIn
 import net.minecraft.world.item.Item
 import net.minecraft.world.item.Item.{Properties, TooltipContext}
 import net.minecraft.world.item.ItemStack
-import net.minecraft.world.level.Level
+import net.minecraft.world.level.{Level, LevelReader}
 import net.minecraft.network.chat.Component
 import net.minecraft.world.item.TooltipFlag
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.InteractionResultHolder
 import net.minecraft.world.InteractionHand
+import net.minecraft.core.BlockPos
 import net.neoforged.neoforge.common.extensions.IItemExtension
 
 class Terminal(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
   def hasServer(stack: ItemStack) = stack.has(OCComponents.TERMINAL_REFERENCE)
+
+  override def doesSneakBypassUse(stack: ItemStack, level: LevelReader, pos: BlockPos, player: Player): Boolean = {
+    level.getBlockEntity(pos) match {
+      // Pairing is a sneak-use on the terminal server's rack face. Allow the
+      // rack to receive that interaction instead of sending it to the item.
+      case _: blockentity.Rack => true
+      case _ => super.doesSneakBypassUse(stack, level, pos, player)
+    }
+  }
 
   @OnlyIn(Dist.CLIENT)
   override def appendHoverText(stack: ItemStack, context: TooltipContext, tooltip: util.List[Component], flag: TooltipFlag): Unit = {
@@ -70,6 +81,10 @@ class Terminal(props: Properties) extends Item(props) with traits.SimpleItem wit
 
   @OnlyIn(Dist.CLIENT)
   private def showGui(stack: ItemStack, key: String, term: component.TerminalServer, inRange: () => Boolean): Unit = {
+    term.buffer match {
+      case buffer: component.TextBuffer => buffer.requestSynchronization()
+      case _ =>
+    }
     Minecraft.getInstance.pushGuiLayer(new gui.Screen(term.buffer, true, () => true, () => {
       // Check if someone else bound a term to our server.
       if (stack.getComponent(OCComponents.TERMINAL_REFERENCE).exists(r => r.key != key)) Minecraft.getInstance.popGuiLayer

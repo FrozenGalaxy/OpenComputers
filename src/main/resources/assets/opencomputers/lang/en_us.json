@@ -379,7 +379,7 @@
   "oc:tooltip.rack": "Allows the installation of up to four servers or other rack mountables.",
   "oc:tooltip.tablet": "A tablet computer, for fresh Lua on the go. Can be forced to shut down by sneak-activating it.",
   "oc:tooltip.tabletcase": "Basic case for tablets. Place it into the assembler to add in components and create a tablet computer.",
-  "oc:tooltip.terminal": "Allows controlling a server remotely, as long as you are in range of it. Acts like a portable screen and keyboard. Shift-right-click a server in a server rack to bind the terminal to it.",
+  "oc:tooltip.terminal": "Allows controlling a server remotely, as long as you are in range of it. Acts like a portable screen and keyboard. SNEAK + right-click a terminal server in a server rack to bind the remote terminal to it.",
   "oc:tooltip.terminalserver": "Backend to which Remote Terminals can be connected to provide remote control. Houses a virtual screen and keyboard.",
   "oc:tooltip.texturepicker": "This tool allows showing a string describing a block's surface, for use in 3D printer shape definitions. Totally not texture names, nope. No sir.",
   "oc:tooltip.tier": "§8Tier %s",

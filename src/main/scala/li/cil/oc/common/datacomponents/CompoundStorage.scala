@@ -35,6 +35,12 @@ class CompoundStorage(orig: DataComponentMap = DataComponentMap.EMPTY) extends M
     this
   }
 
+  def toPatch: DataComponentPatch = {
+    val builder = DataComponentPatch.builder()
+    components.forEach(component => builder.set(component))
+    builder.build()
+  }
+
   override def getComponents: DataComponentMap = components
 }
 
@@ -47,11 +53,7 @@ object CompoundStorage {
     case None => CompoundStorage.EMPTY
   })
   val STREAM_CODEC: StreamCodec[RegistryFriendlyByteBuf, CompoundStorage] = DataComponentPatch.STREAM_CODEC
-    .map[CompoundStorage](patch => new CompoundStorage().andApply(patch), (c: CompoundStorage) => {
-      val builder = DataComponentPatch.builder()
-      c.components.forEach(i => builder.set(i))
-      builder.build()
-    })
+    .map[CompoundStorage](patch => new CompoundStorage().andApply(patch), _.toPatch)
   val OPTION_STREAM_CODEC: StreamCodec[RegistryFriendlyByteBuf, Option[CompoundStorage]] =
     STREAM_CODEC.map(i => Option.when(!i.isEmpty) { i }, _ getOrElse CompoundStorage.EMPTY)
 }

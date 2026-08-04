@@ -100,6 +100,14 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
     relativeLitArea = -1 // Recompute lit area, avoid screens blanking out until something changes.
   }
 
+  def requestSynchronization(): Unit = if (SideTracker.isClient) {
+    // Do not turn an initialized buffer back into an uninitialized one. While
+    // uninitialized, multi-update packets are intentionally ignored until the
+    // authoritative snapshot arrives, so resetting this here would make live
+    // terminal input appear only after closing and reopening the GUI.
+    if (!isInitialized) TextBuffer.registerClientBuffer(this)
+  }
+
   def isInitialized: Boolean = syncCooldown < 0
 
   private final lazy val deviceInfo = Map(
@@ -435,7 +443,7 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
       if (SideTracker.isClient) {
         if (!Strings.isNullOrEmpty(proxy.nodeAddress)) return // Only load once.
         proxy.nodeAddress = address
-        TextBuffer.registerClientBuffer(this)
+        requestSynchronization()
       }
       else {
         holder.getComponent(OCComponents.TEXT_BUFFER) match {
@@ -495,9 +503,13 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
     }
 
     host match {
-      // A tablet has no stable world position to reload auxiliary SaveHandler
-      // data from. Keep its display contents on the screen item itself.
-      case _: api.internal.Tablet => data.saveData(holder)
+      // These screens are themselves stored inside another ItemStack-backed
+      // environment. Persist their contents inline so restoring them does not
+      // depend on an auxiliary file being available before the containing
+      // environment resumes. In particular, a terminal server otherwise starts
+      // with its ScreenTier1 constructor buffer and can overwrite the saved
+      // higher resolution before the auxiliary state is recovered.
+      case _: api.internal.Tablet | _: TerminalServer => data.saveData(holder)
       case environmentHost: EnvironmentHost =>
         SaveHandler.scheduleSave(environmentHost, new CompoundTag(), bufferPath, (tag: CompoundTag) => {
           val storage = new CompoundStorage()
