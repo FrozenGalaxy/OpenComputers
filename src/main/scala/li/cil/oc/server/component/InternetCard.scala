@@ -378,7 +378,7 @@ object InternetCard {
 
   private def extractNAT64EmbeddedAddress(addr: Inet6Address): Inet4Address = {
     val b = addr.getAddress
-    new Inet4Address(null, Array(b(12), b(13), b(14), b(15)))
+    InetAddress.getByAddress(Array(b(12), b(13), b(14), b(15))).asInstanceOf[Inet4Address]
   }
 
   def isRequestAllowed(settings: Settings, inetAddress: InetAddress, host: String): Boolean = {
