@@ -87,7 +87,7 @@ class Settings(val config: Config) {
       Array(tier1: Int, tier2: Int, tier3: Int, tier4: Int, tier5: Int, tier6: Int, tier7: Int, tier8: Int)
     case _ =>
       OpenComputers.log.warn("Bad number of RAM sizes, ignoring.")
-      Array(128, 256, 512, 1024, 2048, 4096, 8192, 16384)
+      Array(256, 384, 512, 768, 1024, 1536, 2048, 3072)
   }
   val ramScaleFor64Bit = config.getDouble("computer.lua.ramScaleFor64Bit") max 1
   val maxTotalRam = config.getInt("computer.lua.maxTotalRam") max 0
@@ -279,7 +279,7 @@ class Settings(val config: Config) {
       Array(tier1: Int, tier2: Int, tier3: Int, tier4: Int)
     case _ =>
       OpenComputers.log.warn("Bad number of HDD sizes, ignoring.")
-      Array(2048, 4096, 8192, 16384)
+      Array(1024, 2048, 4096, 8192)
   }
   val ssdSizes = config.getIntList("filesystem.ssdSizes").asScala.toArray match {
     case Array(tier1, tier2, tier3) =>
@@ -293,7 +293,7 @@ class Settings(val config: Config) {
       Array(tier1: Int, tier2: Int, tier3: Int, tier4: Int)
     case _ =>
       OpenComputers.log.warn("Bad number of HDD platter counts, ignoring.")
-      Array(2, 4, 6, 8)
+      Array(2, 4, 8, 12)
   }
   val floppySize = config.getInt("filesystem.floppySize") max 0
   val tmpSize = config.getInt("filesystem.tmpSize") max 0
@@ -514,7 +514,7 @@ class Settings(val config: Config) {
   val httpUserAgent = config.getString("internet.httpUserAgent")
 
   // >= 1.9.0
-  val audioCardChunkSize: Int = config.getInt("audio.chunkSize") max 0 // 2048
+  val audioCardChunkSize: Int = config.getInt("audio.chunkSize") max 0 // 4096
   val audioCardBufferLimit: Int = config.getInt("audio.bufferLimit") max 0 // 8 MiB (8 * 1024 * 1024)
   val audioCardSampleRate: Int = config.getInt("audio.sampleRate") min 48000 max 0 // 48000
   val audioCardFormat: Int = config.getInt("audio.format") // 1
