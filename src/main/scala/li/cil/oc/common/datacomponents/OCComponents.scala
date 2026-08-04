@@ -17,6 +17,7 @@ import net.minecraft.network.codec.{ByteBufCodecs, StreamCodec}
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.util.ColorRGBA
 import net.minecraft.world.item.{DyeColor, ItemStack}
+import net.neoforged.bus.api.IEventBus
 import net.neoforged.neoforge.fluids.FluidStack
 import net.neoforged.neoforge.registries.{DeferredHolder, DeferredRegister}
 
@@ -37,6 +38,11 @@ object OCComponents {
   type Type[T] = DeferredHolder[DataComponentType[_], DataComponentType[T]]
 
   val REGISTRAR: DeferredRegister.DataComponents = DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, "opencomputers")
+
+  def init(modBus: IEventBus): Unit = {
+    Network.initialize()
+    REGISTRAR.register(modBus)
+  }
 
   private def persistent[T](name: String, codec: Codec[T]): Type[T] =
     REGISTRAR.registerComponentType(name, _.persistent(codec))
@@ -133,5 +139,7 @@ object OCComponents {
     val LAST_DISK_ACCESS: Type[Long] = sharedOnly("network/last_disk_access", ScalaStreamCodec.VAR_LONG)
     val LAST_NETWORK_ACCESS: Type[Long] = sharedOnly("network/last_network_access", ScalaStreamCodec.VAR_LONG)
     val DISK_ITEM: Type[ImmutableItemStack] = sharedOnly("network/disk_item", ImmutableItemStack.OPTIONAL_STREAM_CODEC)
+
+    private[datacomponents] def initialize(): Unit = ()
   }
 }

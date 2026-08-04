@@ -357,7 +357,7 @@ class Rack(pos: BlockPos, state: BlockState)
       for (connectable <- 0 until 4) {
         nodeMapping(slot)(connectable) = None
       }
-      lastData(slot) = null
+      lastData(slot) = None
       hasChanged(slot) = true
     }
     super.onItemAdded(slot, stack)
@@ -368,7 +368,7 @@ class Rack(pos: BlockPos, state: BlockState)
       for (connectable <- 0 until 4) {
         nodeMapping(slot)(connectable) = None
       }
-      lastData(slot) = null
+      lastData(slot) = None
     }
     super.onItemRemoved(slot, stack)
   }

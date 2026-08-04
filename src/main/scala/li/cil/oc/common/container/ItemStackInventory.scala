@@ -16,7 +16,7 @@ trait ItemStackInventory extends Inventory {
 
   override def items = inventory
 
-  private def provider = if( FMLEnvironment.dist == Dist.CLIENT) ClientAccessHelper.getClientRegistryAccess else ServerLifecycleHooks.getCurrentServer.registryAccess()
+  private def provider = if (FMLEnvironment.dist == Dist.CLIENT) ClientAccessHelper.getClientRegistryAccess else ServerLifecycleHooks.getCurrentServer.registryAccess()
 
   // Initialize the list automatically if we have a container.
   {
@@ -26,16 +26,24 @@ trait ItemStackInventory extends Inventory {
     }
   }
 
-  // Load items from tag.
+  // Load items from the container's data components.
   def reinitialize(): Unit = {
     for (i <- items.indices) {
       updateItems(i, ItemStack.EMPTY)
     }
-    loadData(container.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe, provider)
+    if (container.has(component)) {
+      loadData(container)
+    }
+    else {
+      // Early versions of the data-component port serialized a component
+      // patch inside CUSTOM_DATA. Keep those stacks readable; the next save
+      // writes their inventory to the real ItemStack data component below.
+      loadData(container.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe, provider)
+    }
   }
 
-  // Write items back to tag.
+  // Write items back to the container's data components.
   override def setChanged(): Unit = {
-    saveData(container.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).getUnsafe, provider)
+    saveData(container)
   }
 }

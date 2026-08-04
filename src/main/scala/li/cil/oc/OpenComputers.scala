@@ -62,7 +62,7 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   Settings.load(FMLPaths.CONFIGDIR.get().resolve(Paths.get("opencomputers", "settings.conf")).toFile())
 
   modBus.register(this)
-  OCComponents.REGISTRAR.register(modBus)
+  OCComponents.init(modBus)
   Items.init(modBus)
   Blocks.init(modBus)
   CreativeTab.CREATIVE_TABS.register(modBus)
