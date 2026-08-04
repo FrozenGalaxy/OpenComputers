@@ -18,8 +18,7 @@ import net.neoforged.neoforge.client.event.RenderHandEvent
 object TabletRenderer {
   private val FrameBorder = 12
   private val BottomBorder = 20
-  private val SideFaceSize = 0.32f
-  private val OffhandFaceSize = 0.42f
+  private val OffhandFaceSize = 1.26f
   private val CenterFaceSize = 0.65f
 
   @SubscribeEvent
@@ -68,8 +67,7 @@ object TabletRenderer {
     }
     else {
       val arm = if (hand == InteractionHand.MAIN_HAND) player.getMainArm else player.getMainArm.getOpposite
-      val faceSize = if (hand == InteractionHand.OFF_HAND) OffhandFaceSize else SideFaceSize
-      renderAtSide(stack, renderBuffer, packedLight, arm, equipProgress, swingProgress, textBuffer, faceSize)
+      renderAtSide(stack, renderBuffer, packedLight, arm, equipProgress, swingProgress, textBuffer, OffhandFaceSize)
     }
     stack.popPose()
   }
