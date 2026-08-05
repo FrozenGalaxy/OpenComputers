@@ -2,11 +2,11 @@ package li.cil.oc.common
 
 import li.cil.oc._
 import li.cil.oc.common.blockentity.BlockEntityTypes
-import li.cil.oc.common.init.Items
+import li.cil.oc.common.init.OCItems
 import li.cil.oc.common.{PacketHandler => CommonPacketHandler}
 import li.cil.oc.common.menu.MenuTypes
 import li.cil.oc.common.entity.EntityTypes
-import li.cil.oc.common.init.{Blocks, Items}
+import li.cil.oc.common.init.{OCBlocks, OCItems}
 import li.cil.oc.common.item.RedstoneCard
 import li.cil.oc.common.recipe.Recipes
 import li.cil.oc.integration.Mods
@@ -31,7 +31,7 @@ class Proxy(val modBus: IEventBus) {
     api.CreativeTab.instance = CreativeTab.MAIN.getKey
     api.API.driver = driver.Registry
     api.API.fileSystem = fs.FileSystem
-    api.API.items = Items
+    api.API.items = OCItems
     api.API.machine = machine.Machine
     api.API.nanomachines = nanomachines.Nanomachines
     api.API.network = network.Network
@@ -63,7 +63,6 @@ class Proxy(val modBus: IEventBus) {
       CommonPacketHandler.serverHandler = server.PacketHandler
 
       Loot.init()
-      Advancement.init()
 
       OpenComputers.log.debug("Initializing mod integration.")
       Mods.init()

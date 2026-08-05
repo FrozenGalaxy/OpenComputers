@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "opencomputers:capacitor"
+    },
+    {
+      "item": "minecraft:white_carpet"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "opencomputers:carpetedcapacitor"
+  }
+}

@@ -1,6 +1,6 @@
 package li.cil.oc
 
-import li.cil.oc.common.init.Items
+import li.cil.oc.common.init.OCItems
 import net.minecraft.core.registries.Registries
 import net.minecraft.network.chat.Component
 import net.minecraft.world.item.{CreativeModeTab, CreativeModeTabs}
@@ -24,10 +24,10 @@ object CreativeTab {
   @SubscribeEvent
   def onBuildContents(event: BuildCreativeModeTabContentsEvent): Unit = {
     if (event.getTabKey == MAIN.getKey) {
-      Items.decorateCreativeTab(event, ModOpenComputers.hasRedstoneCardT2)
+      OCItems.decorateCreativeTab(event, ModOpenComputers.hasRedstoneCardT2)
       OpenPrinter.addCreativeItems(event)
     } else if (event.getTabKey == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-      event.accept(Items.createChargedHoverBoots())
+      event.accept(OCItems.createChargedHoverBoots())
     }
   }
 }

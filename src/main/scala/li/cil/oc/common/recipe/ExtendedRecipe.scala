@@ -14,9 +14,7 @@ import li.cil.oc.common.item.data.PrintData
 import li.cil.oc.common.item.data.RobotData
 import li.cil.oc.common.item.data.TabletData
 import li.cil.oc.server.machine.luac.LuaStateFactory
-import li.cil.oc.util.ExtendedNBT._
 import li.cil.oc.util.ExtendedDataComponentHolder._
-import li.cil.oc.util.ExtendedItemStack._
 import li.cil.oc.util.{ItemUtils, SideTracker}
 import net.minecraft.core.component.DataComponents
 import net.minecraft.core.HolderLookup
@@ -27,7 +25,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.nbt.{CompoundTag, StringTag}
 import net.minecraft.world.item.component.CustomData
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.tags.ItemTags
+import net.minecraft.tags.{BlockTags, ItemTags}
 import net.minecraft.world.item.crafting.{CraftingInput, Recipe}
 
 import java.nio.ByteBuffer
@@ -61,8 +59,8 @@ object ExtendedRecipe {
   private lazy val robot = api.Items.get(Constants.BlockName.Robot)
   private lazy val tablet = api.Items.get(Constants.ItemName.Tablet)
   private lazy val print = api.Items.get(Constants.BlockName.Print)
-  private val beaconBlocks = ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", "beacon_base_blocks"))
-  
+  val beaconBlocks = ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", "beacon_base_blocks"))
+
   private def initializeStaticResultData(recipe: Recipe[_], resultStack: ItemStack): Unit = {
     val resultItemName = api.Items.get(resultStack)
     val tag = ItemUtils.getTag(resultStack)

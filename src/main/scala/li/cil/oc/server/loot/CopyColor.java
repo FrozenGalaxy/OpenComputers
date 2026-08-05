@@ -4,15 +4,17 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import li.cil.oc.api.internal.Colored;
 import li.cil.oc.util.ItemColorizer;
-import java.util.List;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.functions.LootItemConditionalFunction;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 import net.minecraft.world.level.storage.loot.functions.LootItemFunctionType;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
 
 public final class CopyColor extends LootItemConditionalFunction {
     public static final MapCodec<CopyColor> CODEC = RecordCodecBuilder.mapCodec(
@@ -46,4 +48,15 @@ public final class CopyColor extends LootItemConditionalFunction {
         return stack;
     }
 
+    public static final class Builder extends LootItemConditionalFunction.Builder<Builder> {
+        @Override
+        public LootItemFunction build() {
+            return new CopyColor(getConditions());
+        }
+
+        @Override
+        protected Builder getThis() {
+            return this;
+        }
+    }
 }

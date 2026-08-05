@@ -4,7 +4,7 @@ import li.cil.oc.{Constants, Settings, api}
 import li.cil.oc.client.renderer.block.PrintModel
 import li.cil.oc.common.block.{Print => PrintBlock}
 import li.cil.oc.common.blockentity.traits.RedstoneChangedEventArgs
-import li.cil.oc.common.init.Blocks
+import li.cil.oc.common.init.OCBlocks
 import li.cil.oc.common.item.data.PrintData
 import li.cil.oc.util.ExtendedAABB._
 import li.cil.oc.util.ExtendedNBT._
@@ -73,7 +73,7 @@ class Print(pos: BlockPos, blockState: BlockState, val canToggle: Option[() => B
       getLevel.sendBlockUpdated(getBlockPos, getLevel.getBlockState(getBlockPos), getLevel.getBlockState(getBlockPos), 3)
       updateRedstone()
       if (state && data.isButtonMode) {
-        val block = Blocks.Print.get()
+        val block = OCBlocks.Print.get()
         val delay = block.tickRate(getLevel)
         scheduleUpdate match {
           case Some(callback) => callback(delay)
