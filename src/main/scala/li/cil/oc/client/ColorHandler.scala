@@ -19,6 +19,9 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.level.{BlockAndTintGetter, BlockGetter, ItemLike}
 
 object ColorHandler {
+  private def opaque(color: Int): Int =
+    0xFF000000 | (color & 0x00FFFFFF)
+
   def init(): Unit = {
     register((state, world, pos, tintIndex) => state.getBlock match {
       case block: block.Cable => block.colorMultiplierOverride.getOrElse(0xFFFFFFFF)
@@ -53,20 +56,23 @@ object ColorHandler {
       OCBlocks.ScreenTier2.get(),
       OCBlocks.ScreenTier3.get())
 
-    register((stack, tintIndex) => if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else tintIndex,
+    register((stack, tintIndex) =>
+      if (ItemColorizer.hasColor(stack)) opaque(ItemColorizer.getColor(stack)) else 0xFFFFFFFF,
       OCBlocks.Cable.get())
 
-    register((stack, tintIndex) => Color.byTier(ItemUtils.caseTier(stack)),
+    register((stack, tintIndex) =>
+      opaque(Color.byTier(ItemUtils.caseTier(stack))),
       OCBlocks.CaseTier1.get(),
       OCBlocks.CaseTier2.get(),
       OCBlocks.CaseTier3.get(),
       OCBlocks.CaseTier4.get(),
       OCBlocks.CaseCreative.get())
 
-    register((stack, tintIndex) => Color.rgbValues(DyeColor.byId(stack.getDamageValue)),
+    register((stack, tintIndex) =>
+      opaque(Color.rgbValues(DyeColor.byId(stack.getDamageValue))),
       OCBlocks.ChameliumBlock.get())
 
-    register((stack, tintIndex) => tintIndex,
+    register((stack, tintIndex) => 0xFFFFFFFF,
       OCBlocks.ScreenTier1.get(),
       OCBlocks.ScreenTier2.get(),
       OCBlocks.ScreenTier3.get(),
@@ -75,10 +81,8 @@ object ColorHandler {
 
     register((stack, tintIndex) =>
       if (tintIndex == 1) {
-        // Item tint colors are ARGB in modern Minecraft. Preserve full opacity;
-        // returning a 24-bit RGB value makes alpha = 0 and the layer invisible.
         val rgb = if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else 0x66DD55
-        0xFF000000 | (rgb & 0x00FFFFFF)
+        opaque(rgb)
       } else 0xFFFFFFFF,
       OCItems.HoverBoots.get())
   }
