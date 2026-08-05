@@ -45,6 +45,15 @@ configurations {
     implementation.extendsFrom embedded
 }
 
+sourceSets {
+    register("data") {
+        def main = sourceSets.main
+        it.compileClasspath += main.compileClasspath
+        it.runtimeClasspath += main.runtimeClasspath
+        project.dependencies.add(it.implementationConfigurationName, main.output)
+    }
+}
+
 neoForge {
     version = project.neoforge_version
 
@@ -58,16 +67,22 @@ neoForge {
     }
 
     mods {
-        opencomputers {
+        register("opencomputers") {
             sourceSet sourceSets.main
         }
+
+        register("opencomputersData") {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.data
+        }
+
     }
 
     runs {
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
-
+            loadedMods = [mods.opencomputers]
         }
 
         client {
@@ -92,14 +107,19 @@ neoForge {
         data {
             data()
 
-            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/data/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+            loadedMods = [mods.opencomputersData]
+            programArguments.addAll(
+                '--mod', project.mod_id,
+                '--all',
+                '--output', file('src/main/generatedResources/').getAbsolutePath(),
+                '--existing', file('src/main/resources/').getAbsolutePath()
+            )
         }
     }
 }
 
-sourceSets.main.scala { srcDir 'src/data/scala' }
 sourceSets.main.resources {
-    srcDir 'src/data/resources'
+    srcDir 'src/main/generatedResources'
     exclude '.cache/**'
 }
 

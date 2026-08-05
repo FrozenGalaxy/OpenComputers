@@ -33,14 +33,6 @@ import net.neoforged.neoforge.common.extensions.IItemExtension
 trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExtension {
   def createItemStack(amount: Int = 1) = new ItemStack(this, amount)
 
-  def getRarity(stack: ItemStack): item.Rarity = item.Rarity.COMMON
-
-  // bruh
-  override def verifyComponentsAfterLoad(stack: ItemStack): Unit = {
-    super.verifyComponentsAfterLoad(stack)
-    stack.set(DataComponents.RARITY, this.getRarity(stack))
-  }
-
   @Deprecated
   protected var unlocalizedName = getClass.getSimpleName.toLowerCase
 

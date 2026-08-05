@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "opencomputers:chamelium"
+    }
+  },
+  "pattern": [
+    "CCC",
+    "CCC",
+    "CCC"
+  ],
+  "result": {
+    "components": {
+      "minecraft:damage": 15
+    },
+    "count": 1,
+    "id": "opencomputers:chameliumblock"
+  }
+}

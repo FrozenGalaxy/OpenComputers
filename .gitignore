@@ -38,7 +38,7 @@
 /.bloop
 /.scalafmt.conf
 /font
-/src/data/resources/.cache
+/src/main/generatedResources/.cache
 .mimocode/
 
 # Local porting references and inspection tools

@@ -69,9 +69,10 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
     }
   }
 
-  override def getRarity(stack: ItemStack): item.Rarity = {
-    val data = new TabletData(stack)
-    Rarity.byTier(data.tier)
+  override def verifyComponentsAfterLoad(stack: ItemStack): Unit = {
+    super.verifyComponentsAfterLoad(stack)
+    // FIXME: This is a horrible hack!
+    stack.set(DataComponents.RARITY, Rarity.byTier(new TabletData(stack).tier))
   }
 
   override def isBarVisible(stack: ItemStack) = true
@@ -372,7 +373,7 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
     }
 
   override def internalComponents(): java.lang.Iterable[ItemStack] = (0 until getContainerSize).collect {
-      case slot if !getItem(slot).isEmpty && isComponentSlot(slot, getItem(slot)) => getItem(slot)
+    case slot if !getItem(slot).isEmpty && isComponentSlot(slot, getItem(slot)) => getItem(slot)
   }.asJava
 
   override def componentSlot(address: String): Int = componentSlots.indexWhere(_.exists(env => env.node != null && env.node.address == address))

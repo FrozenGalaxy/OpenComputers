@@ -9,7 +9,7 @@ import li.cil.oc.Settings
 import li.cil.oc.api
 import li.cil.oc.api.fs.FileSystem
 import li.cil.oc.common.datacomponents.OCComponents
-import li.cil.oc.common.init.Items
+import li.cil.oc.common.init.OCItems
 import li.cil.oc.util.Color
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.item.DyeColor
@@ -67,7 +67,7 @@ object Loot {
     else None
 
   def registerLootDisk(name: String, loc: ResourceLocation, color: DyeColor, factory: Callable[FileSystem], doRecipeCycling: Boolean): ItemStack = {
-    val stack = Items.get(Constants.ItemName.Floppy).createItemStack(1)
+    val stack = OCItems.get(Constants.ItemName.Floppy).createItemStack(1)
     stack.set(OCComponents.LABEL, name)
     stack.set(DataComponents.CUSTOM_NAME, Component.literal(name))
     stack.set(OCComponents.LOOT_DISK, loc)
@@ -158,7 +158,7 @@ object Loot {
     val stack = registerLootDisk(path, ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, path), color.getOrElse(DyeColor.LIGHT_GRAY), callable, doRecipeCycling = true)
     stack.set(DataComponents.CUSTOM_NAME, Component.literal(name))
     if (!external) {
-      Items.registerStack(stack, path)
+      OCItems.registerStack(stack, path)
       lootDiskDescriptorIds += path
     }
     stack

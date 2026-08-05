@@ -34,17 +34,18 @@ import scala.collection.convert.ImplicitConversionsToJava._
 import scala.collection.convert.ImplicitConversionsToScala._
 import scala.collection.mutable
 
+object ControllerImpl {
+  val OverloadDamageKey: ResourceKey[DamageType] = ResourceKey.create(
+    Registries.DAMAGE_TYPE,
+    ResourceLocation.fromNamespaceAndPath("opencomputers", "nanomachines_overload")
+  )
+}
 class ControllerImpl(val player: Player) extends Controller with WirelessEndpoint {
   if (isServer) api.Network.joinWirelessNetwork(this)
   var previousDimension = player.level.dimension
 
   lazy val CommandRange = Settings.get.nanomachinesCommandRange * Settings.get.nanomachinesCommandRange
   final val FullSyncInterval = 20 * 60
-
-  val OverloadDamageKey: ResourceKey[DamageType] = ResourceKey.create(
-    Registries.DAMAGE_TYPE,
-    ResourceLocation.fromNamespaceAndPath("opencomputers", "nanomachines_overload")
-  )
 
   var uuid = UUID.randomUUID.toString
   var responsePort = 0
@@ -279,7 +280,7 @@ class ControllerImpl(val player: Player) extends Controller with WirelessEndpoin
 
         val overload = activeInputs - getSafeActiveInputs
         if (!player.isCreative && overload > 0 && player.level().getGameTime % 20 == 0) {
-          val src = new DamageSourceWithRandomCause(OverloadDamageKey, 3, player.level())
+          val src = new DamageSourceWithRandomCause(ControllerImpl.OverloadDamageKey, 3, player.level())
 
           player.hurt(src, overload.toFloat)
         }

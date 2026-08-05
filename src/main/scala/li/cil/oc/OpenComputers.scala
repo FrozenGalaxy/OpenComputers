@@ -5,7 +5,7 @@ import li.cil.oc.common.block.ChameliumBlock
 import li.cil.oc.common.blockentity.BlockEntityTypes
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.entity.EntityTypes
-import li.cil.oc.common.init.{Blocks, Items}
+import li.cil.oc.common.init.{OCBlocks, OCItems}
 import li.cil.oc.common.menu.MenuTypes
 import li.cil.oc.common.openprinter.OpenPrinter
 import li.cil.oc.common.recipe.Recipes
@@ -63,8 +63,8 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
 
   modBus.register(this)
   OCComponents.init(modBus)
-  Items.init(modBus)
-  Blocks.init(modBus)
+  OCItems.init(modBus)
+  OCBlocks.init(modBus)
   CreativeTab.CREATIVE_TABS.register(modBus)
   BlockEntityTypes.init(modBus)
   Recipes.init(modBus)
@@ -72,7 +72,6 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   EntityTypes.ENTITY_TYPES.register(modBus)
   MenuTypes.MENU.register(modBus)
   OpenPrinter.init(modBus, modContainer)
-  modBus.register(li.cil.oc.data.DataGenerators)
   modBus.register(CreativeTab)
   OpenComputers.instance = Some(this)
   modBus.register(OpenComputers.proxy)
