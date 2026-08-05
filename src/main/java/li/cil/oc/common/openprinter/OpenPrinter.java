@@ -36,7 +36,9 @@ import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredRegister.Blocks;
 import net.neoforged.neoforge.registries.DeferredRegister.Items;
@@ -70,24 +72,24 @@ public final class OpenPrinter {
     public static final DeferredRegister<MenuType<?>> MENUS =
             DeferredRegister.create(Registries.MENU, MOD_ID);
 
-    public static final DeferredHolder<Block, DeviceBlock> PRINTER =
+    public static final DeferredBlock<DeviceBlock> PRINTER =
             block("document_printer", DeviceBlock.Kind.PRINTER);
-    public static final DeferredHolder<Block, DeviceBlock> SHREDDER =
+    public static final DeferredBlock<DeviceBlock> SHREDDER =
             block("shredder", DeviceBlock.Kind.SHREDDER);
-    public static final DeferredHolder<Block, DeviceBlock> FILE_CABINET =
+    public static final DeferredBlock<DeviceBlock> FILE_CABINET =
             block("filecabinet", DeviceBlock.Kind.FILE_CABINET);
-    public static final DeferredHolder<Block, DeviceBlock> BRIEFCASE =
+    public static final DeferredBlock<DeviceBlock> BRIEFCASE =
             block("briefcase", DeviceBlock.Kind.BRIEFCASE);
 
-    public static final DeferredHolder<Item, Item> PRINTED_PAGE = ITEMS.register("printed_page",
+    public static final DeferredItem<Item> PRINTED_PAGE = ITEMS.register("printed_page",
             () -> new PrintedPageItem(new Item.Properties().stacksTo(1)));
-    public static final DeferredHolder<Item, Item> BLACK_INK = ITEMS.register("printer_ink_black",
+    public static final DeferredItem<Item> BLACK_INK = ITEMS.register("printer_ink_black",
             () -> new Item(new Item.Properties().stacksTo(1).durability(400)));
-    public static final DeferredHolder<Item, Item> COLOR_INK = ITEMS.register("printer_ink_color",
+    public static final DeferredItem<Item> COLOR_INK = ITEMS.register("printer_ink_color",
             () -> new Item(new Item.Properties().stacksTo(1).durability(400)));
-    public static final DeferredHolder<Item, Item> PAPER_SHREDS = ITEMS.register("paper_shreds",
+    public static final DeferredItem<Item> PAPER_SHREDS = ITEMS.register("paper_shreds",
             () -> new Item(new Item.Properties()));
-    public static final DeferredHolder<Item, Item> FOLDER = ITEMS.register("folder",
+    public static final DeferredItem<Item> FOLDER = ITEMS.register("folder",
             () -> new PortableFolderItem(new Item.Properties().stacksTo(1)));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PrinterBlockEntity>> PRINTER_BE =
@@ -119,8 +121,8 @@ public final class OpenPrinter {
                 event.enqueueWork(OpenPrinter::registerOpenComputersIntegration));
     }
 
-    private static DeferredHolder<Block, DeviceBlock> block(String name, DeviceBlock.Kind kind) {
-        DeferredHolder<Block, DeviceBlock> holder = BLOCKS.register(name, () -> {
+    private static DeferredBlock<DeviceBlock> block(String name, DeviceBlock.Kind kind) {
+        DeferredBlock<DeviceBlock> holder = BLOCKS.register(name, () -> {
             Block.Properties properties = Block.Properties.of().mapColor(MapColor.METAL)
                     .strength(2.5F).sound(SoundType.METAL);
             if (kind == DeviceBlock.Kind.PRINTER || kind == DeviceBlock.Kind.BRIEFCASE) {

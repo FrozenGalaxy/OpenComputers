@@ -4,6 +4,7 @@ import li.cil.oc.Constants
 import li.cil.oc.api
 import li.cil.oc.api.internal.Colored
 import li.cil.oc.common.block
+import li.cil.oc.common.init.{Blocks, Items}
 import li.cil.oc.util.Color
 import li.cil.oc.util.ItemColorizer
 import li.cil.oc.util.ItemUtils
@@ -23,7 +24,7 @@ object ColorHandler {
       case block: block.Cable => block.colorMultiplierOverride.getOrElse(0xFFFFFFFF)
       case _ => 0xFFFFFFFF
     },
-      api.Items.get(Constants.BlockName.Cable).block())
+      Blocks.Cable.get())
 
     register((state, world, pos, tintIndex) => if (pos == null) 0xFFFFFFFF else world.getBlockEntity(pos) match {
       case colored: Colored => colored.getColor
@@ -32,45 +33,45 @@ object ColorHandler {
         case _ => 0xFFFFFFFF
       }
     },
-      api.Items.get(Constants.BlockName.CaseTier1).block(),
-      api.Items.get(Constants.BlockName.CaseTier2).block(),
-      api.Items.get(Constants.BlockName.CaseTier3).block(),
-      api.Items.get(Constants.BlockName.CaseTier4).block(),
-      api.Items.get(Constants.BlockName.CaseCreative).block())
+      Blocks.CaseTier1.get(),
+      Blocks.CaseTier2.get(),
+      Blocks.CaseTier3.get(),
+      Blocks.CaseTier4.get(),
+      Blocks.CaseCreative.get())
 
     register((state, world, pos, tintIndex) => Color.rgbValues(state.getValue(block.ChameliumBlock.Color)),
-      api.Items.get(Constants.BlockName.ChameliumBlock).block())
+      Blocks.ChameliumBlock.get())
 
     register((state, world, pos, tintIndex) => tintIndex,
-      api.Items.get(Constants.BlockName.Print).block())
+      Blocks.Print.get())
 
     register((state, world, pos, tintIndex) => state.getBlock match {
       case block: block.Screen => Color.byTier(block.tier)
       case _ => 0xFFFFFFFF
     },
-      api.Items.get(Constants.BlockName.ScreenTier1).block(),
-      api.Items.get(Constants.BlockName.ScreenTier2).block(),
-      api.Items.get(Constants.BlockName.ScreenTier3).block())
+      Blocks.ScreenTier1.get(),
+      Blocks.ScreenTier2.get(),
+      Blocks.ScreenTier3.get())
 
     register((stack, tintIndex) => if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else tintIndex,
-      api.Items.get(Constants.BlockName.Cable).block())
+      Blocks.Cable.get())
 
     register((stack, tintIndex) => Color.byTier(ItemUtils.caseTier(stack)),
-      api.Items.get(Constants.BlockName.CaseTier1).block(),
-      api.Items.get(Constants.BlockName.CaseTier2).block(),
-      api.Items.get(Constants.BlockName.CaseTier3).block(),
-      api.Items.get(Constants.BlockName.CaseTier4).block(),
-      api.Items.get(Constants.BlockName.CaseCreative).block())
+      Blocks.CaseTier1.get(),
+      Blocks.CaseTier2.get(),
+      Blocks.CaseTier3.get(),
+      Blocks.CaseTier4.get(),
+      Blocks.CaseCreative.get())
 
     register((stack, tintIndex) => Color.rgbValues(DyeColor.byId(stack.getDamageValue)),
-      api.Items.get(Constants.BlockName.ChameliumBlock).block())
+      Blocks.ChameliumBlock.get())
 
     register((stack, tintIndex) => tintIndex,
-      api.Items.get(Constants.BlockName.ScreenTier1).block(),
-      api.Items.get(Constants.BlockName.ScreenTier2).block(),
-      api.Items.get(Constants.BlockName.ScreenTier3).block(),
-      api.Items.get(Constants.BlockName.Print).block(),
-      api.Items.get(Constants.BlockName.Robot).block())
+      Blocks.ScreenTier1.get(),
+      Blocks.ScreenTier2.get(),
+      Blocks.ScreenTier3.get(),
+      Blocks.Print.get(),
+      Blocks.Robot.get())
 
     register((stack, tintIndex) =>
       if (tintIndex == 1) {
@@ -79,7 +80,7 @@ object ColorHandler {
         val rgb = if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else 0x66DD55
         0xFF000000 | (rgb & 0x00FFFFFF)
       } else 0xFFFFFFFF,
-      api.Items.get(Constants.ItemName.HoverBoots).item())
+      Items.HoverBoots.get())
   }
 
   def register(handler: (BlockState, BlockGetter, BlockPos, Int) => Int, blocks: Block*): Unit = {
