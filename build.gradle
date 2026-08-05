@@ -24,8 +24,8 @@ def githubTag = System.getenv('GITHUB_REF_TYPE') == 'tag'
 // Jenkins provides BUILD_NUMBER; GitHub Actions provides GITHUB_RUN_NUMBER.
 def ciBuildNumber = findProperty('build_number') ?:
         System.getenv('BUILD_NUMBER') ?:
-                System.getenv('GITHUB_RUN_NUMBER') ?:
-                        'local'
+        System.getenv('GITHUB_RUN_NUMBER') ?:
+        'local'
 
 version = githubTag ?: "${mod_version}-dev.${ciBuildNumber}"
 
@@ -39,7 +39,6 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 configurations {
     embedded
     requiredMods
-
     compileClasspath.extendsFrom embedded
     runtimeClasspath.extendsFrom embedded
     runtimeClasspath.extendsFrom requiredMods
@@ -114,54 +113,83 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 repositories {
-    flatDir {
-        dirs 'libs'
-    }
-
-    // ScalableCatsForce is deliberately excluded from the Michiyo mirror.
-    // Its former Maven endpoint now returns an HTML redirect whose target no
-    // longer contains this version. Resolve the exact published with-library
-    // artifact directly from CurseMaven instead. Only this module is excluded;
-    // all other curse.maven modules continue through the Michiyo mirror below.
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = "ScalableCatsForce"
-                url = uri("https://cursemaven.com/")
-            }
-        }
-        filter {
-            includeModule("curse.maven", "scalable-cats-force-320926")
-        }
-    }
-
-    // All other remote dependencies resolve through the Michiyo mirror.
+    mavenCentral()
     maven {
-        name = "Michiyo"
-        url = uri("https://maven.michiyo.me/releases/")
-
+        name "MightyPirates"
+        url "https://maven.cil.li/"
         metadataSources {
             mavenPom()
             artifact()
-            ignoreGradleMetadataRedirection()
         }
     }
+    maven {
+        url "https://maven.squiddev.cc"
+        content {
+            includeGroup "cc.tweaked"
+        }
+    }
+    maven {
+        url "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven {
+        url "https://cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
+    maven {
+        url "https://modmaven.dev"
+        content {
+            includeGroup "mezz.jei"
+            includeGroup 'appeng'
+        }
+    }
+    maven {
+        url "https://chickenbones.net/maven/"
+        content {
+            includeGroup "codechicken"
+            includeGroup "mrtjp"
+        }
+    }
+    maven {
+        url "https://modmaven.dev/"
+        content {
+            includeGroup "appeng"
+            includeGroup "mekanism"
+        }
+    }
+    maven {
+        url "https://proxy-maven.covers1624.net/"
+        content {
+            includeModule "net.minecraftforge", "Scorge"
+        }
+    }
+    maven {
+        name = "kotori316"
+        url = "https://maven.kotori316.com"
+    }
+    maven {
+        name = "Jared's maven"
+        url = "https://maven.blamejared.com/"
+    }
+    maven {
+        url = "https://maven.createmod.net"
+    }
+    maven {
+        url = "https://maven.ithundxr.dev/mirror"
+    }
+    maven { url = "https://maven.ithundxr.dev/snapshots" } // Registrate
+    flatDir { dirs 'libs' }
 }
 
 dependencies {
     compileOnly("org.scala-lang:scala-library:2.13.12")
     compileOnly("org.typelevel:cats-core_2.13:2.8.1-kotori")
-
-    // Prefer the local outage fallback when present. If it is removed, resolve
-    // the exact ScalableCatsForce file directly from CurseMaven. The exclusive
-    // content rule prevents either path from using the Michiyo mirror.
-    def localScalableCatsForce = file("libs/scalablecatsforce-neoforge-3.3.3-build-15-with-library.jar")
-    if (localScalableCatsForce.exists()) {
-        requiredMods files(localScalableCatsForce)
-    } else {
-        requiredMods("curse.maven:scalable-cats-force-320926:5527136") {
-            transitive(false)
-        }
+    requiredMods("com.kotori316:scalablecatsforce-neoforge:3.3.3-build-15:with-library") {
+        transitive(false)
     }
 
     embedded "com.typesafe:config:1.4.5"
@@ -195,22 +223,11 @@ dependencies {
 //    compileOnly("curse.maven:cofh-core-69162:4801048")
 //    compileOnly("curse.maven:thermal-foundation-222880:4788649")
 
-    // Create - local workaround while Create's Maven is unavailable.
-    implementation files("libs/create-1.21.1-6.0.10-280-slim.jar")
-    implementation files("libs/ponder-neoforge-1.0.82+mc1.21.1.jar")
-    runtimeOnly files("libs/flywheel-neoforge-1.21.1-1.0.6.jar")
-    runtimeOnly files("libs/Registrate-MC1.21-1.3.0+67.jar")
-
-    // Once Create is available through maven.michiyo.me again, comment out the
-    // four local lines and uncomment these. No upstream repository changes are
-    // needed: these coordinates intentionally resolve through the mirror.
-    /*
+    // Create
     implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
     implementation("net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("com.tterrag.registrate:Registrate:${registrate_version}")
-    */
-
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
 
     // AE2
