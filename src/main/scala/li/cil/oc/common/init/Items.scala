@@ -454,6 +454,7 @@ object Items extends ItemAPI {
 
     // 1.6
     registerItem(new item.TerminalServer(defaultProps.stacksTo(1)), Constants.ItemName.TerminalServer)
+    registerItem(new item.RackKVM(defaultProps.stacksTo(1)), Constants.ItemName.RackKVM)
     registerItem(new item.DiskDriveMountable(defaultProps.stacksTo(1)), Constants.ItemName.DiskDriveMountable)
 
     // 1.9

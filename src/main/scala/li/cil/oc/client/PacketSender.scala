@@ -194,6 +194,16 @@ object PacketSender {
     pb.sendToServer()
   }
 
+  def sendRackKVMSelection(rack: Rack, kvmSlot: Int, serverSlot: Int): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.RackKVMSelection)
+
+    pb.writeTileEntity(rack)
+    pb.writeInt(kvmSlot)
+    pb.writeInt(serverSlot)
+
+    pb.sendToServer()
+  }
+
   def sendRobotAssemblerStart(assembler: menu.Assembler): Unit = {
     val pb = new SimplePacketBuilder(PacketType.RobotAssemblerStart)
 

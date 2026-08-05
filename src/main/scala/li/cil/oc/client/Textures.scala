@@ -131,6 +131,8 @@ object Textures {
     val RackTerminalServer = L("rack_terminal_server")
     val RackTerminalServerOn = L("overlay/rack_terminal_server_on")
     val RackTerminalServerPresence = L("overlay/rack_terminal_server_presence")
+    val RackKVM = L("rack_kvm")
+    val RackKVMPresence = L("overlay/rack_kvm_presence")
     val RaidFrontActivity = L("overlay/raid_front_activity")
     val RaidFrontError = L("overlay/raid_front_error")
     val ScreenUpIndicator = L("overlay/screen_up_indicator")

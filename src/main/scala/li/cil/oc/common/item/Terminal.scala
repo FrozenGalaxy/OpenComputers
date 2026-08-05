@@ -80,17 +80,22 @@ class Terminal(props: Properties) extends Item(props) with traits.SimpleItem wit
   }
 
   @OnlyIn(Dist.CLIENT)
-  private def showGui(stack: ItemStack, key: String, term: component.TerminalServer, inRange: () => Boolean): Unit = {
+  private def showGui(stack: ItemStack, key: String, term: component.RemoteTerminalHost, inRange: () => Boolean): Unit = {
     term.buffer match {
       case buffer: component.TextBuffer => buffer.requestSynchronization()
       case _ =>
     }
-    Minecraft.getInstance.pushGuiLayer(new gui.Screen(term.buffer, true, () => true, () => {
+    def remainsUsable(): Boolean = {
       // Check if someone else bound a term to our server.
-      if (stack.getComponent(OCComponents.TERMINAL_REFERENCE).exists(r => r.key != key)) Minecraft.getInstance.popGuiLayer
+      if (!stack.getComponent(OCComponents.TERMINAL_REFERENCE).exists(_.key == key) || !term.sidedKeys.contains(key)) Minecraft.getInstance.popGuiLayer
       // Check whether we're still in range.
       if (!inRange()) Minecraft.getInstance.popGuiLayer
       true
-    }))
+    }
+
+    term match {
+      case kvm: component.RackKVM => Minecraft.getInstance.pushGuiLayer(new gui.RackKVM(kvm, () => remainsUsable()))
+      case _ => Minecraft.getInstance.pushGuiLayer(new gui.Screen(term.buffer, true, () => true, () => remainsUsable()))
+    }
   }
 }

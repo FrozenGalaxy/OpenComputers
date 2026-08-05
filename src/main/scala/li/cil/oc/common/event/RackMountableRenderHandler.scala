@@ -26,6 +26,7 @@ object RackMountableRenderHandler {
   )
 
   lazy val TerminalServer = api.Items.get(Constants.ItemName.TerminalServer)
+  lazy val RackKVM = api.Items.get(Constants.ItemName.RackKVM)
   lazy val CapacitorMountable = api.Items.get(Constants.ItemName.CapacitorMountable)
 
   @SubscribeEvent
@@ -93,6 +94,16 @@ object RackMountableRenderHandler {
         renderOverlayFromAtlas(e, Textures.Block.RackTerminalServerPresence, u0, u1)
       }
     }
+    else if (e.data != null && RackKVM == api.Items.get(e.rack.getItem(e.mountable))) {
+      // Rack KVM. Light one of its three server indicators for the selected server.
+      renderOverlayFromAtlas(e, Textures.Block.RackTerminalServerOn)
+      val selectedSlot = e.data.getComponent(OCComponents.RACK_KVM_SELECTED_SLOT).getOrElse(-1)
+      val logicalIndex = (0 until 4).filter(_ != e.mountable).indexOf(selectedSlot)
+      if (logicalIndex >= 0) {
+        val u0 = (7 + logicalIndex * 2) / 16f
+        renderOverlayFromAtlas(e, Textures.Block.RackKVMPresence, u0, u0 + 1 / 16f)
+      }
+    }
     else if (e.data != null && CapacitorMountable == api.Items.get(e.rack.getItem(e.mountable))) {
       // Render overlay if active (it has power)
       if (e.data.getComponent(OCComponents.IS_POWERED) getOrElse false) {
@@ -122,6 +133,9 @@ object RackMountableRenderHandler {
     } else if (TerminalServer == api.Items.get(e.rack.getItem(e.mountable))) {
       // Terminal server.
       e.setFrontTextureOverride(Textures.getSprite(Textures.Block.RackTerminalServer))
+    } else if (RackKVM == api.Items.get(e.rack.getItem(e.mountable))) {
+      // Rack KVM.
+      e.setFrontTextureOverride(Textures.getSprite(Textures.Block.RackKVM))
     } else if (CapacitorMountable == api.Items.get(e.rack.getItem(e.mountable))) {
       e.setFrontTextureOverride(Textures.getSprite(Textures.Block.RackCapacitor))
     }

@@ -7,7 +7,7 @@ import li.cil.oc.api.network._
 import li.cil.oc.api.util.StateAware
 import li.cil.oc.client.renderer.block.ServerRackModel
 import li.cil.oc.common.blockentity.traits.RedstoneChangedEventArgs
-import li.cil.oc.common.component.TerminalServer
+import li.cil.oc.common.component.{RackKVM, TerminalServer}
 import li.cil.oc.common.datacomponents.{CompoundStorage, OCComponents}
 import li.cil.oc.common.{Slot, menu}
 import li.cil.oc.integration.opencomputers.DriverRedstoneCard
@@ -429,6 +429,7 @@ class Rack(pos: BlockPos, state: BlockState)
       // initialization retries alive during world loading.
       componentSlots.foreach {
         case Some(terminal: TerminalServer) => terminal.update()
+        case Some(kvm: RackKVM) => kvm.update()
         case _ =>
       }
     }
@@ -468,6 +469,7 @@ class Rack(pos: BlockPos, state: BlockState)
     // disturb their machine lifecycle and saved running state.
     componentSlots.zip(items).foreach {
       case (Some(terminal: TerminalServer), stack) if !stack.isEmpty => terminal.saveData(stack)
+      case (Some(kvm: RackKVM), stack) if !stack.isEmpty => kvm.saveData(stack)
       case _ =>
     }
     super.saveForServer(nbt, provider)

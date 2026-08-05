@@ -509,7 +509,7 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
       // environment resumes. In particular, a terminal server otherwise starts
       // with its ScreenTier1 constructor buffer and can overwrite the saved
       // higher resolution before the auxiliary state is recovered.
-      case _: api.internal.Tablet | _: TerminalServer => data.saveData(holder)
+      case _: api.internal.Tablet | _: RemoteTerminalHost => data.saveData(holder)
       case environmentHost: EnvironmentHost =>
         SaveHandler.scheduleSave(environmentHost, new CompoundTag(), bufferPath, (tag: CompoundTag) => {
           val storage = new CompoundStorage()

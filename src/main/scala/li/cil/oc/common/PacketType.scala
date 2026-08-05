@@ -103,6 +103,7 @@ object PacketType extends Enumeration {
   RobotStateRequest,
   ServerPower,
   HoloScreenResize,
+  RackKVMSelection,
 
   EndOfList = Value
 }

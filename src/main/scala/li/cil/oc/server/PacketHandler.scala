@@ -10,7 +10,7 @@ import li.cil.oc.api.machine.Machine
 import li.cil.oc.api.network.Connector
 import li.cil.oc.common.Advancement
 import li.cil.oc.common.PacketType
-import li.cil.oc.common.component.TextBuffer
+import li.cil.oc.common.component.{RackKVM => RackKVMComponent, RemoteTerminalHost, TextBuffer}
 import li.cil.oc.common.menu
 import li.cil.oc.common.entity.Drone
 import li.cil.oc.common.entity.DroneInventory
@@ -44,6 +44,7 @@ object PacketHandler extends CommonPacketHandler {
     case textBuffer: TextBuffer => textBuffer.host match {
       case screen: Screen => screen.screens.exists(part =>
         player.distanceToSqr(part.x + 0.5, part.y + 0.5, part.z + 0.5) <= 64)
+      case remote: RemoteTerminalHost => remote.isBufferUsable(buffer, player)
       case _ => true
     }
     case _ => false
@@ -70,6 +71,7 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.PetVisibility => onPetVisibility(p)
       case PacketType.RackMountableMapping => onRackMountableMapping(p)
       case PacketType.RackRelayState => onRackRelayState(p)
+      case PacketType.RackKVMSelection => onRackKVMSelection(p)
       case PacketType.RobotAssemblerStart => onRobotAssemblerStart(p)
       case PacketType.RobotStateRequest => onRobotStateRequest(p)
       case PacketType.ServerPower => onServerPower(p)
@@ -354,6 +356,20 @@ object PacketHandler extends CommonPacketHandler {
         }
       }
       case _ => // Invalid packet or container closed early.
+    }
+  }
+
+  def onRackKVMSelection(p: PacketParser): Unit = {
+    val rack = p.readBlockEntity[Rack]()
+    val kvmSlot = p.readInt()
+    val serverSlot = p.readInt()
+    (rack, p.player) match {
+      case (Some(targetRack), player: ServerPlayer) if kvmSlot >= 0 && kvmSlot < targetRack.getContainerSize =>
+        targetRack.getMountable(kvmSlot) match {
+          case kvm: RackKVMComponent if kvm.isRemoteUsable(player) => kvm.selectRackSlot(serverSlot)
+          case _ => logForgedPacket(player)
+        }
+      case _ =>
     }
   }
 

@@ -40,8 +40,8 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.item.component.CustomData
 import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-class TerminalServer(val rack: api.internal.Rack, val slot: Int) extends Environment with EnvironmentHost with Analyzable with RackMountable with Lifecycle with DeviceInfo {
-  val node = api.Network.newNode(this, Visibility.None).create()
+class TerminalServer(val rack: api.internal.Rack, val slot: Int) extends Environment with EnvironmentHost with Analyzable with RackMountable with Lifecycle with DeviceInfo with RemoteTerminalHost {
+  override val node = api.Network.newNode(this, Visibility.None).create()
 
   lazy val buffer = {
     val screenItem = api.Items.get(Constants.BlockName.ScreenTier1).createItemStack(1)
@@ -55,33 +55,14 @@ class TerminalServer(val rack: api.internal.Rack, val slot: Int) extends Environ
   lazy val keyboard = {
     val keyboardItem = api.Items.get(Constants.BlockName.Keyboard).createItemStack(1)
     val keyboard = api.Driver.driverFor(keyboardItem, getClass).createEnvironment(keyboardItem, this).asInstanceOf[api.internal.Keyboard]
-    keyboard.setUsableOverride((keyboard: api.internal.Keyboard, player: Player) => {
-      val stack = player.getItemInHand(InteractionHand.MAIN_HAND)
-      stack.getItem match {
-        case t: item.Terminal if stack.has(OCComponents.TERMINAL_REFERENCE) =>
-          sidedKeys.contains(stack.getComponent(OCComponents.TERMINAL_REFERENCE).get.key)
-        case _ => false
-      }
-    })
+    keyboard.setUsableOverride((keyboard: api.internal.Keyboard, player: Player) => isRemoteUsable(player))
     keyboard
   }
 
-  var range = Settings.get.maxWirelessRange(Tier.Two)
+  override val range = Settings.get.maxWirelessRange(Tier.Two)
   val keys = mutable.ListBuffer.empty[String]
 
-  def hasAddress: Boolean = {
-    if (rack != null) {
-      val data = rack.getMountableData(slot)
-      if (data != null) {
-        return data.has(OCComponents.ADDRESS)
-      }
-    }
-    false
-  }
-
-  def address: String = rack.getMountableData(slot).getComponent(OCComponents.ADDRESS).get
-
-  def sidedKeys = {
+  override def sidedKeys = {
     if (!rack.getEnvironmentLevel.isClientSide) keys
     else rack.getMountableData(slot).getComponent(OCComponents.KEYS) getOrElse List.empty
   }
@@ -253,11 +234,11 @@ object TerminalServer {
   // As an address loads, repeated addresses are dropped from the list
   class TerminalServerCache {
 
-    private val ready: mutable.Map[String, TerminalServer] = new mutable.HashMap[String, TerminalServer]()
-    private val pending: mutable.Buffer[TerminalServer] = mutable.Buffer.empty[TerminalServer]
+    private val ready: mutable.Map[String, RemoteTerminalHost] = new mutable.HashMap[String, RemoteTerminalHost]()
+    private val pending: mutable.Buffer[RemoteTerminalHost] = mutable.Buffer.empty[RemoteTerminalHost]
 
     private def completePending(): Unit = {
-      val promoted: mutable.Buffer[TerminalServer] = mutable.Buffer.empty[TerminalServer]
+      val promoted: mutable.Buffer[RemoteTerminalHost] = mutable.Buffer.empty[RemoteTerminalHost]
       pending.foreach { term => if (term.hasAddress)
         promoted += term
       }
@@ -270,7 +251,7 @@ object TerminalServer {
       }
     }
 
-    def add(terminal: TerminalServer): Boolean = {
+    def add(terminal: RemoteTerminalHost): Boolean = {
       completePending()
       if (terminal.hasAddress) {
         val newAddress: String = terminal.address
@@ -287,7 +268,7 @@ object TerminalServer {
       }
     }
 
-    def remove(terminal: TerminalServer): Boolean = {
+    def remove(terminal: RemoteTerminalHost): Boolean = {
       completePending()
       if (terminal.hasAddress)
         ready.remove(terminal.address).isDefined
@@ -303,10 +284,10 @@ object TerminalServer {
       pending.clear()
     }
 
-    def find(address: String): Option[TerminalServer] = {
+    def find(address: String): Option[RemoteTerminalHost] = {
       completePending()
       ready.getOrDefault(address, null) match {
-        case term: TerminalServer => Option(term)
+        case term: RemoteTerminalHost => Option(term)
         case _ => None
       }
     }

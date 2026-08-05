@@ -9,7 +9,7 @@ import li.cil.oc.client.audio.AudioSession
 import li.cil.oc.client.renderer.PetRenderer
 import li.cil.oc.common.blockentity._
 import li.cil.oc.common.blockentity.traits._
-import li.cil.oc.common.datacomponents.{CompoundStorage, ScalaStreamCodec}
+import li.cil.oc.common.datacomponents.{CompoundStorage, OCComponents, ScalaStreamCodec}
 import li.cil.oc.common.item.Tablet
 import li.cil.oc.common.nanomachines.ControllerImpl
 import li.cil.oc.common.{Loot, PacketType, component, menu, PacketHandler => CommonPacketHandler}
@@ -571,7 +571,27 @@ object PacketHandler extends CommonPacketHandler {
         val count = p.readInt()
         for (_ <- 0 until count) {
           val slot = p.readInt()
-          t.setItem(slot, p.readItemStack())
+          val incoming = p.readItemStack()
+          val current = t.getItem(slot)
+          val currentAddress = if (current.isEmpty) null else current.get(OCComponents.ADDRESS.get())
+          val incomingAddress = if (incoming.isEmpty) null else incoming.get(OCComponents.ADDRESS.get())
+
+          // Saving a terminal server or rack KVM updates the framebuffer data
+          // embedded in its ItemStack. A later inventory synchronization must
+          // not interpret that persistence-only change as removing and
+          // reinstalling the mountable: an open Remote Terminal GUI would keep
+          // the disposed buffer while packets go to the replacement, appearing
+          // frozen until the GUI is reopened. The stable controller address
+          // distinguishes an update of the same mountable from a real swap.
+          val preserveRemoteEnvironment =
+            slot >= 0 && slot < t.getContainerSize &&
+              !current.isEmpty && !incoming.isEmpty &&
+              ItemStack.isSameItem(current, incoming) &&
+              currentAddress != null && currentAddress == incomingAddress &&
+              t.getMountable(slot).isInstanceOf[component.RemoteTerminalHost]
+
+          if (preserveRemoteEnvironment) t.updateItems(slot, incoming)
+          else t.setItem(slot, incoming)
         }
       case _ => // Invalid packet.
     }

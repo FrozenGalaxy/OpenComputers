@@ -10,8 +10,10 @@ import org.lwjgl.glfw.GLFW
 import net.minecraft.client.gui.components.events.ContainerEventHandler
 import net.minecraft.network.chat.Component
 
-class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val hasKeyboardCallback: () => Boolean, val hasPower: () => Boolean)
+class Screen(initialBuffer: api.internal.TextBuffer, val hasMouse: Boolean, val hasKeyboardCallback: () => Boolean, val hasPower: () => Boolean)
   extends screens.Screen(Component.empty()) with traits.InputBuffer with ContainerEventHandler {
+
+  override def buffer: api.internal.TextBuffer = initialBuffer
 
   override protected def hasKeyboard = hasKeyboardCallback()
 
@@ -28,6 +30,8 @@ class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val has
   private var innerWidth, innerHeight = 0
 
   private var mx, my = -1
+
+  protected def topPadding: Int = 0
 
   override def mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean = {
     if (hasMouse) {
@@ -124,12 +128,13 @@ class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val has
     val bw = buffer.renderWidth
     val bh = buffer.renderHeight
     val scaleX = math.min(width / (bw + bufferMargin * 2.0), 1)
-    val scaleY = math.min(height / (bh + bufferMargin * 2.0), 1)
+    val availableHeight = height - topPadding
+    val scaleY = math.min(availableHeight / (bh + bufferMargin * 2.0), 1)
     val scale = math.min(scaleX, scaleY)
     innerWidth = (bw * scale).toInt
     innerHeight = (bh * scale).toInt
     x = (width - (innerWidth + bufferMargin * 2)) / 2
-    y = (height - (innerHeight + bufferMargin * 2)) / 2
+    y = topPadding + (availableHeight - (innerHeight + bufferMargin * 2)) / 2
     scale
   }
 }
