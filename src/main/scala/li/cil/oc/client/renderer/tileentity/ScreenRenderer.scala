@@ -24,7 +24,7 @@ import net.minecraft.client.renderer.blockentity.{BlockEntityRenderer => TileEnt
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.neoforged.api.distmarker.{Dist, OnlyIn}
-import net.minecraft.world.phys.Vec3
+import net.minecraft.world.phys.{AABB, Vec3}
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.InputEvent
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent
@@ -150,6 +150,8 @@ class ScreenRenderer extends TileEntityRenderer[Screen] {
   private case class MonitorContentLayout(border: Float, liftFromSurface: Float)
 
   private case class HologramLayout(surface: HologramSurfaceLayout, beam: Option[ProjectionBeamLayout], content: MonitorContentLayout)
+
+  override def getRenderBoundingBox(screen: Screen): AABB = screen.getRenderBoundingBox
 
   override def render(
                        screen: Screen,

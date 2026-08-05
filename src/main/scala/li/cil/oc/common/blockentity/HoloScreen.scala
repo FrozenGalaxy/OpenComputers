@@ -155,6 +155,28 @@ class HoloScreen(pos: BlockPos, state: BlockState, tier: Int) extends Screen(pos
     super.dispose()
   }
 
+  override def loadForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.loadForServer(nbt, provider)
+    updateInternalKeyboard()
+    internalKeyboard.foreach(_.loadData(nbt.getCompound(KeyboardTag), provider))
+  }
+
+  override def saveForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.saveForServer(nbt, provider)
+    internalKeyboard.foreach(keyboard =>
+      nbt.setNewCompoundTag(KeyboardTag, (tag: CompoundTag) => keyboard.saveData(tag, provider)))
+  }
+
+  override def loadForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.loadForClient(nbt, provider)
+    clientHasInternalKeyboard = nbt.getBoolean(HasInternalKeyboardTag)
+  }
+
+  override def saveForClientDirect(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    super.saveForClientDirect(nbt, provider)
+    nbt.putBoolean(HasInternalKeyboardTag, hasInternalKeyboard)
+  }
+
   override def loadComponentsCommon(holder: DataComponentHolder): Unit = {
     super.loadComponentsCommon(holder)
     for(VideoMode(w, h) <- holder.getComponent(OCComponents.VIDEO_MODE)) {
@@ -162,6 +184,11 @@ class HoloScreen(pos: BlockPos, state: BlockState, tier: Int) extends Screen(pos
       height = h max 1 min Settings.get.maxScreenHeight
       checkMultiBlock()
     }
+  }
+
+  override def loadComponentsForServer(holder: DataComponentHolder): Unit = {
+    super.loadComponentsForServer(holder)
+    updateInternalKeyboard()
   }
 
   override def saveComponentsCommon(holder: MutableDataComponentHolder): Unit = {
