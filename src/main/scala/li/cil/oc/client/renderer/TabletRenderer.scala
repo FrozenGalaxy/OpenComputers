@@ -19,7 +19,7 @@ object TabletRenderer {
   private val FrameBorder = 12
   private val BottomBorder = 20
   private val OffhandFaceSize = 1.26f
-  private val CenterFaceSize = 0.65f
+  private val CenterFaceSize = 1f
 
   @SubscribeEvent
   def onRenderHand(event: RenderHandEvent): Unit = {
