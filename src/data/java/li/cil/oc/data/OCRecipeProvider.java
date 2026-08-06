@@ -741,7 +741,7 @@ class OCRecipeProvider extends RecipeProvider {
             .pattern("iAC")
             .pattern(" B ")
             .define('i', Tags.Items.NUGGETS_IRON)
-            .define('C', OCItems.ChipTier1())
+            .define('C', OCItems.ChipTier2())
             .define('B', OCItems.Card())
             .define('A', OCItems.Alu())
             .unlockedBy(getHasName(OCItems.Card()), has(OCItems.Card()))
@@ -1779,7 +1779,7 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.PrintedCircuitBoard()), has(OCItems.PrintedCircuitBoard()))
             .save(output);
 
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.Endstone())
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.Endstone(), 4)
             .pattern("eCe")
             .pattern("CeC")
             .pattern("eCe")
@@ -1861,7 +1861,7 @@ class OCRecipeProvider extends RecipeProvider {
 
         ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, OCBlocks.CarpetedCapacitor())
             .requires(OCBlocks.Capacitor())
-            .requires(Items.WHITE_CARPET)
+            .requires(ItemTags.WOOL_CARPETS)
             .unlockedBy(getHasName(OCBlocks.Capacitor()), has(OCBlocks.Capacitor()))
             .save(output);
     }
