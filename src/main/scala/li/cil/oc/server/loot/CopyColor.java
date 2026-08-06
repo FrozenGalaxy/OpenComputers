@@ -4,6 +4,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import li.cil.oc.api.internal.Colored;
 import li.cil.oc.util.ItemColorizer;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.storage.loot.LootContext;
@@ -41,7 +42,12 @@ public final class CopyColor extends LootItemConditionalFunction {
         BlockEntity be = ctx.getParamOrNull(LootContextParams.BLOCK_ENTITY);
 
         if (be instanceof Colored colored) {
-            ItemColorizer.setColor(stack, colored.getColor());
+            int color = colored.getColor();
+            if (color == 0xABABAB) {
+                ItemColorizer.removeColor(stack);
+            } else {
+                ItemColorizer.setColor(stack, color);
+            }
         } else {
             ItemColorizer.removeColor(stack);
         }
