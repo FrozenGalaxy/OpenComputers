@@ -16,7 +16,7 @@
       "item": "minecraft:filled_map"
     },
     "p": {
-      "item": "minecraft:potion"
+      "tag": "c:potions/bottle"
     },
     "C": {
       "tag": "opencomputers:circuitchip2"
