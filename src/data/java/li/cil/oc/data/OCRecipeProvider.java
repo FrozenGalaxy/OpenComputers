@@ -1603,7 +1603,7 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.PrintedCircuitBoard()), has(OCItems.PrintedCircuitBoard()))
             .save(output);
 
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier1(), 4)
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier1(), 1)
             .pattern("iri")
             .pattern("rCG")
             .pattern("iri")
@@ -1614,7 +1614,7 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.ChipTier1()), has(OCItems.ChipTier1()))
             .save(output);
 
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier2(), 4)
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier2(), 1)
             .pattern("gcg")
             .pattern("pCG")
             .pattern("gyg")
@@ -1627,7 +1627,7 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.ChipTier2()), has(OCItems.ChipTier2()))
             .save(output);
 
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier3(), 4)
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier3(), 1)
             .pattern("ogo")
             .pattern("gCG")
             .pattern("ogo")
@@ -1638,7 +1638,7 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.ChipTier3()), has(OCItems.ChipTier3()))
             .save(output);
 
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier4(), 4)
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.ScreenTier4(), 1)
             .pattern("ogo")
             .pattern("gCG")
             .pattern("ogo")
