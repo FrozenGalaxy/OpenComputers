@@ -85,7 +85,7 @@ object CallbackDocHandler {
 
     def initialize(guiHelper: IGuiHelper): Unit = {
       icon = new DrawableAnimatedIcon(
-        ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, "textures/items/tablet_on.png"),
+        ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, "textures/item/tablet_on.png"),
         0, 0, 16, 16, 16, 32,
         guiHelper.createTickTimer(20, 1, true), 0, 16
       )
