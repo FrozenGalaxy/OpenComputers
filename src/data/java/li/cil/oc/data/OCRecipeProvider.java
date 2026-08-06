@@ -1288,7 +1288,7 @@ class OCRecipeProvider extends RecipeProvider {
             .requires(OpenPrinter.PAPER_SHREDS)
             .requires(Items.WATER_BUCKET)
             .unlockedBy(getHasName(OpenPrinter.PAPER_SHREDS), has(OpenPrinter.PAPER_SHREDS))
-            .save(output);
+            .save(output, ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "paper_from_shreds"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OpenPrinter.FILE_CABINET, 1)
             .pattern("i i")

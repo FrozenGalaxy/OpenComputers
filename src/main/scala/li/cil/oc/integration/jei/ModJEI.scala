@@ -30,4 +30,16 @@ object ModJEI {
       }
     }
   }
+
+  def addItemAtRuntime(stack: ItemStack): Unit = ingredientRegistry.foreach { registry =>
+    if (!registry.getAllIngredients(VanillaTypes.ITEM_STACK).exists(ItemStack.matches(_, stack))) {
+      EventHandler.scheduleClient { () =>
+        ingredientRegistry.foreach { currentRegistry =>
+          if (!currentRegistry.getAllIngredients(VanillaTypes.ITEM_STACK).exists(ItemStack.matches(_, stack))) {
+            currentRegistry.addIngredientsAtRuntime(VanillaTypes.ITEM_STACK, seqAsJavaList(Seq(stack)))
+          }
+        }
+      }
+    }
+  }
 }

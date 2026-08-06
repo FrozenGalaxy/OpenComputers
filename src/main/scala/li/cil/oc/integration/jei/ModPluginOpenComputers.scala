@@ -47,6 +47,7 @@ class ModPluginOpenComputers extends IModPlugin {
     stackUnderMouse = (_, _, _) => StackOption(jeiRuntime.getIngredientListOverlay.getIngredientUnderMouse(VanillaTypes.ITEM_STACK))
     ModJEI.runtime = Option(jeiRuntime)
     ModJEI.ingredientRegistry = Option(jeiRuntime.getIngredientManager)
+    ModJEI.addItemAtRuntime(Items.get(Constants.ItemName.LuaBios).createItemStack(1))
   }
 
   override def onRuntimeUnavailable(): Unit = {

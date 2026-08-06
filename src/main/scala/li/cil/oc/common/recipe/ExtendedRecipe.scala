@@ -61,7 +61,7 @@ object ExtendedRecipe {
   private lazy val print = api.Items.get(Constants.BlockName.Print)
   val beaconBlocks = ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", "beacon_base_blocks"))
 
-  private def initializeStaticResultData(recipe: Recipe[_], resultStack: ItemStack): Unit = {
+  def initializeStaticResultData(recipe: Recipe[_], resultStack: ItemStack): Unit = {
     val resultItemName = api.Items.get(resultStack)
     val tag = ItemUtils.getTag(resultStack)
 
@@ -71,6 +71,14 @@ object ExtendedRecipe {
       resultStack.getCount == 1 && tag != null &&
       recipe.getIngredients.size == 2) {
       val nbt = tag.getCompound(Settings.namespace + "data")
+
+      val labelNbt = nbt.get(Settings.namespace + "label")
+      if (labelNbt != null && labelNbt.getType == StringTag.TYPE) {
+        resultStack.set(OCComponents.LABEL, labelNbt.asInstanceOf[StringTag].getAsString)
+      }
+      if (nbt.contains(Settings.namespace + "readonly")) {
+        resultStack.set(OCComponents.READONLY, nbt.getBoolean(Settings.namespace + "readonly"))
+      }
 
       val codeNbt = nbt.get(Settings.namespace + "eeprom")
       if (codeNbt != null && codeNbt.getType == StringTag.TYPE) {
@@ -99,6 +107,11 @@ object ExtendedRecipe {
           finally stream.close()
         }
       }
+
+      // The custom data above is recipe-only initialization metadata. Keeping
+      // it would make JEI treat this result as a different EEPROM subtype from
+      // the registered Lua BIOS stack, whose state is stored in components.
+      resultStack.remove(DataComponents.CUSTOM_DATA)
     }
   }
 

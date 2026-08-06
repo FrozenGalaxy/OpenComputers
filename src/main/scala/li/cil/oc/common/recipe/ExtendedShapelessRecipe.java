@@ -35,7 +35,9 @@ public class ExtendedShapelessRecipe implements CraftingRecipe {
 
     @Override
     public ItemStack getResultItem(@NotNull HolderLookup.Provider registries) {
-        return wrapped.getResultItem(registries);
+        ItemStack result = wrapped.getResultItem(registries);
+        ExtendedRecipe.initializeStaticResultData(this, result);
+        return result;
     }
 
     @Override
