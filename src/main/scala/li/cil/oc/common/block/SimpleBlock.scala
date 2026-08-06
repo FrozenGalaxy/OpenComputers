@@ -147,22 +147,33 @@ abstract class SimpleBlock(props: Properties) extends ContainerBlock(props) {
       case _ => false
     }
 
+  def applyColor(colored: Colored, world: World, pos: BlockPos, player: PlayerEntity, dyeItem: ItemStack) = {
+    colored.setColor(Color.rgbValues(Color.dyeColor(dyeItem)))
+    world.sendBlockUpdated(pos, world.getBlockState(pos), world.getBlockState(pos), 3)
+    if (!player.isCreative && colored.consumesDye) {
+      dyeItem.split(1)
+    }
+  }
+
   // ----------------------------------------------------------------------- //
   override def useItemOn(stack: ItemStack, state: BlockState, level: World, pos: BlockPos, player: PlayerEntity, hand: InteractionHand, hitResult: BlockHitResult): ItemInteractionResult = {
-    val result = localOnBlockActivated(level, pos, player, hand, stack, hitResult.getDirection,
-      (hitResult.getLocation.x - pos.getX).toFloat, (hitResult.getLocation.y - pos.getY).toFloat, (hitResult.getLocation.z - pos.getZ).toFloat)
-    if (result) ItemInteractionResult.sidedSuccess(level.isClientSide) else ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION
+    level.getBlockEntity(pos) match {
+      case colored: Colored if Color.isDye(stack) =>
+        applyColor(colored, level, pos, player, stack)
+        ItemInteractionResult.sidedSuccess(level.isClientSide)
+      case _ => {
+        val result = localOnBlockActivated(level, pos, player, hand, stack, hitResult.getDirection,
+          (hitResult.getLocation.x - pos.getX).toFloat, (hitResult.getLocation.y - pos.getY).toFloat, (hitResult.getLocation.z - pos.getZ).toFloat)
+        if (result) ItemInteractionResult.sidedSuccess(level.isClientSide) else ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION
+      }
+    }
   }
-  
+
   override def useWithoutItem(state: BlockState, world: World, pos: BlockPos, player: PlayerEntity, hitResult: BlockHitResult): InteractionResult = {
     val heldItem = player.getItemInHand(InteractionHand.MAIN_HAND)
     world.getBlockEntity(pos) match {
       case colored: Colored if Color.isDye(heldItem) =>
-        colored.setColor(Color.rgbValues(Color.dyeColor(heldItem)))
-        world.sendBlockUpdated(pos, world.getBlockState(pos), world.getBlockState(pos), 3)
-        if (!player.isCreative && colored.consumesDye) {
-          heldItem.split(1)
-        }
+        applyColor(colored, world, pos, player, heldItem)
         InteractionResult.sidedSuccess(world.isClientSide)
       case _ => {
         val loc = hitResult.getLocation
