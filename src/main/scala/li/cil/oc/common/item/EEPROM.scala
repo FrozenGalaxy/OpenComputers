@@ -17,15 +17,6 @@ import net.neoforged.neoforge.common.extensions.IItemExtension
 class EEPROM(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension {
   override def getName(stack: ItemStack): Component = {
     stack.getComponent(OCComponents.LABEL).foreach(label => return Component.literal(label))
-
-    // Legacy fallback for stacks from worlds created before data components.
-    val tag = ItemUtils.getTag(stack)
-    if (tag != null && tag.contains(Settings.namespace + "data")) {
-      val data = tag.getCompound(Settings.namespace + "data")
-      if (data.contains(Settings.namespace + "label")) {
-        return Component.literal(data.getString(Settings.namespace + "label"))
-      }
-    }
     super.getName(stack)
   }
 
