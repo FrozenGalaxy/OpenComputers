@@ -6,7 +6,7 @@
       "item": "opencomputers:capacitor"
     },
     {
-      "item": "minecraft:white_carpet"
+      "tag": "minecraft:wool_carpets"
     }
   ],
   "result": {

@@ -49,7 +49,7 @@ object ManualUsageHandler {
 
     def initialize(guiHelper: IGuiHelper): Unit = {
       icon = guiHelper.drawableBuilder(
-        ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, "textures/items/manual.png"),
+        ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, "textures/item/manual.png"),
         0, 0, 16, 16
       ).setTextureSize(16, 16).build()
     }
