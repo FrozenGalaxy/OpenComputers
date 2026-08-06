@@ -36,7 +36,16 @@ public final class PortableStorageMenu extends AbstractContainerMenu {
         int columns = 9;
         for (int slot = 0; slot < portableSlots; slot++) {
             int top = portableSlots == 18 ? 17 : 19;
-            addSlot(new SlotItemHandler(portableInventory, slot, 8 + (slot % columns) * 18, top + (slot / columns) * 18));
+            addSlot(new SlotItemHandler(portableInventory, slot, 8 + (slot % columns) * 18, top + (slot / columns) * 18) {
+                @Override
+                public void setChanged() {
+                    // SlotItemHandler's default implementation only marks its empty
+                    // placeholder container. Merges mutate the handler's stack in place,
+                    // so explicitly persist the portable inventory here.
+                    super.setChanged();
+                    portableInventory.saveToContainer();
+                }
+            });
         }
     }
 
@@ -60,6 +69,12 @@ public final class PortableStorageMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         return !containerStack.isEmpty() && player.getInventory().contains(containerStack);
+    }
+
+    @Override
+    public void removed(Player player) {
+        portableInventory.saveToContainer();
+        super.removed(player);
     }
 
     @Override
