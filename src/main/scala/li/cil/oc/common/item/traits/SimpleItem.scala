@@ -74,9 +74,21 @@ trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExt
   @Deprecated
   def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = false
 
+  /**
+   * Opt in to the shared double sneak-right-click gesture handled by SimpleItem.
+   * Items only need to override this flag; the timing and action live here.
+   */
+  protected def supportsDoubleSneakClick: Boolean = false
+
   @Deprecated
   override def use(world: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] =
     player.getItemInHand(hand) match {
+      case stack: ItemStack if supportsDoubleSneakClick && player.isShiftKeyDown =>
+        if (!world.isClientSide && SimpleItem.registerSneakClick(player, hand, stack.getItem, world.getGameTime)) {
+          // Dummy action only. Replace this later with the real shared behavior.
+          player.sendSystemMessage(Component.literal("Double sneak-click detected."))
+        }
+        new InteractionResultHolder(InteractionResult.sidedSuccess(world.isClientSide), stack)
       case stack: ItemStack => use(stack, world, player)
       case _ => super.use(world, player, hand)
     }
@@ -129,4 +141,18 @@ trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExt
 
   @OnlyIn(Dist.CLIENT)
   override def render(matrix: PoseStack, buffer: MultiBufferSource, light: Int, stack: ItemStack, mountPoint: MountPoint, robot: Robot, pt: Float): Unit = ItemUpgradeRenderer.render(matrix, buffer, light, stack, mountPoint)
+}
+
+
+object SimpleItem {
+  private val DoubleSneakClickWindowTicks = 6L
+  private val lastSneakClicks = scala.collection.mutable.HashMap.empty[(java.util.UUID, InteractionHand, Item), Long]
+
+  private def registerSneakClick(player: Player, hand: InteractionHand, item: Item, now: Long): Boolean = synchronized {
+    val key = (player.getUUID, hand, item)
+    val isDoubleClick = lastSneakClicks.get(key).exists(last => now - last > 0 && now - last <= DoubleSneakClickWindowTicks)
+    if (isDoubleClick) lastSneakClicks.remove(key)
+    else lastSneakClicks.update(key, now)
+    isDoubleClick
+  }
 }
