@@ -38,6 +38,15 @@ object PacketSender {
     pb.sendToServer()
   }
 
+  def sendTabletPower(tablet: menu.Tablet, power: Boolean): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.ComputerPower)
+
+    pb.writeInt(tablet.containerId)
+    pb.writeBoolean(power)
+
+    pb.sendToServer()
+  }
+
   def sendDriveMode(unmanaged: Boolean): Unit = {
     val pb = new SimplePacketBuilder(PacketType.DriveMode)
 

@@ -20,28 +20,23 @@ class Tablet(state: menu.Tablet, playerInventory: Inventory, name: Component)
   protected var powerButton: ImageButton = _
 
   override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
-    // Issue: don't know how to get to the machine state from this class
-    powerButton.toggled = ???
+    powerButton.toggled = inventoryContainer.isRunning
     super.render(graphics, mouseX, mouseY, dt)
   }
 
   override protected def init(): Unit = {
     super.init()
-    //val machine = inventoryContainer.machine
-    //powerButton = new ImageButton(leftPos + 70, topPos + 34, 18, 18, (_: Button) => ClientPacketSender.sendComputerPower(machine, !machine.isRunning), Textures.GUI.ButtonPower, canToggle = true)
-    powerButton = new ImageButton(leftPos + 68, topPos + 34, 18, 18, (_: Button) => false, Textures.GUI.ButtonPower, canToggle = true)
+    powerButton = new ImageButton(leftPos + 68, topPos + 34, 18, 18, (_: Button) => ClientPacketSender.sendTabletPower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUI.ButtonPower, canToggle = true)
     addRenderableWidget(powerButton)
   }
 
   override protected def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
     super.drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
-    //val machine = inventoryContainer.machine
     if (powerButton.isMouseOver(mouseX, mouseY)) {
       val tooltip = new java.util.ArrayList[Component]
       tooltip.addAll(
-        // (if (machine.isRunning) Localization.Computer.TurnOff
-        // else Localization.Computer.TurnOn)
-        Localization.Computer.TurnOn
+        (if (inventoryContainer.isRunning) Localization.Computer.TurnOff
+        else Localization.Computer.TurnOn)
           .linesIterator
           .map(Component.literal)
           .toSeq

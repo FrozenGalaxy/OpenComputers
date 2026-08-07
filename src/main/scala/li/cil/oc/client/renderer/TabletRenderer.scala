@@ -34,6 +34,7 @@ object TabletRenderer {
     val buffer = wrapper.flatMap(_.componentSlots.collectFirst {
       case Some(textBuffer: api.internal.TextBuffer) => textBuffer
     })
+    val powered = wrapper.exists(_.data.isRunning)
 
     // Never expose the baked icon's fake screen in-hand. Until the client
     // receives the authoritative buffer snapshot, render an empty tablet face;
@@ -46,7 +47,8 @@ object TabletRenderer {
       event.getInterpolatedPitch,
       event.getEquipProgress,
       event.getSwingProgress,
-      buffer)
+      buffer,
+      powered)
     event.setCanceled(true)
   }
 
@@ -57,17 +59,18 @@ object TabletRenderer {
                                 pitch: Float,
                                 equipProgress: Float,
                                 swingProgress: Float,
-                                textBuffer: Option[api.internal.TextBuffer]): Unit = {
+                                textBuffer: Option[api.internal.TextBuffer],
+                                powered: Boolean): Unit = {
     val player = Minecraft.getInstance.player
     if (player == null) return
 
     stack.pushPose()
     if (hand == InteractionHand.MAIN_HAND && player.getOffhandItem.isEmpty) {
-      renderCentered(stack, renderBuffer, packedLight, pitch, equipProgress, swingProgress, textBuffer)
+      renderCentered(stack, renderBuffer, packedLight, pitch, equipProgress, swingProgress, textBuffer, powered)
     }
     else {
       val arm = if (hand == InteractionHand.MAIN_HAND) player.getMainArm else player.getMainArm.getOpposite
-      renderAtSide(stack, renderBuffer, packedLight, arm, equipProgress, swingProgress, textBuffer, OffhandFaceSize)
+      renderAtSide(stack, renderBuffer, packedLight, arm, equipProgress, swingProgress, textBuffer, powered, OffhandFaceSize)
     }
     stack.popPose()
   }
@@ -79,6 +82,7 @@ object TabletRenderer {
                            equipProgress: Float,
                            swingProgress: Float,
                            textBuffer: Option[api.internal.TextBuffer],
+                           powered: Boolean,
                            faceSize: Float): Unit = {
     val minecraft = Minecraft.getInstance
     val side = if (arm == HumanoidArm.RIGHT) 1f else -1f
@@ -101,7 +105,7 @@ object TabletRenderer {
       -0.3f * Mth.sin(swingProgress * Math.PI.toFloat))
     stack.mulPose(Axis.XP.rotationDegrees(swing * -45f))
     stack.mulPose(Axis.YP.rotationDegrees(side * swing * -30f))
-    renderTablet(stack, textBuffer, faceSize)
+    renderTablet(stack, textBuffer, powered, faceSize)
     stack.popPose()
   }
 
@@ -111,7 +115,8 @@ object TabletRenderer {
                              pitch: Float,
                              equipProgress: Float,
                              swingProgress: Float,
-                             textBuffer: Option[api.internal.TextBuffer]): Unit = {
+                             textBuffer: Option[api.internal.TextBuffer],
+                             powered: Boolean): Unit = {
     val minecraft = Minecraft.getInstance
     val swingRoot = Mth.sqrt(swingProgress)
 
@@ -133,7 +138,7 @@ object TabletRenderer {
 
     stack.mulPose(Axis.XP.rotationDegrees(Mth.sin(swingRoot * Math.PI.toFloat) * 20f))
     stack.scale(2f, 2f, 2f)
-    renderTablet(stack, textBuffer, CenterFaceSize)
+    renderTablet(stack, textBuffer, powered, CenterFaceSize)
   }
 
   private def calculateMapTilt(pitch: Float): Float = {
@@ -188,7 +193,7 @@ object TabletRenderer {
     else playerRenderer.renderLeftHand(stack, renderBuffer, packedLight, minecraft.player)
   }
 
-  private def renderTablet(stack: PoseStack, textBuffer: Option[api.internal.TextBuffer], faceSize: Float): Unit = {
+  private def renderTablet(stack: PoseStack, textBuffer: Option[api.internal.TextBuffer], powered: Boolean, faceSize: Float): Unit = {
     val width = textBuffer.fold(160)(_.renderWidth)
     val height = textBuffer.fold(90)(_.renderHeight)
     if (width <= 0 || height <= 0) return
@@ -202,7 +207,6 @@ object TabletRenderer {
     stack.scale(scale, scale, -1f)
     stack.translate(-width * 0.5, -height * 0.5, 0)
 
-    val powered = textBuffer.exists(_.isRenderingEnabled)
     renderFrame(stack, width, height, powered)
 
     for (buffer <- textBuffer if buffer.isRenderingEnabled) {

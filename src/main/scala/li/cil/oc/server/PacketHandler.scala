@@ -112,6 +112,11 @@ object PacketHandler extends CommonPacketHandler {
             case _ => logForgedPacket(player)
           }
         }
+        case tablet: menu.Tablet if tablet.containerId == containerId =>
+          tablet.otherInventory match {
+            case wrapper: TabletWrapper => trySetComputerPower(wrapper.machine, setPower, player)
+            case _ => logForgedPacket(player)
+          }
         case _ => logForgedPacket(player)
       }
       case _ =>
