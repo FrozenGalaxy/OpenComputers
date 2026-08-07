@@ -6,7 +6,7 @@ import net.neoforged.neoforge.common.extensions.IItemExtension
 
 
 class GraphicsCard(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with traits.GPULike with IItemExtension {
-  override protected def supportsDoubleSneakClick = true
+  override protected def canResetComponentIdentity = true
 
   @Deprecated
   override def getDescriptionId = super.getDescriptionId + tier
