@@ -8,6 +8,7 @@ import li.cil.oc.api.driver.DeviceInfo.DeviceClass
 import li.cil.oc.OpenComputers
 import li.cil.oc.api.Network
 import li.cil.oc.api.driver.DeviceInfo
+import li.cil.oc.api.internal
 import li.cil.oc.api.machine.Arguments
 import li.cil.oc.api.machine.Callback
 import li.cil.oc.api.machine.Context
@@ -25,6 +26,8 @@ import net.minecraft.core.HolderLookup
 import net.minecraft.core.component.DataComponentHolder
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.Mob
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.StringTag
 
@@ -34,7 +37,7 @@ import scala.collection.mutable
 import net.minecraft.nbt.Tag
 import net.neoforged.neoforge.common.MutableDataComponentHolder
 
-class UpgradeLeash(val host: Entity) extends AbstractManagedEnvironment with traits.LevelAware with DeviceInfo {
+class UpgradeLeash(val host: Entity with internal.Drone) extends AbstractManagedEnvironment with traits.LevelAware with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("leash").
     create()
@@ -53,7 +56,7 @@ class UpgradeLeash(val host: Entity) extends AbstractManagedEnvironment with tra
 
   val leashedEntities = mutable.Set.empty[UUID]
 
-  override def position = BlockPosition(host)
+  override def position = BlockPosition(host.asInstanceOf[Entity])
 
   @Callback(doc = """function(side:number):boolean -- Tries to put an entity on the specified side of the device onto a leash.""")
   def leash(context: Context, args: Arguments): Array[AnyRef] = {
@@ -64,11 +67,16 @@ class UpgradeLeash(val host: Entity) extends AbstractManagedEnvironment with tra
     val bounds = nearBounds.minmax(farBounds)
     entitiesInBounds[Mob](classOf[Mob], bounds).find(_.canBeLeashed()) match {
       case Some(entity) =>
-        entity.setLeashedTo(host, false)
-        leashedEntities += entity.getUUID
-        context.pause(0.1)
-        result(true)
-      case _ => result((), "no unleashed entity")
+        if (shrinkLeash()) {
+          entity.setLeashedTo(host, false)
+          leashedEntities += entity.getUUID
+          context.pause(0.1)
+          result(true)
+        }
+        else {
+          result(false, "no lead in inventory")
+        }
+      case _ => result(false, "no unleashed entity")
     }
   }
 
@@ -88,10 +96,49 @@ class UpgradeLeash(val host: Entity) extends AbstractManagedEnvironment with tra
   private def unleashAll(): Unit = {
     entitiesInBounds(classOf[Mob], position.bounds.inflate(5, 5, 5)).foreach(entity => {
       if (leashedEntities.contains(entity.getUUID) && entity.getLeashHolder == host) {
-        entity.dropLeash(true, false)
+        if (returnLeash()) {
+          entity.dropLeash(true, false)
+          leashedEntities -= entity.getUUID
+        }
       }
     })
     leashedEntities.clear()
+  }
+
+  private def shrinkLeash(): Boolean = {
+    val inventory = host.mainInventory()
+    for (index <- 0 until inventory.getContainerSize) {
+      val stack = inventory.getItem(index)
+      if (!stack.isEmpty && stack.getItem == Items.LEAD) {
+        stack.shrink(1)
+        if (stack.isEmpty) {
+          inventory.setItem(index, ItemStack.EMPTY)
+        }
+        return true
+      }
+    }
+    false
+  }
+
+  private def returnLeash(): Boolean = {
+    val inventory = host.mainInventory()
+
+    for (index <- 0 until inventory.getContainerSize) {
+      val stack = inventory.getItem(index)
+      if (!stack.isEmpty && stack.getItem == Items.LEAD && stack.getCount < stack.getMaxStackSize) {
+        stack.grow(1)
+        return true
+      }
+    }
+
+    for (index <- 0 until inventory.getContainerSize) {
+      if (inventory.getItem(index).isEmpty) {
+        inventory.setItem(index, new ItemStack(Items.LEAD))
+        return true
+      }
+    }
+
+    false
   }
 
   override def loadData(holder: DataComponentHolder): Unit = {

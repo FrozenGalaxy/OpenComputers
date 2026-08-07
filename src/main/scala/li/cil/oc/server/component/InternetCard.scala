@@ -63,7 +63,7 @@ class InternetCard extends AbstractManagedEnvironment with DeviceInfo {
   @Callback(direct = true, doc = """function():boolean -- Returns whether HTTP requests can be made (config setting).""")
   def isHttpEnabled(context: Context, args: Arguments): Array[AnyRef] = result(Settings.get.httpEnabled)
 
-  @Callback(doc = """function(url:string[, postData:string[, headers:table[, method:string]]]):userdata -- Starts an HTTP request. If this returns true, further results will be pushed using `http_response` signals.""")
+  @Callback(doc = """function(url:string[, postData:string[, headers:table[, method:string[, allowErrorBody:boolean]]]]):userdata -- Starts an HTTP request. If allowErrorBody is true, HTTP error responses will return their body instead of throwing an exception.""")
   def request(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
     checkOwner(context)
     val address = args.checkString(0)
@@ -85,7 +85,8 @@ class InternetCard extends AbstractManagedEnvironment with DeviceInfo {
       return result((), "http request headers are unavailable")
     }
     val method = if (args.isString(3)) Option(args.checkString(3)) else None
-    val request = new InternetCard.HTTPRequest(this, checkAddress(address), post, headers, method)
+    val allowErrorBody = args.optBoolean(4, false)
+    val request = new InternetCard.HTTPRequest(this, checkAddress(address), post, headers, method, allowErrorBody)
     connections += request
     result(request)
   }
@@ -331,7 +332,9 @@ object InternetCard {
     private def checkConnected() = {
       if (owner.isEmpty) throw new IOException("connection lost")
       try {
-        if (isAddressResolved) channel.finishConnect()
+        if (isAddressResolved) {
+          channel.finishConnect()
+        }
         else if (address.isCancelled) {
           // I don't think this can ever happen, Justin Case.
           channel.close()
@@ -343,14 +346,15 @@ object InternetCard {
             case e: ExecutionException => throw e.getCause
           }
           isAddressResolved = true
-          false
+          // After address resolution, immediately attempt connection.
+          channel.finishConnect()
         }
         else false
       }
       catch {
         case t: Throwable =>
           close()
-          false
+          throw t
       }
     }
 
@@ -426,11 +430,31 @@ object InternetCard {
     }
   }
 
+  private[component] def responseStream(http: HttpURLConnection, allowErrorBody: Boolean): InputStream = {
+    val responseCode = http.getResponseCode
+    if (responseCode >= 200 && responseCode < 300) {
+      // Successful responses always use getInputStream().
+      http.getInputStream
+    }
+    else if (allowErrorBody) {
+      // Error responses may expose their body when explicitly requested.
+      Option(http.getErrorStream).getOrElse(new java.io.ByteArrayInputStream(Array.empty[Byte]))
+    }
+    else {
+      // Preserve the historical behavior for existing callers.
+      http.getInputStream
+    }
+  }
+
   class HTTPRequest extends AbstractValue with Closable {
-    def this(owner: InternetCard, url: URL, post: Option[String], headers: Map[String, String], method: Option[String]) = {
+    def this(owner: InternetCard, url: URL, post: Option[String], headers: Map[String, String], method: Option[String], allowErrorBody: Boolean) = {
       this()
       this.owner = Some(owner)
-      this.stream = threadPool.submit(new RequestSender(url, post, headers, method))
+      this.stream = threadPool.submit(new RequestSender(url, post, headers, method, allowErrorBody))
+    }
+
+    def this(owner: InternetCard, url: URL, post: Option[String], headers: Map[String, String], method: Option[String]) = {
+      this(owner, url, post, headers, method, false)
     }
 
     private var owner: Option[InternetCard] = None
@@ -529,7 +553,7 @@ object InternetCard {
     }
 
     // This one doesn't (see comment in TCP socket), but I like to keep it consistent.
-    private class RequestSender(val url: URL, val post: Option[String], val headers: Map[String, String], val method: Option[String]) extends Callable[InputStream] {
+    private class RequestSender(val url: URL, val post: Option[String], val headers: Map[String, String], val method: Option[String], val allowErrorBody: Boolean) extends Callable[InputStream] {
       override def call() = try {
         checkLists(InetAddress.getByName(url.getHost), url.getHost)
         val proxy = ServerLifecycleHooks.getCurrentServer.proxy
@@ -564,9 +588,7 @@ object InternetCard {
               response = Some((http.getResponseCode, http.getResponseMessage, http.getHeaderFields))
             }
 
-            // TODO: This should allow accessing getErrorStream() for reading unsuccessful HTTP responses' output,
-            // but this would be a breaking change for existing OC code.
-            http.getInputStream
+            responseStream(http, allowErrorBody)
           }
           catch {
             case t: Throwable =>
