@@ -26,6 +26,8 @@ import net.neoforged.api.distmarker.OnlyIn
 import scala.collection.convert.ImplicitConversionsToScala._
 import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.common.item.data.TabletData
+import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.util.ExtendedDataComponentHolder._
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.item.Item.TooltipContext
 import net.neoforged.neoforge.common.extensions.IItemExtension
@@ -114,12 +116,9 @@ trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExt
   protected def tooltipExtended(stack: ItemStack, tooltip: java.util.List[Component]): Unit = {}
 
   protected def tooltipCosts(stack: ItemStack, tooltip: java.util.List[Component]): Unit = {
-    val tag = ItemUtils.getTag(stack)
-    if (tag != null && tag.contains(Settings.namespace + "data")) {
-      val data = tag.getCompound(Settings.namespace + "data")
-      if (data.contains("node") && data.getCompound("node").contains("address")) {
-        tooltip.add(Component.literal("§8" + data.getCompound("node").getString("address").substring(0, 13) + "...§7"))
-      }
+    stack.getComponent(OCComponents.ADDRESS).foreach { address =>
+      val shortened = if (address.length > 13) address.substring(0, 13) + "..." else address
+      tooltip.add(Component.literal("§8" + shortened + "§7"))
     }
   }
 
