@@ -179,14 +179,16 @@ object FileSystem extends api.detail.FileSystemAPI {
 
   abstract class ItemLabel(val stack: ItemStack) extends Label
 
-  class ReadOnlyLabel(val label: String) extends Label {
+  class ReadOnlyLabel(private var label: String) extends Label {
     def setLabel(value: String) = throw new IllegalArgumentException("label is read only")
 
     def getLabel(provider: HolderLookup.Provider): String = label
 
-    private final val LabelTag = Settings.namespace + "fs.label"
-
-    override def loadData(holder: DataComponentHolder): Unit = {}
+    override def loadData(holder: DataComponentHolder): Unit = {
+      for (value <- holder.getComponent(OCComponents.LABEL)) {
+        label = value
+      }
+    }
 
     override def saveData(holder: MutableDataComponentHolder): Unit = {
       if(label != null) {
