@@ -3,7 +3,7 @@ package li.cil.oc.common
 import li.cil.oc.Settings
 import li.cil.oc.api.network.EnvironmentHost
 import li.cil.oc.util.BlockPosition
-import net.minecraft.core.{Direction, Registry}
+import net.minecraft.core.{Direction, Registry, RegistryAccess}
 import net.minecraft.nbt.{CompoundTag, NbtIo}
 import net.minecraft.server.level.{ServerLevel, ServerPlayer}
 import net.minecraft.world.entity.Entity
@@ -50,11 +50,11 @@ abstract class PacketBuilder(stream: OutputStream) extends DataOutputStream(stre
     case _ => writeByte(-1: Byte)
   }
 
-  def writeItemStack(stack: ItemStack) = {
+  def writeItemStack(stack: ItemStack, registryAccess: RegistryAccess): Unit = {
     val haveStack = !stack.isEmpty && stack.getCount > 0
     writeBoolean(haveStack)
     if (haveStack) {
-      writeNBT(stack.save(ServerLifecycleHooks.getCurrentServer.registryAccess()).asInstanceOf[CompoundTag])
+      writeNBT(stack.save(registryAccess).asInstanceOf[CompoundTag])
     }
   }
 
