@@ -136,15 +136,18 @@ trait Computer extends Environment with ComponentInventory with Rotatable with B
   def tickMoving(): Unit = updateEntity()
 
   /** Save the live machine/component state back into Create's captured NBT. */
-  override def saveMovingState(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = saveAdditional(nbt, provider)
+  override def saveMovingState(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    saveAdditional(nbt, provider)
+    // One-shot marker. A normal chunk save writes fresh NBT and drops it after
+    // the restored machine has consumed the grace period.
+    nbt.putInt(MovingRestoreGraceTag, 40)
+  }
 
   /** Dispose the temporary machine and its component nodes before reassembly. */
   override def disposeMoving(): Unit = {
-    disconnectComponents()
-    // Do not call machine.stop() here. That only queues a deferred close,
-    // while Create is about to throw this temporary host away. Removing the
-    // machine node closes it synchronously and avoids the old fake host
-    // waking up after the real block entity has been rebuilt.
+    // Removing the machine node closes the VM synchronously, then its normal
+    // onDisconnect callback removes internal components. Doing that cleanup
+    // first would feed fake component_removed events to the still-live VM.
     super.disposeMoving()
   }
 
@@ -166,6 +169,13 @@ trait Computer extends Environment with ComponentInventory with Rotatable with B
   private final val HasErroredTag = Settings.namespace + "hasErrored"
   private final val IsRunningTag = Settings.namespace + "isRunning"
   private final val UsersTag = Settings.namespace + "users"
+  private final val MovingRestoreGraceTag = Settings.namespace + "movingRestoreGrace"
+  private var pendingMovingRestoreGrace = 0
+
+  override def loadAdditional(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
+    pendingMovingRestoreGrace = nbt.getInt(MovingRestoreGraceTag)
+    super.loadAdditional(nbt, provider)
+  }
 
   override def loadComponentsForServer(holder: DataComponentHolder): Unit = {
     super.loadComponentsForServer(holder)
@@ -186,6 +196,14 @@ trait Computer extends Environment with ComponentInventory with Rotatable with B
 
   private def loadMachineData(holder: DataComponentHolder): Unit = {
     machine.loadData(holder)
+    if (pendingMovingRestoreGrace > 0) {
+      machine match {
+        case implementation: li.cil.oc.server.machine.Machine =>
+          implementation.beginComponentRestoreGrace(pendingMovingRestoreGrace)
+        case _ =>
+      }
+      pendingMovingRestoreGrace = 0
+    }
 
     // Kickstart initialization to avoid values getting overwritten by
     // loadForClient if that packet is handled after a manual
