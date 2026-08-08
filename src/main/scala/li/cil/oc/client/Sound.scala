@@ -24,6 +24,10 @@ import net.neoforged.neoforge.event.level.LevelEvent
 
 object Sound {
   private val sources = mutable.WeakHashMap.empty[BlockEntity, PseudoLoopingStream]
+  // SoundEngine owns the actual sound instance. Keep a strong reference to
+  // every instance while it is playing so cleanup cannot lose it when the
+  // block entity key disappears from the weak map during a world transition.
+  private val activeSounds = mutable.Set.empty[PseudoLoopingStream]
 
   private val commandQueue = mutable.PriorityQueue.empty[Command]
 
@@ -84,11 +88,30 @@ object Sound {
 
   @SubscribeEvent
   def onWorldUnload(event: LevelEvent.Unload): Unit = {
+    stopAll()
+  }
+
+  def stopAll(): Unit = {
     commandQueue.synchronized(commandQueue.clear())
-    sources.synchronized(try sources.foreach(_._2.stop()) catch {
-      case _: Throwable => // Ignore.
-    })
-    sources.clear()
+    sources.synchronized {
+      try activeSounds.toSeq.foreach(stopSound) catch {
+        case _: Throwable => // Ignore.
+      }
+      activeSounds.clear()
+      sources.clear()
+    }
+  }
+
+  private def stopSound(sound: PseudoLoopingStream): Unit = {
+    sound.stop()
+    val minecraft = Minecraft.getInstance
+    if (minecraft != null && minecraft.getSoundManager != null) {
+      // Marking a TickableSoundInstance stopped only makes SoundEngine notice
+      // it on its next tick. Stop the channel too, so a world transition or
+      // resource reload cannot leave the fan playing in the next world.
+      minecraft.getSoundManager.stop(sound)
+    }
+    activeSounds -= sound
   }
 
   private abstract class Command(val when: Long, val blockEntity: WeakReference[BlockEntity]) extends Ordered[Command] {
@@ -103,9 +126,10 @@ object Sound {
         sources.synchronized {
           val current = sources.getOrElse(entity, null)
           if (current == null || !current.getLocation.getPath.equals(name)) {
-            if (current != null) current.stop()
+            if (current != null) stopSound(current)
             val sound = new PseudoLoopingStream(blockEntity, volume, name)
             sources(entity) = sound
+            activeSounds += sound
             Minecraft.getInstance.getSoundManager.play(sound)
           }
         }
@@ -118,7 +142,7 @@ object Sound {
       blockEntity.get.foreach { entity =>
         sources.synchronized {
           sources.remove(entity) match {
-            case Some(sound) => sound.stop()
+            case Some(sound) => stopSound(sound)
             case _ =>
           }
         }
@@ -148,7 +172,10 @@ object Sound {
 
     var stopped = false
     volume = subVolume * Settings.get.soundVolume
-    relative = blockEntity.get.isDefined
+    // Computer running sounds are world-positioned and must attenuate with
+    // distance. Relative sounds are listener-relative and bypass world range.
+    relative = false
+    attenuation = SoundInstance.Attenuation.LINEAR
     looping = true
     updatePosition()
 
@@ -166,7 +193,26 @@ object Sound {
     override def isStopped() = stopped
 
     // Required by ITickableSound, which is required to update position while playing
-    override def tick(): Unit = if (blockEntity.get.isDefined) updatePosition() else stop()
+    override def tick(): Unit = if (blockEntity.get.isDefined) updatePosition() else stopSound(this)
+
+    // Keep a hard positional cutoff even if a sound-engine implementation or
+    // resource definition ignores the normal attenuation distance.
+    override def getVolume(): Float = {
+      val listener = Minecraft.getInstance.player
+      val maxDistance = 16.0
+      if (listener == null) 0f
+      else {
+        val distance = math.sqrt(listener.distanceToSqr(x, y, z))
+        if (distance >= maxDistance) 0f
+        else {
+          // SoundEngine already applies one linear falloff. Apply a second,
+          // gentle linear factor here so the fan fades more noticeably with
+          // distance instead of staying prominent until the cutoff.
+          val distanceFade = (1.0 - distance / maxDistance).toFloat
+          super.getVolume() * distanceFade
+        }
+      }
+    }
 
     def stop(): Unit = {
       stopped = true

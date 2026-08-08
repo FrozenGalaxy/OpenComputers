@@ -6,6 +6,7 @@ object ModCreate extends ModProxy {
   override def getMod = Mods.Create
 
   override def initialize(): Unit = {
+    CreateContraptionTransformers.register()
     CreateDrivers.register()
   }
 }

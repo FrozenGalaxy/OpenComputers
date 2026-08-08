@@ -27,6 +27,7 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.component.CustomData
 import net.minecraft.world.level.ChunkPos
+import net.minecraft.world.level.Level
 import net.neoforged.api.distmarker.{Dist, OnlyIn}
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.common.MutableDataComponentHolder
@@ -107,6 +108,14 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
     // terminal input appear only after closing and reopening the GUI.
     if (!isInitialized) TextBuffer.registerClientBuffer(this)
   }
+
+  /** Register a captured Create screen with the real client world. */
+  def registerClientBufferOnLevel(level: Level): Unit =
+    TextBuffer.registerClientBuffer(this, level)
+
+  /** Remove a captured Create screen from the client tracker after disassembly. */
+  def unregisterClientBufferOnLevel(level: Level): Unit =
+    TextBuffer.unregisterClientBuffer(this, level)
 
   def isInitialized: Boolean = syncCooldown < 0
 
@@ -556,8 +565,18 @@ object TextBuffer {
   }
 
   def registerClientBuffer(t: TextBuffer): Unit = {
-    val level = t.host.getEnvironmentLevel
+    registerClientBuffer(t, t.host.getEnvironmentLevel)
+  }
+
+  def registerClientBuffer(t: TextBuffer, level: Level): Unit = {
     if (level == null || Strings.isNullOrEmpty(t.proxy.nodeAddress)) return
+
+    // Captured block entities initially register against Create's virtual
+    // render level. Move the same buffer to the real client level instead.
+    val hostLevel = t.host.getEnvironmentLevel
+    if (hostLevel != null && hostLevel != level) {
+      ClientComponentTracker.remove(hostLevel, t)
+    }
 
     // Re-applying component data during chunk/menu synchronization must not
     // leave duplicate/stale client buffer registrations behind.
@@ -569,6 +588,17 @@ object TextBuffer {
     }
 
     ClientPacketSender.sendTextBufferInit(t.proxy.nodeAddress)
+  }
+
+  def unregisterClientBuffer(t: TextBuffer, level: Level): Unit = {
+    if (level == null) return
+
+    ClientComponentTracker.remove(level, t)
+    val hostLevel = t.host.getEnvironmentLevel
+    if (hostLevel != null && hostLevel != level) {
+      ClientComponentTracker.remove(hostLevel, t)
+    }
+    clientBuffers -= t
   }
 
   abstract class Proxy {

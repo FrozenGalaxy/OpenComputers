@@ -2,7 +2,7 @@
   "computer_running": {
     "category": "block",
     "sounds": [
-      {"name": "opencomputers:computer_running", "stream": true}
+      {"name": "opencomputers:computer_running", "stream": false, "preload": true}
     ]
   },
   "floppy_access": {
