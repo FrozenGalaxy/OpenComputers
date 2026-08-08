@@ -11,7 +11,7 @@ import li.cil.oc.common.blockentity.traits.Computer
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.world.item.ItemStack
-import net.minecraft.core.Direction
+import net.minecraft.core.{Direction, RegistryAccess}
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.sounds.SoundEvents
 
@@ -119,10 +119,10 @@ object PacketSender {
     }
   }
 
-  def sendMachineItemStateRequest(stack: ItemStack): Unit = {
+  def sendMachineItemStateRequest(stack: ItemStack, registryAccess: RegistryAccess): Unit = {
     val pb = new SimplePacketBuilder(PacketType.MachineItemStateRequest)
 
-    pb.writeItemStack(stack)
+    pb.writeItemStack(stack, registryAccess)
 
     pb.sendToServer()
   }
