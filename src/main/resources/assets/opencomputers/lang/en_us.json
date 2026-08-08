@@ -196,6 +196,7 @@
   "itemGroup.OpenComputers.section.80_upgrade": "Upgrades§f",
   "itemGroup.OpenComputers.section.99_misc": "Miscellaneous§f",
   "entity.oc.Drone": "Drone",
+  "entity.oc.TrainRobot": "Train Robot",
   "oc:gui.Analyzer.Address": "§6Address§f: %s",
   "oc:gui.Analyzer.AddressCopied": "Address copied to clipboard.",
   "oc:gui.Analyzer.ChargerSpeed": "§6Charge speed§f: %s",

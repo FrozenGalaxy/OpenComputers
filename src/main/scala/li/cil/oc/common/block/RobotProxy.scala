@@ -6,6 +6,7 @@ import li.cil.oc.common.item.data.RobotData
 import li.cil.oc.common.menu.MenuTypes
 import li.cil.oc.common.blockentity
 import li.cil.oc.common.blockentity.BlockEntityTypes
+import li.cil.oc.common.entity.TrainRobot
 import li.cil.oc.server.{PacketSender, agent}
 import li.cil.oc.server.loot.LootFunctions
 import li.cil.oc.util.{BlockPosition, InventoryUtils, Tooltip}
@@ -154,7 +155,17 @@ class RobotProxy(props: Properties) extends RedstoneAware(props) with traits.Sta
   // ----------------------------------------------------------------------- //
 
   override def localOnBlockActivated(world: World, pos: BlockPos, player: PlayerEntity, hand: Hand, heldItem: ItemStack, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
-    if (!player.isCrouching) {
+    if (!player.isCrouching && TrainRobot.isHat(heldItem)) {
+      if (!world.isClientSide) {
+        world.getBlockEntity(pos) match {
+          case proxy: blockentity.RobotProxy if TrainRobot.replaceRobot(world, pos, player.getYRot, proxy) =>
+            if (!player.isCreative) heldItem.shrink(1)
+          case _ =>
+        }
+      }
+      true
+    }
+    else if (!player.isCrouching) {
       if (!world.isClientSide) {
         // We only send slot changes to nearby players, so if there was no slot
         // change since this player got into range he might have the wrong one,

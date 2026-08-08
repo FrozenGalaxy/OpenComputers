@@ -70,6 +70,7 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   Recipes.init(modBus)
   LootFunctions.init(modBus)
   EntityTypes.ENTITY_TYPES.register(modBus)
+  modBus.addListener(EntityTypes.onAttributeCreation)
   MenuTypes.MENU.register(modBus)
   OpenPrinter.init(modBus, modContainer)
   modBus.register(CreativeTab)

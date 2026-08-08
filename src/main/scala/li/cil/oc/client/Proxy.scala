@@ -4,7 +4,7 @@ import li.cil.oc.{api, client}
 import li.cil.oc.client.gui.GuiTypes
 import li.cil.oc.client.renderer._
 import li.cil.oc.client.renderer.block.{ModelInitialization, NetSplitterModel}
-import li.cil.oc.client.renderer.entity.{DroneRenderer, ModelQuadcopter}
+import li.cil.oc.client.renderer.entity.{DroneRenderer, ModelQuadcopter, TrainRobotRenderer}
 import li.cil.oc.client.renderer.tileentity._
 import li.cil.oc.common.blockentity.BlockEntityTypes
 import li.cil.oc.common.component.TextBuffer
@@ -73,6 +73,7 @@ private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
   @SubscribeEvent
   def onRegisterRenderers(e: EntityRenderersEvent.RegisterRenderers): Unit = {
     e.registerEntityRenderer(EntityTypes.DRONE.get(), ctx => new DroneRenderer(ctx))
+    e.registerEntityRenderer(EntityTypes.TRAIN_ROBOT.get(), ctx => new TrainRobotRenderer(ctx))
 
     BlockEntityRenderers.register(BlockEntityTypes.ADAPTER.get(), AdapterRenderer)
     BlockEntityRenderers.register(BlockEntityTypes.ASSEMBLER.get(), AssemblerRenderer)
