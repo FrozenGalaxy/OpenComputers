@@ -62,6 +62,10 @@ trait Rotatable extends RotationAware with internal.Rotatable {
         trySetPitchYaw(Direction.NORTH, yaw)
     }
 
+  /** Public bridge for integrations that transform a block entity off-world. */
+  def setFromPitchAndYaw(newPitch: Direction, newYaw: Direction): Boolean =
+    trySetPitchYaw(newPitch, newYaw)
+
   def invertRotation() =
     trySetPitchYaw(pitch match {
       case Direction.DOWN | Direction.UP => pitch.getOpposite
