@@ -61,7 +61,7 @@ trait Computer extends Environment with ComponentInventory with Rotatable with B
     if (value) {
       hasErrored = false
     }
-    if (getLevel != null) {
+    if (getLevel != null && !isMoving) {
       getLevel.sendBlockUpdated(getBlockPos, getLevel.getBlockState(getBlockPos), getLevel.getBlockState(getBlockPos), 3)
       if (getLevel.isClientSide) {
         runSound.foreach(sound =>
@@ -130,6 +130,22 @@ trait Computer extends Environment with ComponentInventory with Rotatable with B
 
   protected def updateComputer(): Unit = {
     machine.update()
+  }
+
+  /** Used by the optional Create integration while this block entity is off-world. */
+  def tickMoving(): Unit = updateEntity()
+
+  /** Save the live machine/component state back into Create's captured NBT. */
+  override def saveMovingState(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = saveAdditional(nbt, provider)
+
+  /** Dispose the temporary machine and its component nodes before reassembly. */
+  override def disposeMoving(): Unit = {
+    disconnectComponents()
+    // Do not call machine.stop() here. That only queues a deferred close,
+    // while Create is about to throw this temporary host away. Removing the
+    // machine node closes it synchronously and avoids the old fake host
+    // waking up after the real block entity has been rebuilt.
+    super.disposeMoving()
   }
 
   protected def onRunningChanged(): Unit = {
