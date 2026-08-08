@@ -8,11 +8,8 @@ import com.simibubi.create.content.contraptions.behaviour.MovementContext;
 import com.simibubi.create.content.contraptions.StructureTransform;
 import li.cil.oc.api.Network;
 import li.cil.oc.common.block.Case;
-import li.cil.oc.common.block.Cable;
 import li.cil.oc.common.block.Keyboard;
 import li.cil.oc.common.block.Microcontroller;
-import li.cil.oc.common.block.Redstone;
-import li.cil.oc.common.block.RobotProxy;
 import li.cil.oc.common.block.Screen;
 import li.cil.oc.common.block.SimpleBlock;
 import li.cil.oc.common.blockentity.BlockEntityTypes;
@@ -58,13 +55,12 @@ final class CreateContraptionTransformers {
             if (block instanceof SimpleBlock) {
                 MovedBlockTransformerRegistries.BLOCK_TRANSFORMERS.register(
                         block, CreateContraptionTransformers::transformBlock);
-            }
-            if (block instanceof Case || block instanceof Microcontroller || block instanceof RobotProxy
-                    || block instanceof Cable || block instanceof Redstone || block instanceof Screen
-                    || block instanceof Keyboard) {
-                // This is the part where the computer gets dragged into Create's actor system.
-                // Maybe this works.
-                MovementBehaviour.REGISTRY.register(block, OC_MOVEMENT);
+                if (block.defaultBlockState().hasBlockEntity()) {
+                    // Any OC block entity can be an external component. Give it a
+                    // live moving host instead of only supporting the handful of
+                    // blocks that happened to be used by the first test rig.
+                    MovementBehaviour.REGISTRY.register(block, OC_MOVEMENT);
+                }
             }
             if (block instanceof Case || block instanceof Microcontroller || block instanceof Screen
                     || block instanceof Keyboard) {
@@ -97,12 +93,19 @@ final class CreateContraptionTransformers {
         @Override
         public void tick(final MovementContext context) {
             if (context.world.isClientSide) {
+                registerMovingScreen(context);
                 return;
             }
 
             Environment environment = movingEnvironment(context);
             if (environment == null) {
-                return;
+                // Train carriages can deserialize their actor contexts without
+                // temporaryData. Rebuild OC's off-world block entity on demand.
+                environment = makeEnvironment(context);
+                context.temporaryData = environment;
+                if (environment == null) {
+                    return;
+                }
             }
 
             // The position is the center of the actor block. OC wants that
@@ -138,12 +141,7 @@ final class CreateContraptionTransformers {
                 return;
             }
 
-            saveEnvironment(context);
-            Environment environment = movingEnvironment(context);
-            if (environment != null) {
-                environment.disposeMoving();
-            }
-            context.temporaryData = null;
+            stopMovingEnvironments(context);
         }
 
         @Override
@@ -227,12 +225,15 @@ final class CreateContraptionTransformers {
         // position while loadWithComponents reads that file. If we let it use
         // localPos here, it finds nothing and builds a blank T1 buffer instead.
         BlockPos originalPos = context.localPos.offset(context.contraption.anchor);
-        environment.beginMoving(
-                context.world,
-                new Vec3(
+        Vec3 savedPosition = context.position != null
+                ? context.position
+                : new Vec3(
                         originalPos.getX() + 0.5,
                         originalPos.getY() + 0.5,
-                        originalPos.getZ() + 0.5),
+                        originalPos.getZ() + 0.5);
+        environment.beginMoving(
+                context.world,
+                savedPosition,
                 context.rotation,
                 context.state);
         if (context.blockEntityData != null) {
@@ -261,10 +262,55 @@ final class CreateContraptionTransformers {
         }
     }
 
+    private static void registerMovingScreen(final MovementContext context) {
+        if (context.contraption == null || context.contraption.entity == null) {
+            return;
+        }
+
+        BlockEntity renderEntity = context.contraption.getOrCreateClientContraptionLazy()
+                .getBlockEntity(context.localPos);
+        if (renderEntity instanceof li.cil.oc.common.blockentity.Screen screen) {
+            screen.registerMovingClientBuffer(context.contraption.entity.level());
+        }
+    }
+
     private static void saveEnvironment(final MovementContext context) {
         Environment environment = movingEnvironment(context);
         if (environment != null && context.blockEntityData != null) {
             environment.saveMovingState(context.blockEntityData, context.world.registryAccess());
+        }
+    }
+
+    private static void stopMovingEnvironments(final MovementContext context) {
+        if (movingEnvironment(context) == null || context.contraption == null) {
+            return;
+        }
+
+        // Create stops actors one at a time. If the floppy drive happens to go
+        // first, OpenOS gets told its boot filesystem vanished before Create
+        // reaches the computer. Save the entire OC network while it still
+        // exists, then tear it down ourselves in an order that cannot do that.
+        for (var actor : context.contraption.getActors()) {
+            if (actor.right.temporaryData instanceof Environment) {
+                saveEnvironment(actor.right);
+            }
+        }
+
+        // Close every VM before removing any external component host. Their
+        // state is safely in NBT now, and a dead listener cannot queue a fake
+        // component_removed while the remaining actors disappear.
+        for (var actor : context.contraption.getActors()) {
+            if (actor.right.temporaryData instanceof Computer computer) {
+                computer.disposeMoving();
+                actor.right.temporaryData = null;
+            }
+        }
+
+        for (var actor : context.contraption.getActors()) {
+            if (actor.right.temporaryData instanceof Environment environment) {
+                environment.disposeMoving();
+                actor.right.temporaryData = null;
+            }
         }
     }
 

@@ -40,7 +40,7 @@ trait TextBuffer extends Environment with Tickable {
 
   /** Create renders captured screens in a virtual level, but packets use the real client level. */
   def registerMovingClientBuffer(level: Level): Unit = buffer match {
-    case moving: li.cil.oc.common.component.TextBuffer =>
+    case moving: li.cil.oc.common.component.TextBuffer if movingClientLevel ne level =>
       movingClientLevel = level
       moving.registerClientBufferOnLevel(level)
     case _ =>
