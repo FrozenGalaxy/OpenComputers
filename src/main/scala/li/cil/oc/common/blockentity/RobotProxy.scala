@@ -18,8 +18,6 @@ import li.cil.oc.common.container.InventoryProxy
 import li.cil.oc.common.blockentity.traits.RedstoneAware
 import li.cil.oc.server.{PacketSender => ServerPacketSender}
 import net.minecraft.core.component.DataComponentHolder
-import net.neoforged.api.distmarker.Dist
-import net.neoforged.api.distmarker.OnlyIn
 import net.minecraft.world.item.ItemStack
 import net.minecraft.core.{BlockPos, Direction, HolderLookup}
 import net.minecraft.world.level.block.entity.BlockEntity
@@ -251,7 +249,6 @@ class RobotProxy(pos: BlockPos, state: BlockState, val robot: Robot)
 
   override def loadComponentsForClient(holder: DataComponentHolder): Unit = robot.loadComponentsForClient(holder)
 
-  @OnlyIn(Dist.CLIENT)
   override def saveComponentsForClient(holder: MutableDataComponentHolder): Unit = robot.saveComponentsForClient(holder)
 
   override def setChanged(): Unit = robot.setChanged()

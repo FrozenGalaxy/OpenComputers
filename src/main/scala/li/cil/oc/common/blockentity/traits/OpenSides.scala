@@ -4,8 +4,6 @@ import li.cil.oc.Settings
 import li.cil.oc.util.RotationHelper
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.core.{Direction, HolderLookup}
-import net.neoforged.api.distmarker.Dist
-import net.neoforged.api.distmarker.OnlyIn
 
 /**
   * @author Vexatos
@@ -43,7 +41,6 @@ trait OpenSides extends BaseBlockEntity {
     openSides = uncompressSides(nbt.getByte(Settings.namespace + "openSides"))
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     nbt.putByte(Settings.namespace + "openSides", compressSides)

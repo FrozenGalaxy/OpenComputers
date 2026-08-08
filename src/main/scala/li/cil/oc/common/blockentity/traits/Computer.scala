@@ -239,7 +239,6 @@ trait Computer extends Environment with ComponentInventory with Rotatable with B
       Sound.startLoop(this, sound, 0.5f, (1000 + getLevel.random.nextInt(2000)).toLong)
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveComponentsForClient(holder: MutableDataComponentHolder): Unit = {
     super.saveComponentsForClient(holder)
     holder.setComponent(OCComponents.IS_ERRORED, machine != null && machine.lastError != null)

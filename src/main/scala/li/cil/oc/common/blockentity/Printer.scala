@@ -350,7 +350,6 @@ class Printer(pos: BlockPos, state: BlockState)
     requiredEnergy = nbt.getDouble(RemainingTag)
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     nbt.setNewCompoundTag(DataTag, (nbt: CompoundTag) => data.saveData(nbt, provider))

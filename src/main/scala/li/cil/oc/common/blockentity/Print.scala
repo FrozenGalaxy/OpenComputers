@@ -148,7 +148,6 @@ class Print(pos: BlockPos, blockState: BlockState, val canToggle: Option[() => B
     }
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     nbt.setNewCompoundTag(DataTag, (nbt: CompoundTag) => data.saveData(nbt, provider))
