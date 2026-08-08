@@ -148,7 +148,9 @@ object Sound {
 
     var stopped = false
     volume = subVolume * Settings.get.soundVolume
-    relative = blockEntity.get.isDefined
+    // Computer running sounds are world-positioned and must attenuate with
+    // distance. Relative sounds are listener-relative and bypass world range.
+    relative = false
     looping = true
     updatePosition()
 
