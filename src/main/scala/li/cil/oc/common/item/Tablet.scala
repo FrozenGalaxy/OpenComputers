@@ -401,7 +401,7 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
           buffer.setMaximumResolution(80, 25)
       }
 
-      client.PacketSender.sendMachineItemStateRequest(stack)
+      client.PacketSender.sendMachineItemStateRequest(stack, level.registryAccess())
     }
     if (!level.isClientSide) {
       if (isCreative && level.getGameTime % Settings.get.tickFrequency == 0) {
@@ -536,7 +536,7 @@ object Tablet {
               if (timesChanged != weak.timesChanged) {
                 if (!weak.isDirty) {
                   weak.isDirty = true
-                  client.PacketSender.sendMachineItemStateRequest(stack)
+                  client.PacketSender.sendMachineItemStateRequest(stack, holder.level.registryAccess())
                 }
                 weak.timesChanged = timesChanged
               }

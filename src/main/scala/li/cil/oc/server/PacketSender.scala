@@ -154,7 +154,7 @@ object PacketSender {
   def sendMachineItemState(player: ServerPlayer, stack: ItemStack, isRunning: Boolean): Unit = {
     val pb = new SimplePacketBuilder(PacketType.MachineItemStateResponse)
 
-    pb.writeItemStack(stack)
+    pb.writeItemStack(stack, player.server.registryAccess())
     pb.writeBoolean(isRunning)
 
     pb.sendToPlayer(player)
@@ -307,7 +307,7 @@ object PacketSender {
     val pb = new SimplePacketBuilder(PacketType.FloppyChange)
 
     pb.writeTileEntity(t)
-    pb.writeItemStack(stack)
+    pb.writeItemStack(stack, t.getLevel.registryAccess())
 
     pb.sendToPlayersNearTileEntity(t)
   }
@@ -425,14 +425,14 @@ object PacketSender {
     for (stack <- stacks) {
       val pb = new SimplePacketBuilder(PacketType.LootDisk)
 
-      pb.writeItemStack(stack)
+      pb.writeItemStack(stack, p.server.registryAccess())
 
       pb.sendToPlayer(p)
     }
     for (stack <- Loot.disksForCyclingServer) {
       val pb = new SimplePacketBuilder(PacketType.CyclingDisk)
 
-      pb.writeItemStack(stack)
+      pb.writeItemStack(stack, p.server.registryAccess())
 
       pb.sendToPlayer(p)
     }
@@ -556,7 +556,7 @@ object PacketSender {
     pb.writeInt(t.getContainerSize)
     for (slot <- 0 until t.getContainerSize) {
       pb.writeInt(slot)
-      pb.writeItemStack(t.getItem(slot))
+      pb.writeItemStack(t.getItem(slot), t.getLevel.registryAccess())
     }
 
     pb.sendToPlayersNearTileEntity(t)
@@ -568,7 +568,7 @@ object PacketSender {
     pb.writeTileEntity(t)
     pb.writeInt(1)
     pb.writeInt(slot)
-    pb.writeItemStack(t.getItem(slot))
+    pb.writeItemStack(t.getItem(slot), t.getLevel.registryAccess())
 
     pb.sendToPlayersNearTileEntity(t)
   }
@@ -655,7 +655,7 @@ object PacketSender {
 
     pb.writeTileEntity(t.proxy)
     pb.writeInt(slot)
-    pb.writeItemStack(stack)
+    pb.writeItemStack(stack, t.getLevel.registryAccess())
 
     pb.sendToPlayersNearTileEntity(t)
   }
