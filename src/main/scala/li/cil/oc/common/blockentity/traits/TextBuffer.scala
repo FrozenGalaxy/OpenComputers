@@ -7,13 +7,16 @@ import li.cil.oc.api.internal
 import li.cil.oc.api.network.Node
 import li.cil.oc.common.datacomponents.CompoundStorage
 import net.minecraft.core.HolderLookup
+import net.minecraft.core.component.DataComponentHolder
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.api.distmarker.OnlyIn
 import net.minecraft.nbt.{CompoundTag, NbtOps}
+import net.minecraft.world.level.Level
 
 trait TextBuffer extends Environment with Tickable {
   private final val ClientBufferComponentsTag = Settings.namespace + "clientBufferComponents"
   private var pendingServerBufferData: CompoundTag = _
+  private var movingClientLevel: Level = _
   lazy val buffer: internal.TextBuffer = {
     val screenItem = api.Items.get(Constants.BlockName.ScreenTier1).createItemStack(1)
     val buffer = api.Driver.driverFor(screenItem, getClass).createEnvironment(screenItem, this).asInstanceOf[api.internal.TextBuffer]
@@ -35,6 +38,21 @@ trait TextBuffer extends Environment with Tickable {
     }
   }
 
+  /** Create renders captured screens in a virtual level, but packets use the real client level. */
+  def registerMovingClientBuffer(level: Level): Unit = buffer match {
+    case moving: li.cil.oc.common.component.TextBuffer =>
+      movingClientLevel = level
+      moving.registerClientBufferOnLevel(level)
+    case _ =>
+  }
+
+  def unregisterMovingClientBuffer(): Unit = buffer match {
+    case moving: li.cil.oc.common.component.TextBuffer if movingClientLevel != null =>
+      moving.unregisterClientBufferOnLevel(movingClientLevel)
+      movingClientLevel = null
+    case _ =>
+  }
+
   // ----------------------------------------------------------------------- //
 
   private def reapplyTierToBuffer(): Unit = {
@@ -48,6 +66,22 @@ trait TextBuffer extends Environment with Tickable {
     val (maxWidth, maxHeight) = Settings.screenResolutionsByTier(tier)
     buffer.setMaximumResolution(maxWidth, maxHeight)
     buffer.setMaximumColorDepth(Settings.screenDepthsByTier(tier))
+  }
+
+  override def loadComponentsForClient(holder: DataComponentHolder): Unit = {
+    super.loadComponentsForClient(holder)
+    // BaseBlockEntity loads the legacy/client NBT before it loads OC's
+    // components, so tier still has the constructor default during loadForClient.
+    // Do this again after Screen.loadComponentsCommon has supplied the real tier.
+    reapplyTierToBuffer()
+  }
+
+  override def loadComponentsForServer(holder: DataComponentHolder): Unit = {
+    super.loadComponentsForServer(holder)
+    // The moving Screen is reconstructed from Create's NBT just like a client
+    // render Screen: component loading supplies its real tier after the buffer
+    // may already have been forced by loadForServer.
+    reapplyTierToBuffer()
   }
 
   override def loadForServer(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
