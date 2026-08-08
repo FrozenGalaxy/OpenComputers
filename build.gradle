@@ -250,6 +250,7 @@ dependencies {
     // a method signature. Keep it available while compiling the optional OC
     // Create bridge as well as at dev-runtime.
     compileOnly("com.tterrag.registrate:Registrate:${registrate_version}")
+    compileOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("com.tterrag.registrate:Registrate:${registrate_version}")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
