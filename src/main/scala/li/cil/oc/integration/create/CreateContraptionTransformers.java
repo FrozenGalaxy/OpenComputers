@@ -6,6 +6,7 @@ import com.simibubi.create.api.behaviour.interaction.MovingInteractionBehaviour;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.behaviour.MovementContext;
 import com.simibubi.create.content.contraptions.StructureTransform;
+import com.simibubi.create.content.trains.entity.CarriageContraptionEntity;
 import li.cil.oc.api.Network;
 import li.cil.oc.common.block.Case;
 import li.cil.oc.common.block.Keyboard;
@@ -243,6 +244,11 @@ final class CreateContraptionTransformers {
         // The fake BE is not in Level.blockEntities, so the normal neighbor scan
         // cannot find it. A private network still lets its machine and cards run.
         Network.joinNewNetwork(environment.node());
+        if (environment instanceof Computer computer
+                && context.contraption.entity instanceof CarriageContraptionEntity carriageEntity
+                && carriageEntity.getCarriage() != null) {
+            CreateTrainEnvironment.attach(computer, carriageEntity.getCarriage().train, context.world);
+        }
         return environment;
     }
 
@@ -301,6 +307,7 @@ final class CreateContraptionTransformers {
         // component_removed while the remaining actors disappear.
         for (var actor : context.contraption.getActors()) {
             if (actor.right.temporaryData instanceof Computer computer) {
+                CreateTrainEnvironment.detach(computer);
                 computer.disposeMoving();
                 actor.right.temporaryData = null;
             }
