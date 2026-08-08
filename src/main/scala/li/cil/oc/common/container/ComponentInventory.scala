@@ -233,21 +233,33 @@ trait ComponentInventory extends Inventory with network.Environment {
   protected def save(component: ManagedEnvironment, driver: ItemDriver, stack: ItemStack): Unit = {
     try {
       def saveTo(persistenceStack: ItemStack): Unit = {
-        component.saveData(persistenceStack)
+        driver match {
+          case _: api.driver.item.Memory =>
+            // RAM has no persistent per-item state. Its environment gets a temporary
+            // network node while installed, but persisting that node address makes
+            // otherwise identical RAM sticks differ as ItemStacks and prevents them
+            // from stacking again after use. Also clean up addresses written by older
+            // builds of the Data Component port.
+            persistenceStack.remove(OCComponents.ADDRESS.get())
+            persistenceStack.remove(OCComponents.VISIBILITY.get())
 
-        // Enforce node persistence at the inventory boundary. This is the modern
-        // equivalent of old OC's per-component oc:node tag: if an environment
-        // forgot to call super.saveData(), its address must still survive.
-        if (component.node != null) {
-          component.node.saveData(persistenceStack)
+          case _ =>
+            component.saveData(persistenceStack)
 
-          val persisted = persistenceStack.get(OCComponents.ADDRESS)
-          if (component.node.address != null &&
-              (persisted == null || persisted != component.node.address)) {
-            OpenComputers.log.error(
-              s"Failed to persist component node address for ${component.getClass.getName}: " +
-                s"node=${component.node.address}, stack=$persisted")
-          }
+            // Enforce node persistence at the inventory boundary. This is the modern
+            // equivalent of old OC's per-component oc:node tag: if an environment
+            // forgot to call super.saveData(), its address must still survive.
+            if (component.node != null) {
+              component.node.saveData(persistenceStack)
+
+              val persisted = persistenceStack.get(OCComponents.ADDRESS)
+              if (component.node.address != null &&
+                  (persisted == null || persisted != component.node.address)) {
+                OpenComputers.log.error(
+                  s"Failed to persist component node address for ${component.getClass.getName}: " +
+                    s"node=${component.node.address}, stack=$persisted")
+              }
+            }
         }
       }
 
