@@ -3,7 +3,6 @@ package li.cil.oc.common.blockentity.traits
 import li.cil.oc.Settings
 import net.minecraft.core.{Direction, HolderLookup}
 import net.minecraft.nbt.CompoundTag
-import net.neoforged.api.distmarker.{Dist, OnlyIn}
 
 /**
  * Like Rotatable, but stores the rotation information in the TE's NBT instead
@@ -57,7 +56,6 @@ trait RotatableBaseBlock extends Rotatable {
     validatePitchAndYaw()
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     nbt.putInt(PitchTag, pitch.ordinal)

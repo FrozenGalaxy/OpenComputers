@@ -29,8 +29,6 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.core.{BlockPos, Direction, HolderLookup}
 import net.minecraft.world.level.block.state.BlockState
-import net.neoforged.api.distmarker.Dist
-import net.neoforged.api.distmarker.OnlyIn
 import net.neoforged.neoforge.common.extensions.IBlockEntityExtension
 
 import scala.jdk.CollectionConverters._
@@ -152,7 +150,6 @@ class DiskDrive(pos: BlockPos, state: BlockState)
     }
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     if (!items(0).isEmpty) nbt.setNewCompoundTag(DiskTag, _ => items(0).save(provider))

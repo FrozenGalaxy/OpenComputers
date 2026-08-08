@@ -4,8 +4,6 @@ import li.cil.oc.Settings
 import li.cil.oc.server.{PacketSender => ServerPacketSender}
 import net.minecraft.core.HolderLookup
 import net.minecraft.nbt.CompoundTag
-import net.neoforged.api.distmarker.Dist
-import net.neoforged.api.distmarker.OnlyIn
 
 trait PowerInformation extends BaseBlockEntity {
   private var lastSentRatio = -1.0
@@ -50,7 +48,6 @@ trait PowerInformation extends BaseBlockEntity {
     globalBufferSize = nbt.getDouble(GlobalBufferSizeTag)
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     lastSentRatio = if (globalBufferSize > 0) globalBuffer / globalBufferSize else 0

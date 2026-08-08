@@ -137,7 +137,9 @@ trait BaseBlockEntity extends net.minecraft.world.level.block.entity.BlockEntity
 
   @OnlyIn(Dist.CLIENT)
   def loadComponentsForClient(holder: DataComponentHolder): Unit = {}
-  @OnlyIn(Dist.CLIENT)
+
+  // The dedicated server writes this client-facing snapshot into update tags
+  // sent to clients. Only loading the snapshot is client-only.
   def saveComponentsForClient(holder: MutableDataComponentHolder): Unit = {}
 
   // ----------------------------------------------------------------------- //

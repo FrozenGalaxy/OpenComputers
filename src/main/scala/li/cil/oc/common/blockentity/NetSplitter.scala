@@ -127,7 +127,6 @@ class NetSplitter(pos: BlockPos, state: BlockState)
     requestModelDataUpdate()
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     nbt.putBoolean(IsInvertedTag, isInverted)
