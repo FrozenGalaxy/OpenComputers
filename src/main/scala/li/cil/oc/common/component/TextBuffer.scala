@@ -110,7 +110,7 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
   }
 
   /** Register a captured Create screen with the real client world. */
-  def registerClientBufferOnLevel(level: Level): Unit =
+  def registerClientBufferOnLevel(level: Level): Boolean =
     TextBuffer.registerClientBuffer(this, level)
 
   /** Remove a captured Create screen from the client tracker after disassembly. */
@@ -568,8 +568,8 @@ object TextBuffer {
     registerClientBuffer(t, t.host.getEnvironmentLevel)
   }
 
-  def registerClientBuffer(t: TextBuffer, level: Level): Unit = {
-    if (level == null || Strings.isNullOrEmpty(t.proxy.nodeAddress)) return
+  def registerClientBuffer(t: TextBuffer, level: Level): Boolean = {
+    if (level == null || Strings.isNullOrEmpty(t.proxy.nodeAddress)) return false
 
     // Captured block entities initially register against Create's virtual
     // render level. Move the same buffer to the real client level instead.
@@ -588,6 +588,7 @@ object TextBuffer {
     }
 
     ClientPacketSender.sendTextBufferInit(t.proxy.nodeAddress)
+    true
   }
 
   def unregisterClientBuffer(t: TextBuffer, level: Level): Unit = {
