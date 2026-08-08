@@ -24,8 +24,8 @@ object CreativeTab {
   @SubscribeEvent
   def onBuildContents(event: BuildCreativeModeTabContentsEvent): Unit = {
     if (event.getTabKey == MAIN.getKey) {
-      OCItems.decorateCreativeTab(event, ModOpenComputers.hasRedstoneCardT2)
-      OpenPrinter.addCreativeItems(event)
+      //OCItems.decorateCreativeTab(event, ModOpenComputers.hasRedstoneCardT2)
+      //OpenPrinter.addCreativeItems(event)
     } else if (event.getTabKey == CreativeModeTabs.TOOLS_AND_UTILITIES) {
       event.accept(OCItems.createChargedHoverBoots())
     }
