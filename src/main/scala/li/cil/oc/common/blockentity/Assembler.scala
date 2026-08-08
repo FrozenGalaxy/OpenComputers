@@ -186,7 +186,6 @@ class Assembler(pos: BlockPos, state: BlockState)
     requiredEnergy = nbt.getDouble(RemainingTag)
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     nbt.putDouble(RemainingTag, requiredEnergy)

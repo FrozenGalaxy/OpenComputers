@@ -522,7 +522,6 @@ class Hologram(pos: BlockPos, state: BlockState, var tier: Int)
     rotationSpeedZ = nbt.getFloat(RotationSpeedZTag)
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     nbt.putIntArray(VolumeTag, volume)

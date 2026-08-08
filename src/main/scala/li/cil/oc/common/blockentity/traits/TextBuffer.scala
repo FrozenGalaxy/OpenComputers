@@ -8,8 +8,6 @@ import li.cil.oc.api.network.Node
 import li.cil.oc.common.datacomponents.CompoundStorage
 import net.minecraft.core.HolderLookup
 import net.minecraft.core.component.DataComponentHolder
-import net.neoforged.api.distmarker.Dist
-import net.neoforged.api.distmarker.OnlyIn
 import net.minecraft.nbt.{CompoundTag, NbtOps}
 import net.minecraft.world.level.Level
 
@@ -143,7 +141,6 @@ trait TextBuffer extends Environment with Tickable {
     else buffer.loadData(nbt, provider)
   }
 
-  @OnlyIn(Dist.CLIENT)
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     super.saveForClient(nbt, provider)
     val storage = new CompoundStorage()
