@@ -5,4 +5,4 @@ import net.minecraft.world.item.Item.Properties
 import net.neoforged.neoforge.common.extensions.IItemExtension
 
 
-class AudioCard(props: Properties) extends Item(props) with traits.SimpleItem with IItemExtension
+class AudioCard(props: Properties) extends Item(props) with traits.ComponentItem with IItemExtension
