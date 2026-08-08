@@ -204,8 +204,7 @@ object EventHandler {
     Loot.disksForCyclingClient.clear()
     Loot.disksForCyclingClient ++= Loot.disksForCyclingServer.map(_.copy())
 
-    client.Sound.startLoop(null, "computer_running", 0f, 0)
-    scheduleServer(() => client.Sound.stopLoop(null))
+    client.Sound.stopAll()
   }
 
   @SubscribeEvent
