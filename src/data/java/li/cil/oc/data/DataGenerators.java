@@ -45,5 +45,6 @@ public class DataGenerators {
         ), registries));
 
         generator.addProvider(o -> new OCItemModelProvider(o, existingFiles));
+        generator.addProvider(o -> new OCBlockStateProvider(o, existingFiles));
     }
 }

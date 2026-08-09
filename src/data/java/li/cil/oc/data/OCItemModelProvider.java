@@ -172,48 +172,6 @@ public class OCItemModelProvider extends ItemModelProvider {
         basicItem(OpenPrinter.PAPER_SHREDS.get(), "shredded_paper");
         // TODO: This feels like it should have a custom full/empty texture?
         basicItem(OpenPrinter.FOLDER.get(), "folder_empty");
-
-        simpleBlockItem(OCBlocks.Adapter().get());
-        simpleBlockItem(OCBlocks.Assembler().get());
-        simpleBlockItem(OCBlocks.Capacitor().get());
-        simpleBlockItem(OCBlocks.CarpetedCapacitor().get());
-        simpleBlockItem(OCBlocks.ChameliumBlock().get());
-        simpleBlockItem(OCBlocks.Charger().get());
-        simpleBlockItem(OCBlocks.Disassembler().get());
-        simpleBlockItem(OCBlocks.DiskDrive().get());
-        simpleBlockItem(OCBlocks.FlatScreenBackTier1().get());
-        simpleBlockItem(OCBlocks.FlatScreenBackTier2().get());
-        simpleBlockItem(OCBlocks.FlatScreenBackTier3().get());
-        simpleBlockItem(OCBlocks.FlatScreenBackTier4().get());
-        simpleBlockItem(OCBlocks.FlatScreenFrontTier1().get());
-        simpleBlockItem(OCBlocks.FlatScreenFrontTier2().get());
-        simpleBlockItem(OCBlocks.FlatScreenFrontTier3().get());
-        simpleBlockItem(OCBlocks.FlatScreenFrontTier4().get());
-        simpleBlockItem(OCBlocks.Geolyzer().get());
-        simpleBlockItem(OCBlocks.HoloScreenTier1().get());
-        simpleBlockItem(OCBlocks.HoloScreenTier2().get());
-        simpleBlockItem(OCBlocks.HoloScreenTier3().get());
-        simpleBlockItem(OCBlocks.HoloScreenTier4().get());
-        simpleBlockItem(OCBlocks.HologramTier1().get());
-        simpleBlockItem(OCBlocks.HologramTier2().get());
-        simpleBlockItem(OCBlocks.HologramTier3().get());
-        simpleBlockItem(OCBlocks.Keyboard().get());
-        simpleBlockItem(OCBlocks.Microcontroller().get());
-        simpleBlockItem(OCBlocks.MotionSensor().get());
-        simpleBlockItem(OCBlocks.PowerConverter().get());
-        simpleBlockItem(OCBlocks.PowerDistributor().get());
-        simpleBlockItem(OCBlocks.Printer().get());
-        simpleBlockItem(OCBlocks.Rack().get());
-        simpleBlockItem(OCBlocks.Raid().get());
-        simpleBlockItem(OCBlocks.Redstone().get());
-        simpleBlockItem(OCBlocks.Relay().get());
-        simpleBlockItem(OCBlocks.Transposer().get());
-        simpleBlockItem(OCBlocks.Waypoint().get());
-
-        simpleBlockItem(OpenPrinter.BRIEFCASE.get());
-        simpleBlockItem(OpenPrinter.FILE_CABINET.get());
-        simpleBlockItem(OpenPrinter.PRINTER.get());
-        simpleBlockItem(OpenPrinter.SHREDDER.get());
     }
 
     private ItemModelBuilder basicItem(Item item, String texture) {
