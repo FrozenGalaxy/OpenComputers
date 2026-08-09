@@ -519,6 +519,13 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
       // with its ScreenTier1 constructor buffer and can overwrite the saved
       // higher resolution before the auxiliary state is recovered.
       case _: api.internal.Tablet | _: RemoteTerminalHost => data.saveData(holder)
+      // Create's moving block entities are restored at the train's current
+      // coordinates, while physical screen buffers normally live in a
+      // SaveHandler file keyed by the chunk where they were saved. That makes
+      // the post-reload lookup coordinate-dependent and can replace a real
+      // terminal with a blank buffer. The captured block-entity NBT travels
+      // with the contraption, so keep this snapshot inline while it is moving.
+      case moving: blockentity.traits.BaseBlockEntity if moving.isMoving => data.saveData(holder)
       case environmentHost: EnvironmentHost =>
         SaveHandler.scheduleSave(environmentHost, new CompoundTag(), bufferPath, (tag: CompoundTag) => {
           val storage = new CompoundStorage()
