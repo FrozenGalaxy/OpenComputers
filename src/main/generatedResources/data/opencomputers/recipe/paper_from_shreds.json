@@ -3,14 +3,14 @@
   "category": "misc",
   "ingredients": [
     {
-      "item": "opencomputers:capacitor"
+      "item": "opencomputers:paper_shreds"
     },
     {
-      "tag": "minecraft:wool_carpets"
+      "item": "minecraft:water_bucket"
     }
   ],
   "result": {
     "count": 1,
-    "id": "opencomputers:carpetedcapacitor"
+    "id": "minecraft:paper"
   }
 }

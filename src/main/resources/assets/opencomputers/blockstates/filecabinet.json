@@ -1,8 +1,0 @@
-{
-  "variants": {
-    "facing=north": { "model": "opencomputers:block/filecabinet" },
-    "facing=east":  { "model": "opencomputers:block/filecabinet", "y": 90 },
-    "facing=south": { "model": "opencomputers:block/filecabinet", "y": 180 },
-    "facing=west":  { "model": "opencomputers:block/filecabinet", "y": 270 }
-  }
-}
