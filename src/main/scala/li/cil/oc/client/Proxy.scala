@@ -42,8 +42,6 @@ private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
     e.enqueueWork((() => {
       ModelInitialization.preInit()
 
-      ColorHandler.init()
-
       NeoForge.EVENT_BUS.register(HighlightRenderer)
       NeoForge.EVENT_BUS.register(NanomachinesHandler.Client)
       NeoForge.EVENT_BUS.register(PetRenderer)
