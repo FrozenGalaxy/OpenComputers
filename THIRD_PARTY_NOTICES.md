@@ -1,10 +1,10 @@
 # Third-party notices
 
 OpenComputers contains or distributes work from other projects. Their license
-texts are retained in the [`LICENSES`](LICENSES) directory and are packaged in
-release JARs under `META-INF/licenses`.
+and provenance notices are retained in the [`LICENSES`](LICENSES) directory and
+are packaged in release JARs under `META-INF/licenses`.
 
-| Component | Use | License file |
+| Component | Use | License / notice |
 | --- | --- | --- |
 | JNLua | Lua runtime bindings and native libraries | [JNLua](LICENSES/JNLua.txt) |
 | LuaJ | Pure-Java Lua fallback | [LuaJ](LICENSES/LuaJ.txt) |
