@@ -1,15 +1,13 @@
 {
-  "type": "minecraft:crafting_shaped",
+  "type": "minecraft:crafting_shapeless",
   "category": "misc",
-  "key": {
-    "C": {
-      "item": "opencomputers:chamelium"
+  "ingredients": [
+    {
+      "item": "opencomputers:chameliumblock"
+    },
+    {
+      "tag": "c:dyes/black"
     }
-  },
-  "pattern": [
-    "CCC",
-    "CCC",
-    "CCC"
   ],
   "result": {
     "components": {

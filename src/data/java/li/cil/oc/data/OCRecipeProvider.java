@@ -1,6 +1,7 @@
 package li.cil.oc.data;
 
 import li.cil.oc.OpenComputers;
+import li.cil.oc.common.block.ChameliumBlock;
 import li.cil.oc.common.datacomponents.OCComponents;
 import li.cil.oc.common.init.OCBlocks;
 import li.cil.oc.common.init.OCItems;
@@ -12,15 +13,37 @@ import net.minecraft.data.recipes.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ItemLike;
 import net.neoforged.neoforge.common.Tags;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 class OCRecipeProvider extends RecipeProvider {
+    private static final Map<DyeColor, TagKey<Item>> DYE_TAGS = Map.ofEntries(
+        Map.entry(DyeColor.BLACK, Tags.Items.DYES_BLACK),
+        Map.entry(DyeColor.RED, Tags.Items.DYES_RED),
+        Map.entry(DyeColor.GREEN, Tags.Items.DYES_GREEN),
+        Map.entry(DyeColor.BROWN, Tags.Items.DYES_BROWN),
+        Map.entry(DyeColor.BLUE, Tags.Items.DYES_BLUE),
+        Map.entry(DyeColor.PURPLE, Tags.Items.DYES_PURPLE),
+        Map.entry(DyeColor.CYAN, Tags.Items.DYES_CYAN),
+        Map.entry(DyeColor.LIGHT_GRAY, Tags.Items.DYES_LIGHT_GRAY),
+        Map.entry(DyeColor.GRAY, Tags.Items.DYES_GRAY),
+        Map.entry(DyeColor.PINK, Tags.Items.DYES_PINK),
+        Map.entry(DyeColor.LIME, Tags.Items.DYES_LIME),
+        Map.entry(DyeColor.YELLOW, Tags.Items.DYES_YELLOW),
+        Map.entry(DyeColor.LIGHT_BLUE, Tags.Items.DYES_LIGHT_BLUE),
+        Map.entry(DyeColor.MAGENTA, Tags.Items.DYES_MAGENTA),
+        Map.entry(DyeColor.ORANGE, Tags.Items.DYES_ORANGE),
+        Map.entry(DyeColor.WHITE, Tags.Items.DYES_WHITE)
+    );
+
     OCRecipeProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> registries) {
         super(output, registries);
     }
@@ -1414,7 +1437,7 @@ class OCRecipeProvider extends RecipeProvider {
             .save(output);
 
         var chamelium = new ItemStack(OCBlocks.ChameliumBlock());
-        chamelium.set(DataComponents.DAMAGE, 15);
+        chamelium.set(OCComponents.CHAMELIUM_COLOR(), ChameliumBlock.DEFAULT_COLOR());
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, chamelium)
             .pattern("CCC")
             .pattern("CCC")
@@ -1422,6 +1445,21 @@ class OCRecipeProvider extends RecipeProvider {
             .define('C', OCItems.Chamelium())
             .unlockedBy(getHasName(OCItems.Chamelium()), has(OCItems.Chamelium()))
             .save(output);
+
+        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, OCItems.Chamelium(), 9)
+            .requires(OCBlocks.ChameliumBlock())
+            .unlockedBy(getHasName(OCBlocks.ChameliumBlock()), has(OCBlocks.ChameliumBlock()))
+            .save(output, ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "chamelium/splitting"));
+
+        for (var dye : DYE_TAGS.entrySet()) {
+            var dyedChamelium = new ItemStack(OCBlocks.ChameliumBlock());
+            dyedChamelium.set(OCComponents.CHAMELIUM_COLOR(), dye.getKey());
+            ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, dyedChamelium)
+                .requires(OCBlocks.ChameliumBlock())
+                .requires(dye.getValue())
+                .unlockedBy(getHasName(OCBlocks.ChameliumBlock()), has(OCBlocks.ChameliumBlock()))
+                .save(output, ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "chamelium/coloring/" + dye.getKey().getName()));
+        }
 
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.Charger())
             .pattern("igi")

@@ -143,6 +143,7 @@ object OCComponents {
   val RACK_NODE_MAPPING: Type[List[List[Direction]]] = persistent("rack_node_mapping", ScalaCodec.list(ScalaCodec.list(Direction.CODEC)))
   val DEBUG_CARD_ACCESS_CONTEXT: Type[AccessContext] = persistent("debug_card/access_context", AccessContext.CODEC)
   val DEBUG_CARD_REMOTE_NODE_POSITION: Type[BlockPos] = persistent("debug_card/remote_node", BlockPos.CODEC)
+  val CHAMELIUM_COLOR: Type[DyeColor] = persistentShared("chamelium_color", DyeColor.CODEC, DyeColor.STREAM_CODEC)
 
   object Network {
     val LAST_ACCESS: Type[Long] = sharedOnly("network/last_access_timestamp", ScalaStreamCodec.VAR_LONG)
