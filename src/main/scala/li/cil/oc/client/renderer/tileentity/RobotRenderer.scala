@@ -24,12 +24,16 @@ import net.minecraft.core.{Direction, Vec3i}
 import net.minecraft.world.phys.AABB
 import net.minecraft.ChatFormatting
 import net.minecraft.client.gui.Font
+import net.minecraft.resources.ResourceLocation
 import net.neoforged.neoforge.common.NeoForge
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 object RobotRenderer extends BlockEntityRendererProvider[blockentity.RobotProxy] {
+  val RainbowFlag = ResourceLocation.fromNamespaceAndPath(OpenComputers.ID, "rainbow_flag")
+  val TransFlag = ResourceLocation.fromNamespaceAndPath(OpenComputers.ID, "trans_flag")
+
   override def create(ctx: BlockEntityRendererProvider.Context): RobotRenderer =
     new RobotRenderer()
 
@@ -72,6 +76,50 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
   private val gap  = 1.0f / 28.0f
   private val gt   = 0.5f + gap
   private val gb   = 0.5f - gap
+
+  private def drawFlag(
+                        stack: PoseStack,
+                        buffer: MultiBufferSource,
+                        light: Int,
+                        flag: ResourceLocation
+                      ): Unit = {
+    val (renderType, flagHeight) = flag match {
+      case RobotRenderer.RainbowFlag => (RenderTypes.ROBOT_RAINBOW_FLAG, 6f)
+      case RobotRenderer.TransFlag => (RenderTypes.ROBOT_TRANS_FLAG, 5f)
+      case _ => return
+    }
+
+    val r = buffer.getBuffer(renderType)
+    val x = 2f / 16f
+    val flagBottom = 13.5f / 16f
+    val flagTop = (13.5f + flagHeight / 2f) / 16f
+    val flagFront = 10.5f / 16f
+    val flagBack = 15.5f / 16f
+    val poleBottom = 10.5f / 16f
+    val poleTop = 13.5f / 16f
+    val poleBack = 11f / 16f
+
+    @inline def lu(value: Float) = value / 16f
+    @inline def lv(value: Float) = value / 16f
+
+    def quad(y0: Float, y1: Float, z0: Float, z1: Float,
+             u0: Float, v0: Float, u1: Float, v1: Float): Unit = {
+      r.addVertex(stack.last.pose(), x, y0, z0).setColor(0xFF, 0xFF, 0xFF, 0xFF).setUv(lu(u0), lv(v1)).setLight(light).setNormal(stack.last, 1, 0, 0)
+      r.addVertex(stack.last.pose(), x, y1, z0).setColor(0xFF, 0xFF, 0xFF, 0xFF).setUv(lu(u0), lv(v0)).setLight(light).setNormal(stack.last, 1, 0, 0)
+      r.addVertex(stack.last.pose(), x, y1, z1).setColor(0xFF, 0xFF, 0xFF, 0xFF).setUv(lu(u1), lv(v0)).setLight(light).setNormal(stack.last, 1, 0, 0)
+      r.addVertex(stack.last.pose(), x, y0, z1).setColor(0xFF, 0xFF, 0xFF, 0xFF).setUv(lu(u1), lv(v1)).setLight(light).setNormal(stack.last, 1, 0, 0)
+    }
+
+    stack.pushPose()
+    stack.translate(x, 11f / 16f, 10.75f / 16f)
+    stack.mulPose(Axis.XP.rotationDegrees(22.5f))
+    stack.translate(-x, -11f / 16f, -10.75f / 16f)
+
+    quad(flagBottom, flagTop, flagFront, flagBack, 0, 0, 7, flagHeight)
+    quad(poleBottom, poleTop, flagFront, poleBack, 13, 0, 14, 6)
+
+    stack.popPose()
+  }
 
   private def drawTop(
                        stack: PoseStack,
@@ -191,6 +239,8 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
       drawBottom(stack, buffer, light, cr, cg, cb)
       if (!isRunning) stack.translate(0, -2 * gap, 0)
       drawTop(stack, buffer, light, cr, cg, cb)
+
+      if (robot != null) robot.info.flag.foreach(drawFlag(stack, buffer, light, _))
 
       if (isRunning) {
         val lightColor = if (event.lightColor < 0) {

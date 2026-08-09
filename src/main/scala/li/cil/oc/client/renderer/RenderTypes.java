@@ -33,6 +33,20 @@ public class RenderTypes extends RenderType {
                     .setTransparencyState(LIGHTNING_TRANSPARENCY)
                     .createCompositeState(true));
 
+    private static RenderType createRobotFlag(String name, ResourceLocation texture) {
+        return create(OpenComputers.ID() + ":robot_flag_" + name,
+                DefaultVertexFormat.BLOCK, VertexFormat.Mode.QUADS, 256, true, false, CompositeState.builder()
+                        .setShaderState(RENDERTYPE_CUTOUT_SHADER)
+                        .setTextureState(new RenderStateShard.TextureStateShard(texture, false, false))
+                        .setLightmapState(LIGHTMAP)
+                        .setCullState(NO_CULL)
+                        .createCompositeState(true));
+    }
+
+    public static final RenderType ROBOT_RAINBOW_FLAG = createRobotFlag("rainbow", Textures.Model$.MODULE$.RobotRainbowFlag());
+
+    public static final RenderType ROBOT_TRANS_FLAG = createRobotFlag("trans", Textures.Model$.MODULE$.RobotTransFlag());
+
     public static final RenderType HOLOGRAM = create(OpenComputers.ID() + ":hologram",
             DefaultVertexFormat.POSITION_COLOR,
             VertexFormat.Mode.QUADS,

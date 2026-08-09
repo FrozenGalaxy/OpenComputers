@@ -12,6 +12,7 @@ release JARs under `META-INF/licenses`.
 | OpenScreens | Adapted display assets and implementation portions | [OpenScreens](LICENSES/OpenScreens.txt) |
 | GNU Unifont | Glyph data used by screens and manuals | [GNU Unifont](LICENSES/Unifont.txt) |
 | wcwidth tables | Unicode character-width data | [wcwidth](LICENSES/wcwidth.txt) |
+| CC:Tweaked | Rainbow and trans turtle flag textures adapted for robots | [CC:Tweaked](LICENSES/CC-Tweaked.txt) |
 
 Optional mod integrations are compiled against their respective APIs but are
 not bundled into the OpenComputers JAR. Those projects remain subject to their

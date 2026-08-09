@@ -280,10 +280,17 @@ object EventHandler {
       new MicrocontrollerData(stack).components.find(api.Items.get(_) == eeprom).asStackOption
     }) || didRecraft
 
-    didRecraft = recraft(e, robot, stack => {
-      // Restore EEPROM currently used in robot.
-      new RobotData(stack).components.find(api.Items.get(_) == eeprom).asStackOption
-    }) || didRecraft
+    // The robot recrafting recipe swaps an EEPROM and returns the old one.
+    // Do not treat unrelated robot-to-robot recipes (such as cosmetics) as
+    // EEPROM swaps merely because their input and output items match.
+    val swapsRobotEeprom = (0 until e.getInventory.getContainerSize).exists(slot =>
+      api.Items.get(e.getInventory.getItem(slot)) == eeprom)
+    if (swapsRobotEeprom) {
+      didRecraft = recraft(e, robot, stack => {
+        // Restore EEPROM currently used in robot.
+        new RobotData(stack).components.find(api.Items.get(_) == eeprom).asStackOption
+      }) || didRecraft
+    }
 
     didRecraft = recraft(e, tablet, stack => {
       // Restore EEPROM currently used in tablet.
