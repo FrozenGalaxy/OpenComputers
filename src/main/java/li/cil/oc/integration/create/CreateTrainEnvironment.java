@@ -7,7 +7,10 @@ import com.simibubi.create.content.trains.schedule.Schedule;
 import com.simibubi.create.content.trains.station.GlobalStation;
 import com.simibubi.create.content.trains.station.TrainEditPacket;
 import com.simibubi.create.foundation.utility.StringHelper;
+import li.cil.oc.api.DataComponents;
 import li.cil.oc.api.Network;
+import li.cil.oc.api.UnrecoverablePersistanceException;
+import li.cil.oc.api.datacomponents.MutableNbtComponentHolder;
 import li.cil.oc.api.driver.NamedBlock;
 import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Callback;
@@ -29,9 +32,11 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.regex.PatternSyntaxException;
 
@@ -42,17 +47,30 @@ public final class CreateTrainEnvironment extends AbstractManagedEnvironment imp
     private final Train train;
     private final Level level;
 
-    private CreateTrainEnvironment(final Train train, final Level level) {
+    private CreateTrainEnvironment(final Train train, final Level level, final String address) {
         this.train = train;
         this.level = level;
         setNode(Network.newNode(this, Visibility.Network).withComponent("train").create());
+        final MutableNbtComponentHolder addressHolder = new MutableNbtComponentHolder();
+        addressHolder.set(DataComponents.ADDRESS.get(), address);
+        try {
+            node().loadData(addressHolder);
+        } catch (final UnrecoverablePersistanceException e) {
+            throw new IllegalStateException("failed to restore the train component address", e);
+        }
     }
 
     /** Attach one train component to a computer that is currently inside a train carriage. */
     public static synchronized void attach(final Environment computer, final Train train, final Level level) {
         if (computer == null || computer.node() == null || train == null || level == null || attached.containsKey(computer))
             return;
-        final CreateTrainEnvironment environment = new CreateTrainEnvironment(train, level);
+        // The train component is recreated whenever Create restores a carriage.
+        // Give it the same address for the same persisted computer/train pair,
+        // otherwise the machine restores a stale random address and emits a
+        // phantom component_removed after every world load.
+        final String address = UUID.nameUUIDFromBytes((computer.node().address() + ":" + train.id)
+                .getBytes(StandardCharsets.UTF_8)).toString();
+        final CreateTrainEnvironment environment = new CreateTrainEnvironment(train, level, address);
         attached.put(computer, environment);
         computer.node().connect(environment.node());
     }
