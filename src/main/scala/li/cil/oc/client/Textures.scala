@@ -86,6 +86,8 @@ object Textures {
     val HologramEffect = L("hologram_effect")
     val Drone = L("drone")
     val Robot = L("robot")
+    val RobotRainbowFlag = L("robot_rainbow_flag")
+    val RobotTransFlag = L("robot_trans_flag")
 
     override protected def basePath = "model/%s"
   }

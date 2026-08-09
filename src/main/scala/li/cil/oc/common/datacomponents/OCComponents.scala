@@ -108,6 +108,7 @@ object OCComponents {
   val DRONE_STATE: Type[DroneState] = persistentShared("drone_state", DroneState.CODEC, DroneState.STREAM_CODEC)
   val STATUS_TEXT: Type[Component] = persistentShared("status_text", ComponentSerialization.FLAT_CODEC, ComponentSerialization.STREAM_CODEC)
   val LIGHT_COLOR: Type[ColorRGBA] = persistentShared("light_color", ColorRGBA.CODEC, ScalaStreamCodec.COLOR_RGBA)
+  val ROBOT_FLAG: Type[ResourceLocation] = persistentShared("robot_flag", ResourceLocation.CODEC, ResourceLocation.STREAM_CODEC)
   val PRINT: Type[PrintData] = persistentShared("print", PrintData.CODEC, PrintData.STREAM_CODEC)
   val FILESYSTEM_DATA: Type[CompoundTag] = persistent("filesystem", CompoundTag.CODEC)
   val ROBOT_ROM_FILESYSTEM_DATA: Type[CompoundTag] = persistent("robot_rom_filesystem", CompoundTag.CODEC)

@@ -20,6 +20,7 @@ import scala.jdk.CollectionConverters._
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
 import net.minecraft.network.chat.Component
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.util.ColorRGBA
 import net.neoforged.neoforge.common.MutableDataComponentHolder
 import net.neoforged.neoforge.server.ServerLifecycleHooks
@@ -57,6 +58,7 @@ class RobotData extends ItemData(Constants.BlockName.Robot) {
   var components = Array.empty[ItemStack]
   var containers = Array.empty[ItemStack]
   var lightColor = 0xF23030
+  var flag: Option[ResourceLocation] = None
 
   private final val StoredEnergyTag = Settings.namespace + "storedEnergy"
   private final val RobotEnergyTag = Settings.namespace + "robotEnergy"
@@ -91,6 +93,8 @@ class RobotData extends ItemData(Constants.BlockName.Robot) {
     for(color <- holder.getComponent(OCComponents.LIGHT_COLOR)) {
       lightColor = color.rgba
     }
+
+    flag = holder.getComponent(OCComponents.ROBOT_FLAG)
   }
 
   override def saveData(holder: MutableDataComponentHolder): Unit = {
@@ -100,6 +104,7 @@ class RobotData extends ItemData(Constants.BlockName.Robot) {
     holder.setComponent(OCComponents.COMPONENTS, components.map(ImmutableItemStack.copyOf).toList)
     holder.setComponent(OCComponents.CONTAINERS, containers.map(ImmutableItemStack.copyOf).toList)
     holder.setComponent(OCComponents.LIGHT_COLOR, new ColorRGBA(lightColor))
+    holder.setComponent(OCComponents.ROBOT_FLAG, flag)
   }
 
   def copyItemStack(provider: HolderLookup.Provider) = {
