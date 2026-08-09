@@ -52,7 +52,7 @@ object DroneTemplate extends Template {
     val info = new MicrocontrollerData(stack)
     val itemName = Constants.ItemName.DroneCase(info.tier)
 
-    Array(api.Items.get(itemName).createItemStack(1)) ++ info.components
+    Array(api.Items.get(itemName).createItemStack(1)) ++ info.components.filter(!_.isEmpty)
   }
 
   def register(): Unit = {
