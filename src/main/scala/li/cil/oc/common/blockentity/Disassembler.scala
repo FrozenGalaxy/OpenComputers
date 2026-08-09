@@ -118,8 +118,15 @@ class Disassembler(pos: BlockPos, state: BlockState)
       DisassemblerTemplates.select(stack) match {
         case Some(template) =>
           val (stacks, drops) = template.disassemble(stack, ingredients)
-          stacks.foreach(queue ++= _)
-          drops.foreach(_.foreach(drop))
+          stacks match {
+            case Some(output) =>
+              queue ++= output
+              drops.foreach(_.foreach(drop))
+            case None =>
+              // The input was already removed from the inventory. Preserve
+              // it if a callback failed or returned an unsupported result.
+              drop(stack)
+          }
         case _ => queue ++= ingredients
       }
       totalRequiredEnergy = queue.size * Settings.get.disassemblerItemCost

@@ -30,14 +30,18 @@ object DisassemblerTemplates {
 
     def disassemble(stack: ItemStack, ingredients: Array[ItemStack]) = {
       val result = IMC.tryInvokeStatic(disassembler, stack, ingredients)(null: Array[_])
-      Option(result).map(_.toSeq).getOrElse(Seq.empty) match {
-        case Seq(stacks: Array[ItemStack], drops: Array[ItemStack]) =>
+      result match {
+        // Disassembler callbacks return an array directly. Do not convert the
+        // result to a sequence first: that turns Array[ItemStack] into a
+        // sequence of individual stacks and makes the valid flat-array form
+        // impossible to match.
+        case Array(stacks: Array[ItemStack], drops: Array[ItemStack]) =>
           (Some(stacks), Some(drops))
-        case Seq(stack: ItemStack, drops: Array[ItemStack]) =>
+        case Array(stack: ItemStack, drops: Array[ItemStack]) =>
           (Some(Array[ItemStack](stack)), Some(drops))
-        case Seq(stacks: Array[ItemStack], drop: ItemStack) =>
+        case Array(stacks: Array[ItemStack], drop: ItemStack) =>
           (Some(stacks), Some(Array[ItemStack](drop)))
-        case Seq(stacks: Array[ItemStack]) =>
+        case stacks: Array[ItemStack] =>
           (Some(stacks), None)
         case _ => (None, None)
       }
