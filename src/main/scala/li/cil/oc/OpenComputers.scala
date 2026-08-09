@@ -1,7 +1,6 @@
 package li.cil.oc
 
-import li.cil.oc.common.{IMC, Proxy}
-import li.cil.oc.common.block.ChameliumBlock
+import li.cil.oc.client.ColorHandler
 import li.cil.oc.common.blockentity.BlockEntityTypes
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.entity.EntityTypes
@@ -9,16 +8,17 @@ import li.cil.oc.common.init.{OCBlocks, OCItems}
 import li.cil.oc.common.menu.MenuTypes
 import li.cil.oc.common.openprinter.OpenPrinter
 import li.cil.oc.common.recipe.Recipes
+import li.cil.oc.common.{IMC, Proxy}
 import li.cil.oc.integration.Mods
-import li.cil.oc.server.loot.LootFunctions
 import li.cil.oc.server.command.CommandHandler
+import li.cil.oc.server.loot.LootFunctions
 import li.cil.oc.util.ThreadPoolFactory
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.{IEventBus, SubscribeEvent}
-import net.neoforged.fml.{InterModComms, ModContainer}
 import net.neoforged.fml.common.Mod
 import net.neoforged.fml.event.lifecycle.{FMLCommonSetupEvent, InterModProcessEvent}
 import net.neoforged.fml.loading.FMLPaths
+import net.neoforged.fml.{InterModComms, ModContainer}
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforgespi.Environment
 import org.apache.logging.log4j.{LogManager, Logger}
@@ -78,9 +78,7 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   OpenComputers.proxy.preInit()
   NeoForge.EVENT_BUS.register(ThreadPoolFactory)
   NeoForge.EVENT_BUS.addListener(CommandHandler.onRegisterCommands)
-
-  // these used to use @EventBusSubscriber but Scala makes this impossible on NeoForge
-  modBus.register(ChameliumBlock)
+  modBus.register(ColorHandler)
 
   Mods.preInit() // Must happen after loading Settings but before registry events are fired.
 

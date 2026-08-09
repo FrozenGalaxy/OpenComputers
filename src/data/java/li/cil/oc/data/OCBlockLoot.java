@@ -1,21 +1,30 @@
 package li.cil.oc.data;
 
 import li.cil.oc.OpenComputers;
+import li.cil.oc.common.block.ChameliumBlock;
+import li.cil.oc.common.datacomponents.OCComponents;
 import li.cil.oc.common.init.OCBlocks;
 import li.cil.oc.common.openprinter.OpenPrinter;
 import li.cil.oc.server.loot.CopyColor;
 import li.cil.oc.server.loot.LootFunctions;
+import net.minecraft.advancements.critereon.StatePropertiesPredicate;
+import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.loot.BlockLootSubProvider;
 import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.entries.AlternativesEntry;
 import net.minecraft.world.level.storage.loot.entries.DynamicLoot;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
+import net.minecraft.world.level.storage.loot.functions.SetComponentsFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemBlockStatePropertyCondition;
 import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 
+import java.util.Arrays;
 import java.util.Set;
 
 class OCBlockLoot extends BlockLootSubProvider {
@@ -27,9 +36,7 @@ class OCBlockLoot extends BlockLootSubProvider {
     protected Iterable<Block> getKnownBlocks() {
         return BuiltInRegistries.BLOCK.holders()
             .filter(x -> x.key().location().getNamespace().equals(OpenComputers.ID()))
-            // TODO: Handle this, but not until we've switched to components
-            .filter(x -> !x.key().location().getPath().equals("chameliumblock"))
-            .map(x -> x.value())
+            .map(Holder.Reference::value)
             .toList();
     }
 
@@ -43,7 +50,7 @@ class OCBlockLoot extends BlockLootSubProvider {
         dropVolatileContents(OCBlocks.CaseTier2().get());
         dropVolatileContents(OCBlocks.CaseTier3().get());
         dropVolatileContents(OCBlocks.CaseTier4().get());
-        // TODO: chameliumblock
+        dropChamelium();
         dropVolatileContents(OCBlocks.Charger().get());
         dropVolatileContents(OCBlocks.Disassembler().get());
         dropVolatileContents(OCBlocks.DiskDrive().get());
@@ -104,6 +111,19 @@ class OCBlockLoot extends BlockLootSubProvider {
         dropSelf(OpenPrinter.SHREDDER.get());
     }
 
+    private void dropChamelium() {
+        var block = OCBlocks.ChameliumBlock().get();
+        add(block, LootTable.lootTable()
+            .withPool(applyExplosionCondition(block, LootPool.lootPool()
+                .setRolls(ConstantValue.exactly(1.0F))
+                .add(AlternativesEntry.alternatives(Arrays.asList(DyeColor.values()), color -> LootItem.lootTableItem(block)
+                    .when(
+                        LootItemBlockStatePropertyCondition.hasBlockStateProperties(block)
+                            .setProperties(StatePropertiesPredicate.Builder.properties().hasProperty(ChameliumBlock.Color(), color))
+                    )
+                    .apply(SetComponentsFunction.setComponent(OCComponents.CHAMELIUM_COLOR().get(), color))))))
+        );
+    }
 
     private void dropVolatileContents(Block block) {
         add(block, LootTable.lootTable()
