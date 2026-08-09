@@ -8,7 +8,7 @@ import net.neoforged.neoforge.common.extensions.IItemExtension
 
 import scala.language.existentials
 
-class APU(props: Properties, val tier: Int) extends Item(props) with traits.SimpleItem with traits.ItemTier with traits.CPULike with traits.GPULike with IItemExtension {
+class APU(props: Properties, val tier: Int) extends Item(props) with traits.ComponentItem with traits.ItemTier with traits.CPULike with traits.GPULike with IItemExtension {
   @Deprecated
   override def getDescriptionId = super.getDescriptionId + tier
 
@@ -18,9 +18,8 @@ class APU(props: Properties, val tier: Int) extends Item(props) with traits.Simp
 
   override def gpuTier = math.min(Tier.Four, tier)
 
-  override protected def tooltipName = Option(unlocalizedName)
-
   override protected def tooltipData: Seq[Any] = {
     super[CPULike].tooltipData ++ super[GPULike].tooltipData
   }
+
 }
