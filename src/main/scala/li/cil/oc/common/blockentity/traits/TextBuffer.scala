@@ -39,8 +39,13 @@ trait TextBuffer extends Environment with Tickable {
   /** Create renders captured screens in a virtual level, but packets use the real client level. */
   def registerMovingClientBuffer(level: Level): Unit = buffer match {
     case moving: li.cil.oc.common.component.TextBuffer if movingClientLevel ne level =>
-      movingClientLevel = level
-      moving.registerClientBufferOnLevel(level)
+      // The captured client block entity can be constructed before its
+      // component snapshot supplies the node address. Do not remember a
+      // failed registration, or the real-world tracker will never receive
+      // this screen's updates after the address arrives.
+      if (moving.registerClientBufferOnLevel(level)) {
+        movingClientLevel = level
+      }
     case _ =>
   }
 
