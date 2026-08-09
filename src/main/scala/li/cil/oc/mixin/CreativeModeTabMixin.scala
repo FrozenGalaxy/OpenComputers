@@ -9,6 +9,10 @@ import net.minecraft.world.item.ItemStack
 import org.spongepowered.asm.mixin.Mixin
 import org.spongepowered.asm.mixin.Shadow
 
+// Inspired by :
+//  https://github.com/Creators-of-Aeronautics/Simulated-Project/blob/main/simulated/common/src/main/java/dev/simulated_team/simulated/mixin/creative_tab_sections/CreativeModeTabMixin.java
+// On 09/08/26 under MIT Licence
+
 import java.util
 
 

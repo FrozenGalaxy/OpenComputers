@@ -46,7 +46,7 @@ object OCBlocks {
   val Printer: DeferredBlock[Printer] = BLOCKS.register(Constants.BlockName.Printer, () => Items.registerBlock(new Printer(defaultProps), Constants.BlockName.Printer, defaultItemProps,"25_components"))
   val Raid: DeferredBlock[Raid] = BLOCKS.register(Constants.BlockName.Raid, () => Items.registerBlock(new Raid(defaultProps), Constants.BlockName.Raid, defaultItemProps,"25_components"))
   val Redstone: DeferredBlock[Redstone] = BLOCKS.register(Constants.BlockName.Redstone, () => Items.registerBlock(new Redstone(defaultProps), Constants.BlockName.Redstone, defaultItemProps,"25_components"))
-  val Relay: DeferredBlock[Relay] = BLOCKS.register(Constants.BlockName.Relay, () => Items.registerBlock(new Relay(defaultProps), Constants.BlockName.Relay, defaultItemProps,"25_components"))
+  val Relay: DeferredBlock[Relay] = BLOCKS.register(Constants.BlockName.Relay, () => Items.registerBlock(new Relay(defaultProps), Constants.BlockName.Relay, defaultItemProps,"10_networking"))
   val ScreenTier1: DeferredBlock[Screen] = BLOCKS.register(Constants.BlockName.ScreenTier1, () => Items.registerBlock(new Screen(defaultProps, Tier.One), Constants.BlockName.ScreenTier1, defaultItemProps,"25_components"))
   val ScreenTier2: DeferredBlock[Screen] = BLOCKS.register(Constants.BlockName.ScreenTier2, () => Items.registerBlock(new Screen(defaultProps, Tier.Two), Constants.BlockName.ScreenTier2, defaultItemProps.rarity(Rarity.UNCOMMON),"25_components"))
   val ScreenTier3: DeferredBlock[Screen] = BLOCKS.register(Constants.BlockName.ScreenTier3, () => Items.registerBlock(new Screen(defaultProps, Tier.Three), Constants.BlockName.ScreenTier3, defaultItemProps.rarity(Rarity.RARE),"25_components"))

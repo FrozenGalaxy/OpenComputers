@@ -31,6 +31,7 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 object OCItems extends ItemAPI {
   private val ITEM_TO_SECTION = new util.HashMap[String, String]
+  var SECTION_Y_VALUES = new util.HashMap[String, Int]
   private val ITEMS: DeferredRegister.Items = DeferredRegister.createItems(Settings.resourceDomain)
 
   val descriptors = mutable.LinkedHashMap.empty[String, ItemInfo]
@@ -574,6 +575,7 @@ object OCItems extends ItemAPI {
       displayItems.accept(ItemStack.EMPTY)
     }
 
+    SECTION_Y_VALUES.clear()
     var y = 0
     val sectionKeys = sectionMap.keySet.asScala
       .filter(_ != null)
@@ -589,7 +591,7 @@ object OCItems extends ItemAPI {
           itemCount += 1
         }
       })
-      //SECTION_Y_VALUES.put(key, y)
+      SECTION_Y_VALUES.put(key, y)
       val rowCount = Math.ceil(itemCount / 9.0f).toInt
       y += rowCount + 1
       if (key.equals(sectionKeys.last)) return
