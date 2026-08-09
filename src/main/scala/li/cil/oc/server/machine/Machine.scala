@@ -755,6 +755,12 @@ class Machine(val host: MachineHost) extends AbstractManagedEnvironment with mac
         }
       }
       deferredRemovedComponents.clear()
+      // Create restores a moving contraption's actors one at a time. Once its
+      // grace period has elapsed, do the same final component check that a
+      // normal power-on does. Without this, a resumed computer can retain the
+      // saved addresses of the pre-reload screen/keyboard graph until the
+      // player manually power-cycles it.
+      verifyComponents()
     }
   }
 
