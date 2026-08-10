@@ -99,6 +99,10 @@ trait TextBuffer extends Environment with Tickable {
   private def loadServerBufferData(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
     reapplyTierToBuffer()
     buffer.loadData(nbt, provider)
+    // loadData also restores MAX_VIDEO_MODE when it is present. A stale save
+    // can contain the constructor's tier-one limits, so enforce the physical
+    // screen tier again after loading persisted data as well.
+    reapplyTierToBuffer()
   }
 
   /**
@@ -144,6 +148,9 @@ trait TextBuffer extends Environment with Tickable {
       buffer.loadData(storage)
     }
     else buffer.loadData(nbt, provider)
+    // The saved MAX_VIDEO_MODE may be stale or may have been produced while
+    // this block entity still had its constructor-default tier.
+    reapplyTierToBuffer()
   }
 
   override def saveForClient(nbt: CompoundTag, provider: HolderLookup.Provider): Unit = {
