@@ -1,6 +1,6 @@
 package li.cil.oc.client.renderer
 
-import com.mojang.blaze3d.vertex.{ByteBufferBuilder, PoseStack, VertexConsumer}
+import com.mojang.blaze3d.vertex.{PoseStack, VertexConsumer}
 import com.mojang.math.Axis
 import li.cil.oc.{Constants, api}
 import li.cil.oc.common.component.{TextBuffer => ComponentTextBuffer}
@@ -105,7 +105,7 @@ object TabletRenderer {
       -0.3f * Mth.sin(swingProgress * Math.PI.toFloat))
     stack.mulPose(Axis.XP.rotationDegrees(swing * -45f))
     stack.mulPose(Axis.YP.rotationDegrees(side * swing * -30f))
-    renderTablet(stack, textBuffer, powered, faceSize)
+    renderTablet(stack, renderBuffer, textBuffer, powered, faceSize)
     stack.popPose()
   }
 
@@ -138,7 +138,7 @@ object TabletRenderer {
 
     stack.mulPose(Axis.XP.rotationDegrees(Mth.sin(swingRoot * Math.PI.toFloat) * 20f))
     stack.scale(2f, 2f, 2f)
-    renderTablet(stack, textBuffer, powered, CenterFaceSize)
+    renderTablet(stack, renderBuffer, textBuffer, powered, CenterFaceSize)
   }
 
   private def calculateMapTilt(pitch: Float): Float = {
@@ -193,7 +193,11 @@ object TabletRenderer {
     else playerRenderer.renderLeftHand(stack, renderBuffer, packedLight, minecraft.player)
   }
 
-  private def renderTablet(stack: PoseStack, textBuffer: Option[api.internal.TextBuffer], powered: Boolean, faceSize: Float): Unit = {
+  private def renderTablet(stack: PoseStack,
+                          renderBuffer: MultiBufferSource,
+                          textBuffer: Option[api.internal.TextBuffer],
+                          powered: Boolean,
+                          faceSize: Float): Unit = {
     val width = textBuffer.fold(160)(_.renderWidth)
     val height = textBuffer.fold(90)(_.renderHeight)
     if (width <= 0 || height <= 0) return
@@ -207,12 +211,12 @@ object TabletRenderer {
     stack.scale(scale, scale, -1f)
     stack.translate(-width * 0.5, -height * 0.5, 0)
 
-    renderFrame(stack, width, height, powered)
+    renderFrame(stack, renderBuffer, width, height, powered)
 
     for (buffer <- textBuffer if buffer.isRenderingEnabled) {
       stack.translate(0, 0, 0.002f)
       buffer match {
-        case component: ComponentTextBuffer => component.renderText(stack)
+        case component: ComponentTextBuffer => component.renderText(stack, renderBuffer)
         case _ => buffer.renderText(stack)
       }
     }
@@ -220,25 +224,19 @@ object TabletRenderer {
     stack.popPose()
   }
 
-  private def renderFrame(stack: PoseStack, width: Int, height: Int, powered: Boolean): Unit = {
-    val byteBuffer = new ByteBufferBuilder(4096)
-    try {
-      val source = MultiBufferSource.immediate(byteBuffer)
-      val builder = source.getBuffer(RenderTypes.FONT_QUAD)
-      val matrix = stack.last.pose()
+  private def renderFrame(stack: PoseStack, renderBuffer: MultiBufferSource, width: Int, height: Int, powered: Boolean): Unit = {
+    val builder = renderBuffer.getBuffer(RenderTypes.FONT_QUAD)
+    val matrix = stack.last.pose()
 
-      val frameWidth = width + FrameBorder * 2
-      val frameHeight = height + FrameBorder + BottomBorder
-      quad(builder, matrix, -FrameBorder, -FrameBorder, frameWidth, frameHeight, 0f, 0x25262D)
-      quad(builder, matrix, -FrameBorder + 2, -FrameBorder + 2, frameWidth - 4, 2, 0.0005f, 0x4A4C57)
-      quad(builder, matrix, -FrameBorder + 2, -FrameBorder + 4, 2, frameHeight - 8, 0.0005f, 0x3A3C46)
-      quad(builder, matrix, -FrameBorder + 2, height + BottomBorder - 4, frameWidth - 4, 2, 0.0005f, 0x17181D)
-      quad(builder, matrix, width + FrameBorder - 4, -FrameBorder + 4, 2, frameHeight - 8, 0.0005f, 0x17181D)
-      quad(builder, matrix, 0, 0, width, height, 0.001f, 0x000000)
-      quad(builder, matrix, width - 8, height + 5, 5, 5, 0.001f, if (powered) 0x66DD55 else 0x333333)
-      source.endBatch()
-    }
-    finally byteBuffer.close()
+    val frameWidth = width + FrameBorder * 2
+    val frameHeight = height + FrameBorder + BottomBorder
+    quad(builder, matrix, -FrameBorder, -FrameBorder, frameWidth, frameHeight, 0f, 0x25262D)
+    quad(builder, matrix, -FrameBorder + 2, -FrameBorder + 2, frameWidth - 4, 2, 0.0005f, 0x4A4C57)
+    quad(builder, matrix, -FrameBorder + 2, -FrameBorder + 4, 2, frameHeight - 8, 0.0005f, 0x3A3C46)
+    quad(builder, matrix, -FrameBorder + 2, height + BottomBorder - 4, frameWidth - 4, 2, 0.0005f, 0x17181D)
+    quad(builder, matrix, width + FrameBorder - 4, -FrameBorder + 4, 2, frameHeight - 8, 0.0005f, 0x17181D)
+    quad(builder, matrix, 0, 0, width, height, 0.001f, 0x000000)
+    quad(builder, matrix, width - 8, height + 5, 5, 5, 0.001f, if (powered) 0x66DD55 else 0x333333)
   }
 
   private def quad(builder: VertexConsumer,
@@ -252,9 +250,9 @@ object TabletRenderer {
     val r = (color >> 16) & 0xFF
     val g = (color >> 8) & 0xFF
     val b = color & 0xFF
-    builder.addVertex(matrix, x.toFloat, (y + height).toFloat, z).setColor(r, g, b, 255)
-    builder.addVertex(matrix, (x + width).toFloat, (y + height).toFloat, z).setColor(r, g, b, 255)
-    builder.addVertex(matrix, (x + width).toFloat, y.toFloat, z).setColor(r, g, b, 255)
-    builder.addVertex(matrix, x.toFloat, y.toFloat, z).setColor(r, g, b, 255)
+    builder.addVertex(matrix, x.toFloat, (y + height).toFloat, z).setUv(0f, 1f).setColor(r, g, b, 255)
+    builder.addVertex(matrix, (x + width).toFloat, (y + height).toFloat, z).setUv(1f, 1f).setColor(r, g, b, 255)
+    builder.addVertex(matrix, (x + width).toFloat, y.toFloat, z).setUv(1f, 0f).setColor(r, g, b, 255)
+    builder.addVertex(matrix, x.toFloat, y.toFloat, z).setUv(0f, 0f).setColor(r, g, b, 255)
   }
 }

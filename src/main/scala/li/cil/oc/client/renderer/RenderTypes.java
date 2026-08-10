@@ -16,6 +16,8 @@ import org.lwjgl.opengl.GL11;
 public class RenderTypes extends RenderType {
     private static final RenderStateShard.ShaderStateShard POSITION_TEX_COLOR_SHADER =
             new RenderStateShard.ShaderStateShard(GameRenderer::getPositionTexColorShader);
+    private static final RenderStateShard.TextureStateShard WHITE_TEXTURE =
+            new RenderStateShard.TextureStateShard(ResourceLocation.withDefaultNamespace("textures/misc/white.png"), false, false);
 
     public static final RenderStateShard.TextureStateShard ROBOT_CHASSIS_TEXTURE = new RenderStateShard.TextureStateShard(Textures.Model$.MODULE$.Robot(), false, false);
 
@@ -113,11 +115,12 @@ public class RenderTypes extends RenderType {
                     .createCompositeState(false));
 
     public static final RenderType FONT_QUAD = create(OpenComputers.ID() + ":font_quad",
-            DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS, 1024, false, false, CompositeState.builder()
-                    .setShaderState(POSITION_COLOR_SHADER)
-                    .setWriteMaskState(COLOR_WRITE)
+            DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS, 1024, false, false, CompositeState.builder()
+                    .setShaderState(POSITION_TEX_COLOR_SHADER)
+                    .setTextureState(WHITE_TEXTURE)
+                    .setWriteMaskState(COLOR_DEPTH_WRITE)
                     .setDepthTestState(LEQUAL_DEPTH_TEST)
-                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setTransparencyState(NO_TRANSPARENCY)
                     // NO_CULL required: block rendering works because ScreenRenderer.transform()
                     // applies mirrorScale(1,-1,1) which flips Y and reverses winding to CCW (front-face).
                     // GUI rendering has no Y-flip, so quads are CW (back-face) and get culled without this.
