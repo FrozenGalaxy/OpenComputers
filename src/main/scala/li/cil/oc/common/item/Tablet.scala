@@ -134,6 +134,10 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
     true
   }
 
+  @Deprecated
+  override def use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] =
+    use(player.getItemInHand(hand), level, player)
+
   override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
     player.startUsingItem(if (player.getItemInHand(InteractionHand.MAIN_HAND) == stack) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND)
     new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
@@ -166,7 +170,7 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
           }
         }
         else {
-          if (player.isCrouching) {
+          if (player.isSecondaryUseActive) {
             if (!level.isClientSide) {
               player match {
                 case srvPlr: ServerPlayer => MenuTypes.openTabletGui(srvPlr, Tablet.get(stack, player))
