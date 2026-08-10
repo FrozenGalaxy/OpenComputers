@@ -17,32 +17,39 @@ object TextBufferRenderCache {
 
   def render(stack: PoseStack, buffer: TextBufferRenderData): Unit = {
     RenderState.checkError(getClass.getName + ".render: entering")
-    renderDirect(stack, buffer)
+    renderDirect(stack, null, buffer)
     RenderState.checkError(getClass.getName + ".render: leaving")
   }
 
-  def renderImmediate(stack: PoseStack, _renderBuffer: MultiBufferSource, buffer: TextBufferRenderData): Unit = {
+  def renderImmediate(stack: PoseStack, renderBuffer: MultiBufferSource, buffer: TextBufferRenderData): Unit = {
     RenderState.checkError(getClass.getName + ".renderImmediate: entering")
-    renderDirect(stack, buffer)
+    renderDirect(stack, renderBuffer, buffer)
     RenderState.checkError(getClass.getName + ".renderImmediate: leaving")
   }
 
-  private def renderDirect(stack: PoseStack, buffer: TextBufferRenderData): Unit = {
+  private def renderDirect(stack: PoseStack,
+                           renderBuffer: MultiBufferSource,
+                           buffer: TextBufferRenderData): Unit = {
     for (line <- buffer.data.buffer) {
       renderer.generateChars(line)
     }
 
-    // Match the immediate-mode behavior of the working pre-1.13 renderer.
-    // The port's custom VBO cache loses render state in both GUI and block
-    // entity paths, leaving otherwise valid screen contents invisible.
-    val byteBuffer = new ByteBufferBuilder(786432)
-    try {
-      val source = MultiBufferSource.immediate(byteBuffer)
-      renderer.drawBuffer(stack, source, buffer.data, buffer.viewport._1, buffer.viewport._2)
-      source.endBatch()
-      buffer.dirty = false
+    if (renderBuffer == null) {
+        // Match the immediate-mode behavior of the working pre-1.13 renderer.
+        // The port's custom VBO cache loses render state in GUI paths, leaving
+        // otherwise valid screen contents invisible.
+      val byteBuffer = new ByteBufferBuilder(786432)
+      try {
+        val source = MultiBufferSource.immediate(byteBuffer)
+        renderer.drawBuffer(stack, source, buffer.data, buffer.viewport._1, buffer.viewport._2)
+        source.endBatch()
+      }
+      finally byteBuffer.close()
     }
-    finally byteBuffer.close()
+    else {
+      renderer.drawBuffer(stack, renderBuffer, buffer.data, buffer.viewport._1, buffer.viewport._2)
+    }
+    buffer.dirty = false
   }
 
 }
