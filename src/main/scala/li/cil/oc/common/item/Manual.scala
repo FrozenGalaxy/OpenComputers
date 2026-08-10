@@ -11,6 +11,7 @@ import net.neoforged.api.distmarker.OnlyIn
 import net.minecraft.world.level.Level
 import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResultHolder
 import net.minecraft.world.InteractionResult
 import net.minecraft.ChatFormatting
@@ -23,6 +24,10 @@ class Manual(props: Properties) extends Item(props) with traits.SimpleItem with 
     super.appendHoverText(stack, context, tooltip, flag)
     tooltip.add(Component.literal(ChatFormatting.DARK_GRAY.toString + "v" + OpenComputers.Version))
   }
+
+  @Deprecated
+  override def use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] =
+    use(player.getItemInHand(hand), level, player)
 
   override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
     if (level.isClientSide) {
