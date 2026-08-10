@@ -855,7 +855,7 @@ object PacketSender {
     }
   }
 
-  def sendTextBufferInit(address: String, value: CompoundTag, maxWidth: Int, maxHeight: Int, viewportWidth: Int, viewportHeight: Int, player: ServerPlayer): Unit = {
+  def sendTextBufferInit(address: String, value: CompoundTag, maxWidth: Int, maxHeight: Int, maxDepth: Int, viewportWidth: Int, viewportHeight: Int, player: ServerPlayer): Unit = {
     val pb = new CompressedPacketBuilder(PacketType.TextBufferInit)
 
     pb.writeUTF(address)
@@ -863,6 +863,7 @@ object PacketSender {
 
     pb.writeInt(maxWidth)
     pb.writeInt(maxHeight)
+    pb.writeInt(maxDepth)
     pb.writeInt(viewportWidth)
     pb.writeInt(viewportHeight)
 

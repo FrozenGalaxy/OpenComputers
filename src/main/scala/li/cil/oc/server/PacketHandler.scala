@@ -433,6 +433,7 @@ object PacketHandler extends CommonPacketHandler {
                 CompoundStorage.CODEC.encode(nbt, NbtOps.INSTANCE, new CompoundTag()).getOrThrow().asInstanceOf[CompoundTag],
                 buffer.getMaximumWidth,
                 buffer.getMaximumHeight,
+                buffer.getMaximumColorDepth.ordinal,
                 buffer.getViewportWidth,
                 buffer.getViewportHeight,
                 entity

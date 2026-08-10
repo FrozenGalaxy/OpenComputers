@@ -724,6 +724,9 @@ object PacketHandler extends CommonPacketHandler {
       case Some(buffer: li.cil.oc.common.component.TextBuffer) =>
         val nbt = CompoundStorage.CODEC.parse(NbtOps.INSTANCE, p.readNBT()).getOrThrow()
         buffer.setMaximumResolution(p.readInt(), p.readInt())
+        val depthValues = api.internal.TextBuffer.ColorDepth.values
+        val depth = p.readInt() min (depthValues.length - 1) max 0
+        buffer.setMaximumColorDepth(depthValues(depth))
         buffer.data.loadData(nbt)
         buffer.setViewport(p.readInt(), p.readInt())
         buffer.proxy.setChanged()
