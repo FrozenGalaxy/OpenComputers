@@ -74,11 +74,7 @@ object OCItems extends ItemAPI {
         case simple: SimpleBlock =>
           simple.setUnlocalizedName("oc." + id)
 
-          val ro: DeferredItem[Item] = ITEMS.register(id, () => {
-            val itemInst: Item = new common.block.Item(simple, itemProps)
-            OpenComputers.proxy.registerModel(itemInst, id)
-            itemInst
-          })
+          val ro: DeferredItem[Item] = ITEMS.register(id, () => new common.block.Item(simple, itemProps))
 
           descriptors += id -> new ItemInfo {
             override def name: String = id
@@ -106,11 +102,6 @@ object OCItems extends ItemAPI {
     // Construct items inside the supplier while the registry is writable.
     val ro: DeferredItem[T] = ITEMS.register(id, () => {
       val instance = makeItem
-      instance match {
-        case simple: SimpleItem =>
-          OpenComputers.proxy.registerModel(simple, id)
-        case _ =>
-      }
       names += instance -> id
       instance
     })

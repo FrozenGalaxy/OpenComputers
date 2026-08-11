@@ -6,14 +6,12 @@ import li.cil.oc.common.block.ChameliumBlock
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.init.{OCBlocks, OCItems}
 import li.cil.oc.util.{Color, ItemColorizer, ItemUtils}
-import net.minecraft.world.item.DyeColor
+import net.minecraft.util.FastColor
+import net.minecraft.world.item.{DyeColor, ItemStack}
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent
 
 object ColorHandler {
-  private def opaque(color: Int): Int =
-    0xFF000000 | (color & 0x00FFFFFF)
-
   @SubscribeEvent
   def onRegisterBlocks(event: RegisterColorHandlersEvent.Block): Unit = {
     event.register((state, world, pos, tintIndex) => state.getBlock match {
@@ -53,11 +51,11 @@ object ColorHandler {
   @SubscribeEvent
   def onRegisterItems(event: RegisterColorHandlersEvent.Item): Unit = {
     event.register((stack, tintIndex) =>
-      if (ItemColorizer.hasColor(stack)) opaque(ItemColorizer.getColor(stack)) else 0xFFFFFFFF,
+      if (ItemColorizer.hasColor(stack)) FastColor.ARGB32.opaque(ItemColorizer.getColor(stack)) else 0xFFFFFFFF,
       OCBlocks.Cable.get())
 
     event.register((stack, tintIndex) =>
-      opaque(Color.byTier(ItemUtils.caseTier(stack))),
+      FastColor.ARGB32.opaque(Color.byTier(ItemUtils.caseTier(stack))),
       OCBlocks.CaseTier1.get(),
       OCBlocks.CaseTier2.get(),
       OCBlocks.CaseTier3.get(),
@@ -65,7 +63,7 @@ object ColorHandler {
       OCBlocks.CaseCreative.get())
 
     event.register((stack, tintIndex) =>
-      opaque(Color.rgbValues(stack.getOrDefault(OCComponents.CHAMELIUM_COLOR.get(), ChameliumBlock.DEFAULT_COLOR))),
+      FastColor.ARGB32.opaque(Color.rgbValues(stack.getOrDefault(OCComponents.CHAMELIUM_COLOR.get(), ChameliumBlock.DEFAULT_COLOR))),
       OCBlocks.ChameliumBlock.get())
 
     event.register((stack, tintIndex) => 0xFFFFFFFF,
@@ -75,11 +73,14 @@ object ColorHandler {
       OCBlocks.Print.get(),
       OCBlocks.Robot.get())
 
-    event.register((stack, tintIndex) =>
-      if (tintIndex == 1) {
-        val rgb = if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else 0x66DD55
-        opaque(rgb)
-      } else 0xFFFFFFFF,
-      OCItems.HoverBoots.get())
+    event.register((stack, tintIndex) => tintIndex match {
+      case 1 => FastColor.ARGB32.opaque(if (ItemColorizer.hasColor(stack)) ItemColorizer.getColor(stack) else 0x66DD55)
+      case _ => 0xFFFFFFFF
+    }, OCItems.HoverBoots.get())
+
+    event.register((stack: ItemStack, tintIndex: Int) => tintIndex match {
+      case 1 => stack.getOrDefault(OCComponents.DISK_COLOR.get(), DyeColor.GRAY).getTextureDiffuseColor
+      case _ => 0xFFFFFFFF
+    }, OCItems.Floppy.get())
   }
 }
