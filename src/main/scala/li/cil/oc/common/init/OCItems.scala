@@ -176,7 +176,7 @@ object OCItems extends ItemAPI {
     stack.copy()
   }
 
-  private def createEEPROM(name: String, code: Array[Byte], data: Array[Byte], readonly: Boolean): ItemStack = {
+  def createEEPROM(name: String, code: Array[Byte], data: Array[Byte], readonly: Boolean): ItemStack = {
     val stack = get(Constants.ItemName.EEPROM).createItemStack(1)
     if (name != null) {
       stack.set(OCComponents.LABEL, name.trim.take(24))
@@ -572,6 +572,7 @@ object OCItems extends ItemAPI {
     event.accept(OCItems.createConfiguredTablet())
 
     Loot.disksForClient.foreach(event.accept)
+    Loot.eepromsForClient.foreach(event.accept)
     registeredItems.foreach(event.accept)
 
     if (hasRedstoneCardT2) {

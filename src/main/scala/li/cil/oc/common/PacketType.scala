@@ -105,5 +105,9 @@ object PacketType extends Enumeration {
   HoloScreenResize,
   RackKVMSelection,
 
+  LootDisksReset,
+  LootEEPROMsReset,
+  LootEEPROM,
+
   EndOfList = Value
 }
