@@ -1,5 +1,6 @@
 package li.cil.oc.common.init
 
+import codechicken.lib.gui.modular.lib.geometry.Position.Mutable
 import li.cil.oc.api.detail.{ItemAPI, ItemInfo}
 import li.cil.oc.api.fs.FileSystem
 import li.cil.oc.common.block.SimpleBlock
@@ -7,6 +8,7 @@ import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.item.data._
 import li.cil.oc.common.item.traits.SimpleItem
 import li.cil.oc.common.{Loot, Tier, item}
+import li.cil.oc.integration.opencomputers.ModOpenComputers
 import li.cil.oc.server.machine.luac.LuaStateFactory
 import li.cil.oc.util.{Rarity => OCRarity}
 import li.cil.oc.{Constants, OpenComputers, Settings, common}
@@ -549,7 +551,11 @@ object OCItems extends ItemAPI {
     import Constants.{BlockName => B, ItemName => I}
     // Assembled devices are not usable without their component data. Their
     // configured creative variants are added explicitly below.
-    val excluded = Set(B.Microcontroller, B.Print, B.Robot, I.Drone, I.Tablet)
+    val excluded = mutable.Set(B.Microcontroller, B.Print, B.Robot, I.Drone, I.Tablet)
+
+    if (!ModOpenComputers.hasRedstoneCardT2){
+      excluded += I.RedstoneCardTier2
+    }
 
     def accept(id: String, info: ItemInfo): Unit = {
       if (id != B.PowerConverter || !Settings.get.ignorePower) {
@@ -607,10 +613,6 @@ object OCItems extends ItemAPI {
     displayItems.accept(OCItems.createConfiguredRobot())
     displayItems.accept(OCItems.createConfiguredTablet())
 
-    /*if (hasRedstoneCardT2) {
-      descriptors.get(Constants.ItemName.RedstoneCardTier2).foreach { info =>
-        event.accept(info.createItemStack(1))
-      }
-    }*/
+
   }
 }
