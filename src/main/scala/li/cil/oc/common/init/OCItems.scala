@@ -168,19 +168,15 @@ object OCItems extends ItemAPI {
 
   // ----------------------------------------------------------------------- //
 
-  private val registeredItems: ArrayBuffer[ItemStack] = mutable.ArrayBuffer.empty[ItemStack]
-
   override def registerFloppy(name: String, loc: ResourceLocation, color: DyeColor, factory: Callable[FileSystem], doRecipeCycling: Boolean): ItemStack = {
     val stack = Loot.registerLootDisk(name, loc, color, factory, doRecipeCycling)
-
-    registeredItems += stack
-
+    OCItems.registerStack(stack, name)
     stack.copy()
   }
 
   override def registerEEPROM(name: String, code: Array[Byte], data: Array[Byte], readonly: Boolean): ItemStack = {
     val stack = createEEPROM(name, code, data, readonly)
-    registeredItems += stack
+    OCItems.registerStack(stack, name)
     stack.copy()
   }
 
@@ -597,11 +593,12 @@ object OCItems extends ItemAPI {
       SECTION_Y_VALUES.put(key, y)
       val rowCount = Math.ceil(itemCount / 9.0f).toInt
       y += rowCount + 1
-      if (key.equals(sectionKeys.last)) return
-      var padding = 9 - itemCount % 9
-      if (padding < 9) padding += 9
-      for (i <- 0 until padding) {
-        displayItems.accept(ItemStack.EMPTY)
+      if (!key.equals(sectionKeys.last)) {
+        var padding = 9 - itemCount % 9
+        if (padding < 9) padding += 9
+        for (i <- 0 until padding) {
+          displayItems.accept(ItemStack.EMPTY)
+        }
       }
     })
 
@@ -609,10 +606,6 @@ object OCItems extends ItemAPI {
     displayItems.accept(OCItems.createConfiguredMicrocontroller())
     displayItems.accept(OCItems.createConfiguredRobot())
     displayItems.accept(OCItems.createConfiguredTablet())
-
-    Loot.disksForClient.foreach(displayItems.accept)
-    Loot.eepromsForClient.foreach(displayItems.accept)
-    registeredItems.foreach(displayItems.accept)
 
     /*if (hasRedstoneCardT2) {
       descriptors.get(Constants.ItemName.RedstoneCardTier2).foreach { info =>

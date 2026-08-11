@@ -269,7 +269,7 @@ object Loot {
         val root = "opencomputers/eeproms/" + id.getPath
         val code = readEEPROMResource(json, "code", id, root, manager)
         val data = readEEPROMResource(json, "data", id, root, manager)
-        val stack = OCItems.createEEPROM(label, code.orNull, data.orNull, readonly)
+        val stack = OCItems.registerEEPROM(label, code.orNull, data.orNull, readonly)
         datapackEEPROMs += stack
         eepromsForServer += stack
         eepromsForClient += stack.copy()
@@ -332,12 +332,8 @@ object Loot {
     } else new Callable[FileSystem] {
       override def call(): FileSystem = api.FileSystem.fromResource(ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, "loot/" + path))
     }
-    val stack = registerLootDisk(path, ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, path), color.getOrElse(DyeColor.LIGHT_GRAY), callable, doRecipeCycling = true)
-    stack.set(DataComponents.CUSTOM_NAME, Component.literal(name))
-    if (!external) {
-      OCItems.registerStack(stack, path)
-      lootDiskDescriptorIds += path
-    }
+    val stack = OCItems.registerFloppy(path, ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, path), color.getOrElse(DyeColor.LIGHT_GRAY), callable, doRecipeCycling = true)
+    lootDiskDescriptorIds += path
     stack
   }
 }
