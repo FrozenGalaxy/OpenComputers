@@ -1,21 +1,21 @@
 package li.cil.oc.common.item.traits
 
 import com.mojang.blaze3d.vertex.PoseStack
-import li.cil.oc.{Settings, api}
+import li.cil.oc.api
 import li.cil.oc.api.event.RobotRenderEvent.MountPoint
 import li.cil.oc.api.internal.Robot
 import li.cil.oc.client.renderer.item.ItemUpgradeRenderer
 import li.cil.oc.common.blockentity
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.util.ExtendedDataComponentHolder.convert
-import li.cil.oc.util.{BlockPosition, ItemUtils, Tooltip}
+import li.cil.oc.util.{BlockPosition, Tooltip}
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.core.{BlockPos, Direction}
 import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item.TooltipContext
-import net.minecraft.world.item.{Item, ItemStack, TooltipFlag}
 import net.minecraft.world.item.context.UseOnContext
+import net.minecraft.world.item.{Item, ItemStack, TooltipFlag}
 import net.minecraft.world.level.{Level, LevelReader}
 import net.minecraft.world.{InteractionHand, InteractionResult, InteractionResultHolder}
 import net.neoforged.api.distmarker.{Dist, OnlyIn}

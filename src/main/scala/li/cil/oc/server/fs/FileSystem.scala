@@ -20,6 +20,7 @@ import net.minecraft.core.component.DataComponentHolder
 import net.minecraft.world.item.ItemStack
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.world.level.storage.LevelResource
 import net.neoforged.fml.loading.FMLLoader
 import net.neoforged.neoforge.common.MutableDataComponentHolder
@@ -112,6 +113,12 @@ object FileSystem extends api.detail.FileSystemAPI {
       }
     }
   }
+
+  def fromResource(manager: ResourceManager, loc: ResourceLocation): api.fs.FileSystem =
+    ResourceManagerFileSystem.fromResource(manager, loc)
+
+  def readResource(manager: ResourceManager, loc: ResourceLocation): Option[Array[Byte]] =
+    ResourceManagerFileSystem.readResource(manager, loc)
 
   override def fromSaveDirectory(root: String, capacity: Long, buffered: Boolean): Capacity = {
     val path = ServerLifecycleHooks.getCurrentServer.getWorldPath(new LevelResource(Settings.savePath + root)).toFile

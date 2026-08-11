@@ -87,8 +87,11 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.HologramScale => onHologramScale(p)
       case PacketType.HologramTranslation => onHologramPositionOffsetY(p)
       case PacketType.HologramValues => onHologramValues(p)
+      case PacketType.LootDisksReset => onLootDisksReset(p)
       case PacketType.LootDisk => onLootDisk(p)
       case PacketType.CyclingDisk => onCyclingDisk(p)
+      case PacketType.LootEEPROMsReset => onLootEEPROMsReset(p)
+      case PacketType.LootEEPROM => onLootEEPROM(p)
       case PacketType.NanomachinesConfiguration => onNanomachinesConfiguration(p)
       case PacketType.NanomachinesInputs => onNanomachinesInputs(p)
       case PacketType.NanomachinesPower => onNanomachinesPower(p)
@@ -422,6 +425,23 @@ object PacketHandler extends CommonPacketHandler {
       Loot.disksForClient += stack
       if (Mods.JustEnoughItems.isModAvailable) {
         li.cil.oc.integration.jei.ModJEI.addDiskAtRuntime(stack)
+      }
+    }
+  }
+
+  def onLootDisksReset(p: PacketParser): Unit = {
+    Loot.disksForClient.clear()
+    Loot.disksForCyclingClient.clear()
+  }
+
+  def onLootEEPROMsReset(p: PacketParser): Unit = Loot.eepromsForClient.clear()
+
+  def onLootEEPROM(p: PacketParser): Unit = {
+    val stack = p.readItemStack()
+    if (!stack.isEmpty && !Loot.eepromsForClient.exists(ItemStack.isSameItemSameComponents(_, stack))) {
+      Loot.eepromsForClient += stack
+      if (Mods.JustEnoughItems.isModAvailable) {
+        li.cil.oc.integration.jei.ModJEI.addItemAtRuntime(stack)
       }
     }
   }

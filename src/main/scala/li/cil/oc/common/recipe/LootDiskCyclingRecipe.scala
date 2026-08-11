@@ -18,10 +18,6 @@ import scala.collection.JavaConverters
 import scala.collection.immutable
 
 class LootDiskCyclingRecipe(val bookCategory: CraftingBookCategory) extends CraftingRecipe {
-  val ingredients = NonNullList.create[Ingredient]
-  ingredients.add(Ingredient.of(Loot.disksForCycling.toArray: _*))
-  ingredients.add(Ingredient.of(api.Items.get(Constants.ItemName.Wrench).createItemStack(1)))
-
   override def category(): CraftingBookCategory = bookCategory
 
   override def matches(crafting: CraftingInput, level: Level): Boolean = {
@@ -67,5 +63,10 @@ class LootDiskCyclingRecipe(val bookCategory: CraftingBookCategory) extends Craf
     result
   }
 
-  override def getIngredients = ingredients
+  override def getIngredients = {
+    val ingredients = NonNullList.create[Ingredient]
+    ingredients.add(Ingredient.of(Loot.disksForCycling.toArray: _*))
+    ingredients.add(Ingredient.of(api.Items.get(Constants.ItemName.Wrench).createItemStack(1)))
+    ingredients
+  }
 }

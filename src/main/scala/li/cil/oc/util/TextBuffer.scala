@@ -309,6 +309,10 @@ class TextBuffer(var width: Int, var height: Int, initialFormat: PackedColor.Col
       List.tabulate[String](height) { lineToString },
       new TextBufferContents.ShortArray(color)
     ))
+    // Palette formats keep their mutable palette outside TextBufferContents.
+    // Persist it alongside the buffer so palette reads remain available after
+    // a reload or a client synchronization snapshot.
+    _format.saveData(holder)
   }
 
   def lineToString(y: Int): String = {

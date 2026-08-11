@@ -184,7 +184,7 @@ object OCItems extends ItemAPI {
     stack.copy()
   }
 
-  private def createEEPROM(name: String, code: Array[Byte], data: Array[Byte], readonly: Boolean): ItemStack = {
+  def createEEPROM(name: String, code: Array[Byte], data: Array[Byte], readonly: Boolean): ItemStack = {
     val stack = get(Constants.ItemName.EEPROM).createItemStack(1)
     if (name != null) {
       stack.set(OCComponents.LABEL, name.trim.take(24))
@@ -480,33 +480,33 @@ object OCItems extends ItemAPI {
   /////////////////////////////////////////////////////////////////
   // Upgrade components.
   /////////////////////////////////////////////////////////////////
-  val AngelUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradeangel"), Constants.ItemName.AngelUpgrade, "80_upgrade")
-  val BatteryUpgradeTier1: DeferredItem[item.UpgradeBattery] = registerItem(new item.UpgradeBattery(defaultProps, Tier.One), Constants.ItemName.BatteryUpgradeTier1, "80_upgrade")
-  val BatteryUpgradeTier2: DeferredItem[item.UpgradeBattery] = registerItem(new item.UpgradeBattery(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.BatteryUpgradeTier2, "80_upgrade")
-  val BatteryUpgradeTier3: DeferredItem[item.UpgradeBattery] = registerItem(new item.UpgradeBattery(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.BatteryUpgradeTier3, "80_upgrade")
-  val ChunkloaderUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.RARE), "upgradechunkloader"), Constants.ItemName.ChunkloaderUpgrade, "80_upgrade")
-  val CardContainerTier1: DeferredItem[item.UpgradeContainerCard] = registerItem(new item.UpgradeContainerCard(defaultProps, Tier.One), Constants.ItemName.CardContainerTier1, "80_upgrade")
-  val CardContainerTier2: DeferredItem[item.UpgradeContainerCard] = registerItem(new item.UpgradeContainerCard(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.CardContainerTier2, "80_upgrade")
-  val CardContainerTier3: DeferredItem[item.UpgradeContainerCard] = registerItem(new item.UpgradeContainerCard(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.CardContainerTier3, "80_upgrade")
-  val UpgradeContainerTier1: DeferredItem[item.UpgradeContainerUpgrade] = registerItem(new item.UpgradeContainerUpgrade(defaultProps, Tier.One), Constants.ItemName.UpgradeContainerTier1, "80_upgrade")
-  val UpgradeContainerTier2: DeferredItem[item.UpgradeContainerUpgrade] = registerItem(new item.UpgradeContainerUpgrade(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.UpgradeContainerTier2, "80_upgrade")
-  val UpgradeContainerTier3: DeferredItem[item.UpgradeContainerUpgrade] = registerItem(new item.UpgradeContainerUpgrade(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.UpgradeContainerTier3, "80_upgrade")
-  val CraftingUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradecrafting"), Constants.ItemName.CraftingUpgrade, "80_upgrade")
-  val DatabaseUpgradeTier1: DeferredItem[item.UpgradeDatabase] = registerItem(new item.UpgradeDatabase(defaultProps, Tier.One), Constants.ItemName.DatabaseUpgradeTier1, "80_upgrade")
-  val DatabaseUpgradeTier2: DeferredItem[item.UpgradeDatabase] = registerItem(new item.UpgradeDatabase(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.DatabaseUpgradeTier2, "80_upgrade")
-  val DatabaseUpgradeTier3: DeferredItem[item.UpgradeDatabase] = registerItem(new item.UpgradeDatabase(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.DatabaseUpgradeTier3, "80_upgrade")
-  val ExperienceUpgrade: DeferredItem[item.UpgradeExperience] = registerItem(new item.UpgradeExperience(defaultProps.rarity(Rarity.RARE)), Constants.ItemName.ExperienceUpgrade, "80_upgrade")
-  val GeneratorUpgrade: DeferredItem[item.UpgradeGenerator] = registerItem(new item.UpgradeGenerator(defaultProps.rarity(Rarity.UNCOMMON)), Constants.ItemName.GeneratorUpgrade, "80_upgrade")
-  val InventoryUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps, "upgradeinventory"), Constants.ItemName.InventoryUpgrade, "80_upgrade")
-  val InventoryControllerUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradeinventorycontroller"), Constants.ItemName.InventoryControllerUpgrade, "80_upgrade")
-  val NavigationUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradenavigation"), Constants.ItemName.NavigationUpgrade, "80_upgrade")
-  val PistonUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradepiston"), Constants.ItemName.PistonUpgrade, "80_upgrade")
-  val SignUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradesign"), Constants.ItemName.SignUpgrade, "80_upgrade")
-  val SolarGeneratorUpgrade: DeferredItem[item.UpgradeSolarGenerator] = registerItem(new item.UpgradeSolarGenerator(defaultProps.rarity(Rarity.UNCOMMON)), Constants.ItemName.SolarGeneratorUpgrade, "80_upgrade")
-  val TankUpgrade: DeferredItem[item.UpgradeTank] = registerItem(new item.UpgradeTank(defaultProps), Constants.ItemName.TankUpgrade, "80_upgrade")
-  val TankControllerUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradetankcontroller"), Constants.ItemName.TankControllerUpgrade, "80_upgrade")
-  val TractorBeamUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.RARE), "upgradetractorbeam"), Constants.ItemName.TractorBeamUpgrade, "80_upgrade")
-  val LeashUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps, "upgradeleash"), Constants.ItemName.LeashUpgrade, "80_upgrade")
+  val AngelUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradeangel"), Constants.ItemName.AngelUpgrade, "25_components")
+  val BatteryUpgradeTier1: DeferredItem[item.UpgradeBattery] = registerItem(new item.UpgradeBattery(defaultProps, Tier.One), Constants.ItemName.BatteryUpgradeTier1, "25_components")
+  val BatteryUpgradeTier2: DeferredItem[item.UpgradeBattery] = registerItem(new item.UpgradeBattery(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.BatteryUpgradeTier2, "25_components")
+  val BatteryUpgradeTier3: DeferredItem[item.UpgradeBattery] = registerItem(new item.UpgradeBattery(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.BatteryUpgradeTier3, "25_components")
+  val ChunkloaderUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.RARE), "upgradechunkloader"), Constants.ItemName.ChunkloaderUpgrade, "25_components")
+  val CardContainerTier1: DeferredItem[item.UpgradeContainerCard] = registerItem(new item.UpgradeContainerCard(defaultProps, Tier.One), Constants.ItemName.CardContainerTier1, "25_components")
+  val CardContainerTier2: DeferredItem[item.UpgradeContainerCard] = registerItem(new item.UpgradeContainerCard(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.CardContainerTier2, "25_components")
+  val CardContainerTier3: DeferredItem[item.UpgradeContainerCard] = registerItem(new item.UpgradeContainerCard(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.CardContainerTier3, "25_components")
+  val UpgradeContainerTier1: DeferredItem[item.UpgradeContainerUpgrade] = registerItem(new item.UpgradeContainerUpgrade(defaultProps, Tier.One), Constants.ItemName.UpgradeContainerTier1, "25_components")
+  val UpgradeContainerTier2: DeferredItem[item.UpgradeContainerUpgrade] = registerItem(new item.UpgradeContainerUpgrade(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.UpgradeContainerTier2, "25_components")
+  val UpgradeContainerTier3: DeferredItem[item.UpgradeContainerUpgrade] = registerItem(new item.UpgradeContainerUpgrade(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.UpgradeContainerTier3, "25_components")
+  val CraftingUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradecrafting"), Constants.ItemName.CraftingUpgrade, "25_components")
+  val DatabaseUpgradeTier1: DeferredItem[item.UpgradeDatabase] = registerItem(new item.UpgradeDatabase(defaultProps, Tier.One), Constants.ItemName.DatabaseUpgradeTier1, "25_components")
+  val DatabaseUpgradeTier2: DeferredItem[item.UpgradeDatabase] = registerItem(new item.UpgradeDatabase(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.DatabaseUpgradeTier2, "25_components")
+  val DatabaseUpgradeTier3: DeferredItem[item.UpgradeDatabase] = registerItem(new item.UpgradeDatabase(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.DatabaseUpgradeTier3, "25_components")
+  val ExperienceUpgrade: DeferredItem[item.UpgradeExperience] = registerItem(new item.UpgradeExperience(defaultProps.rarity(Rarity.RARE)), Constants.ItemName.ExperienceUpgrade, "25_components")
+  val GeneratorUpgrade: DeferredItem[item.UpgradeGenerator] = registerItem(new item.UpgradeGenerator(defaultProps.rarity(Rarity.UNCOMMON)), Constants.ItemName.GeneratorUpgrade, "25_components")
+  val InventoryUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps, "upgradeinventory"), Constants.ItemName.InventoryUpgrade, "25_components")
+  val InventoryControllerUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradeinventorycontroller"), Constants.ItemName.InventoryControllerUpgrade, "25_components")
+  val NavigationUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradenavigation"), Constants.ItemName.NavigationUpgrade, "25_components")
+  val PistonUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradepiston"), Constants.ItemName.PistonUpgrade, "25_components")
+  val SignUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradesign"), Constants.ItemName.SignUpgrade, "25_components")
+  val SolarGeneratorUpgrade: DeferredItem[item.UpgradeSolarGenerator] = registerItem(new item.UpgradeSolarGenerator(defaultProps.rarity(Rarity.UNCOMMON)), Constants.ItemName.SolarGeneratorUpgrade, "25_components")
+  val TankUpgrade: DeferredItem[item.UpgradeTank] = registerItem(new item.UpgradeTank(defaultProps), Constants.ItemName.TankUpgrade, "25_components")
+  val TankControllerUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.UNCOMMON), "upgradetankcontroller"), Constants.ItemName.TankControllerUpgrade, "25_components")
+  val TractorBeamUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps.rarity(Rarity.RARE), "upgradetractorbeam"), Constants.ItemName.TractorBeamUpgrade, "25_components")
+  val LeashUpgrade: DeferredItem[Item] = registerItem(new item.BasicTieredItem(defaultProps, "upgradeleash"), Constants.ItemName.LeashUpgrade, "25_components")
 
   // 1.5.8
   val HoverUpgradeTier1: DeferredItem[item.UpgradeHover] = registerItem(new item.UpgradeHover(defaultProps, Tier.One), Constants.ItemName.HoverUpgradeTier1, "80_upgrade")
@@ -611,6 +611,7 @@ object OCItems extends ItemAPI {
     displayItems.accept(OCItems.createConfiguredTablet())
 
     Loot.disksForClient.foreach(displayItems.accept)
+    Loot.eepromsForClient.foreach(displayItems.accept)
     registeredItems.foreach(displayItems.accept)
 
     /*if (hasRedstoneCardT2) {

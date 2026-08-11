@@ -3,6 +3,7 @@ package li.cil.oc.common
 import java.io
 import java.util.Random
 import java.util.concurrent.Callable
+import com.google.gson.{GsonBuilder, JsonElement}
 import li.cil.oc.Constants
 import li.cil.oc.OpenComputers
 import li.cil.oc.Settings
@@ -10,6 +11,7 @@ import li.cil.oc.api
 import li.cil.oc.api.fs.FileSystem
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.init.OCItems
+import li.cil.oc.server.fs.{FileSystem => ServerFileSystem}
 import li.cil.oc.util.Color
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.item.DyeColor
@@ -17,6 +19,10 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.event.AddReloadListenerEvent
+import net.neoforged.neoforge.server.ServerLifecycleHooks
+import net.minecraft.server.packs.resources.{ResourceManager, SimpleJsonResourceReloadListener}
+import net.minecraft.util.profiling.ProfilerFiller
 
 import scala.collection.mutable
 import net.minecraft.server.level.ServerLevel
@@ -53,6 +59,15 @@ object Loot {
 
   val disksForClient = mutable.ArrayBuffer.empty[ItemStack]
 
+  val eepromsForServer = mutable.ArrayBuffer.empty[ItemStack]
+  val eepromsForClient = mutable.ArrayBuffer.empty[ItemStack]
+
+  private val datapackDisks = mutable.ArrayBuffer.empty[(ItemStack, Int)]
+  private val datapackCyclingDisks = mutable.ArrayBuffer.empty[ItemStack]
+  private val datapackEEPROMs = mutable.ArrayBuffer.empty[ItemStack]
+  private val datapackFactories = mutable.Map.empty[ResourceLocation, Callable[FileSystem]]
+  private val datapackPreviousFactories = mutable.Map.empty[ResourceLocation, Option[Callable[FileSystem]]]
+
   // IDs registered into Items.descriptors via Items.registerStack for loot disks
   // (see createLootDisk below). decorateCreativeTab must skip these when iterating
   // descriptors, since the same stacks are already added via disksForClient — iterating
@@ -77,7 +92,7 @@ object Loot {
 
     Loot.factories += loc -> factory
 
-    if(doRecipeCycling) {
+    if (doRecipeCycling && !disksForCyclingServer.exists(_.get(OCComponents.LOOT_DISK.get()) == loc)) {
       Loot.disksForCyclingServer += stack
     }
 
@@ -94,36 +109,198 @@ object Loot {
   }
 
   @SubscribeEvent
+  def addReloadListener(e: AddReloadListenerEvent): Unit = {
+    e.addListener(new SimpleJsonResourceReloadListener(new GsonBuilder().create(), "opencomputers/loot_disks") {
+      override protected def apply(definitions: java.util.Map[ResourceLocation, JsonElement], manager: ResourceManager, profiler: ProfilerFiller): Unit = {
+        applyDatapackDisks(definitions, manager)
+      }
+    })
+    e.addListener(new SimpleJsonResourceReloadListener(new GsonBuilder().create(), "opencomputers/eeproms") {
+      override protected def apply(definitions: java.util.Map[ResourceLocation, JsonElement], manager: ResourceManager, profiler: ProfilerFiller): Unit = {
+        applyDatapackEEPROMs(definitions, manager)
+      }
+    })
+  }
+
+  @SubscribeEvent
   def initForWorld(e: LevelEvent.Load): Unit = e.getLevel match {
     case world: ServerLevel if world.dimension == Level.OVERWORLD => {
-      worldDisks.clear()
-      disksForSampling.clear()
-      val path = world.getServer.getWorldPath(new LevelResource(Settings.savePath)).toFile
-      if (path.exists && path.isDirectory) {
-        val listFile = new io.File(path, "loot/loot.properties")
-        if (listFile.exists && listFile.isFile) {
+      refreshWorldDisks(world.getServer)
+    }
+    case _ =>
+  }
+
+  private def refreshWorldDisks(server: net.minecraft.server.MinecraftServer): Unit = {
+    worldDisks.clear()
+    disksForSampling.clear()
+
+    val path = server.getWorldPath(new LevelResource(Settings.savePath)).toFile
+    if (path.exists && path.isDirectory) {
+      val listFile = new io.File(path, "loot/loot.properties")
+      if (listFile.exists && listFile.isFile) {
+        try {
+          val listStream = new io.FileInputStream(listFile)
           try {
-            val listStream = new io.FileInputStream(listFile)
             val list = new java.util.Properties()
             list.load(listStream)
-            listStream.close()
             parseLootDisks(list, worldDisks, external = true)
           }
-          catch {
-            case t: Throwable => OpenComputers.log.warn("Failed opening loot descriptor file in saves folder.")
-          }
+          finally listStream.close()
         }
-      }
-      for (entry <- globalDisks if !worldDisks.contains(entry)) {
-        worldDisks += entry
-      }
-      for ((stack, count) <- worldDisks) {
-        for (i <- 0 until count) {
-          disksForSampling += stack
+        catch {
+          case t: Throwable => OpenComputers.log.warn("Failed opening loot descriptor file in saves folder.", t)
         }
       }
     }
-    case _ =>
+
+    for (entry <- globalDisks ++ datapackDisks if !worldDisks.exists(existing => sameLootDisk(existing._1, entry._1))) {
+      worldDisks += entry
+    }
+    for ((stack, count) <- worldDisks if count > 0) {
+      for (_ <- 0 until count) disksForSampling += stack
+    }
+  }
+
+  private def refreshAndSyncWorldDisks(): Unit = {
+    Option(ServerLifecycleHooks.getCurrentServer).foreach { server =>
+      refreshWorldDisks(server)
+      for (player <- server.getPlayerList.getPlayers.asScala) {
+        li.cil.oc.server.PacketSender.sendLootDisks(player)
+      }
+    }
+  }
+
+  private def sameLootDisk(left: ItemStack, right: ItemStack): Boolean =
+    left.get(OCComponents.LOOT_DISK.get()) == right.get(OCComponents.LOOT_DISK.get())
+
+  private def applyDatapackDisks(definitions: java.util.Map[ResourceLocation, JsonElement], manager: ResourceManager): Unit = synchronized {
+    clearDatapackDisks()
+
+    definitions.asScala.toSeq.sortBy(_._1.toString).foreach { case (id, element) =>
+      try {
+        val json = if (element.isJsonObject) element.getAsJsonObject else throw new IllegalArgumentException("definition must be a JSON object")
+        val label = json.get("label") match {
+          case null => id.getPath
+          case value if value.isJsonPrimitive => value.getAsString
+          case _ => throw new IllegalArgumentException("label must be a string")
+        }
+        val color = json.get("color") match {
+          case null => DyeColor.LIGHT_GRAY
+          case value if value.isJsonPrimitive =>
+            val name = value.getAsString.toLowerCase(java.util.Locale.ROOT)
+            Color.byName.getOrElse(name, throw new IllegalArgumentException("unknown color '" + name + "'"))
+          case _ => throw new IllegalArgumentException("color must be a dye color name")
+        }
+        val weight = json.get("weight") match {
+          case null => 1
+          case value if value.isJsonPrimitive && value.getAsJsonPrimitive.isNumber => value.getAsInt
+          case _ => throw new IllegalArgumentException("weight must be an integer")
+        }
+        if (weight < 0) throw new IllegalArgumentException("weight must not be negative")
+        val recipeCycling = json.get("recipe_cycling") match {
+          case null => true
+          case value if value.isJsonPrimitive && value.getAsJsonPrimitive.isBoolean => value.getAsBoolean
+          case _ => throw new IllegalArgumentException("recipe_cycling must be a boolean")
+        }
+        val contents = ResourceLocation.fromNamespaceAndPath(id.getNamespace, "opencomputers/loot_disks/" + id.getPath)
+        val filesystem = ServerFileSystem.fromResource(manager, contents)
+        if (filesystem == null) throw new IllegalArgumentException("no filesystem resources found below " + contents)
+
+        val factory = new Callable[FileSystem] {
+          override def call(): FileSystem = filesystem
+        }
+        datapackPreviousFactories.getOrElseUpdate(id, factories.get(id))
+        datapackFactories += id -> factory
+        val hadCyclingDisk = disksForCyclingServer.exists(_.get(OCComponents.LOOT_DISK.get()) == id)
+        val stack = registerLootDisk(label, id, color, factory, recipeCycling)
+        datapackDisks += ((stack, weight))
+        if (recipeCycling && !hadCyclingDisk) datapackCyclingDisks += stack
+      }
+      catch {
+        case t: Throwable => OpenComputers.log.warn(s"Skipping bad loot disk definition '$id'.", t)
+      }
+    }
+
+    refreshAndSyncWorldDisks()
+  }
+
+  private def clearDatapackDisks(): Unit = {
+    for ((stack, _) <- datapackDisks) {
+      worldDisks --= worldDisks.filter(entry => sameLootDisk(entry._1, stack))
+      disksForSampling --= disksForSampling.filter(existing => sameLootDisk(existing, stack))
+    }
+    disksForCyclingServer --= disksForCyclingServer.filter(existing =>
+      datapackCyclingDisks.exists(added => ItemStack.isSameItemSameComponents(existing, added)))
+
+    for ((id, factory) <- datapackFactories) {
+      if (factories.get(id).exists(_ eq factory)) {
+        datapackPreviousFactories.get(id).flatten match {
+          case Some(previous) => factories += id -> previous
+          case _ => factories -= id
+        }
+      }
+    }
+    datapackDisks.clear()
+    datapackCyclingDisks.clear()
+    datapackFactories.clear()
+    datapackPreviousFactories.clear()
+  }
+
+  private def applyDatapackEEPROMs(definitions: java.util.Map[ResourceLocation, JsonElement], manager: ResourceManager): Unit = synchronized {
+    eepromsForServer --= eepromsForServer.filter(existing =>
+      datapackEEPROMs.exists(previous => ItemStack.isSameItemSameComponents(existing, previous)))
+    eepromsForClient --= eepromsForClient.filter(existing =>
+      datapackEEPROMs.exists(previous => ItemStack.isSameItemSameComponents(existing, previous)))
+    datapackEEPROMs.clear()
+
+    definitions.asScala.toSeq.sortBy(_._1.toString).foreach { case (id, element) =>
+      try {
+        val json = if (element.isJsonObject) element.getAsJsonObject else throw new IllegalArgumentException("definition must be a JSON object")
+        val label = json.get("label") match {
+          case null => id.getPath
+          case value if value.isJsonPrimitive => value.getAsString
+          case _ => throw new IllegalArgumentException("label must be a string")
+        }
+        val readonly = json.get("readonly") match {
+          case null => false
+          case value if value.isJsonPrimitive && value.getAsJsonPrimitive.isBoolean => value.getAsBoolean
+          case _ => throw new IllegalArgumentException("readonly must be a boolean")
+        }
+        val root = "opencomputers/eeproms/" + id.getPath
+        val code = readEEPROMResource(json, "code", id, root, manager)
+        val data = readEEPROMResource(json, "data", id, root, manager)
+        val stack = OCItems.createEEPROM(label, code.orNull, data.orNull, readonly)
+        datapackEEPROMs += stack
+        eepromsForServer += stack
+        eepromsForClient += stack.copy()
+      }
+      catch {
+        case t: Throwable => OpenComputers.log.warn(s"Skipping bad EEPROM loot definition '$id'.", t)
+      }
+    }
+
+    Option(ServerLifecycleHooks.getCurrentServer).foreach { server =>
+      for (player <- server.getPlayerList.getPlayers.asScala) {
+        li.cil.oc.server.PacketSender.sendLootEEPROMs(player)
+      }
+    }
+  }
+
+  private def readEEPROMResource(json: com.google.gson.JsonObject, field: String, id: ResourceLocation, root: String, manager: ResourceManager): Option[Array[Byte]] = {
+    json.get(field) match {
+      case null => None
+      case value if value.isJsonPrimitive =>
+        val path = value.getAsString
+        if (path.isEmpty || path.startsWith("/") || path.contains("..") || path.contains(":")) {
+          throw new IllegalArgumentException(field + " must be a relative resource path")
+        }
+        val location = ResourceLocation.fromNamespaceAndPath(id.getNamespace, root + "/" + path)
+        ServerFileSystem.readResource(manager, location) match {
+          case Some(bytes) => Some(bytes)
+          case _ => throw new IllegalArgumentException("missing " + field + " resource " + location)
+        }
+      case _ => throw new IllegalArgumentException(field + " must be a resource path string")
+    }
   }
 
   private def parseLootDisks(list: java.util.Properties, acc: mutable.ArrayBuffer[(ItemStack, Int)], external: Boolean): Unit = {

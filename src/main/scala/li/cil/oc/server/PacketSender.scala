@@ -421,6 +421,9 @@ object PacketSender {
 
   def sendLootDisks(p: ServerPlayer): Unit = {
     // Sending as separate packets, because NbtIo hiccups otherwise...
+    val reset = new SimplePacketBuilder(PacketType.LootDisksReset)
+    reset.sendToPlayer(p)
+
     val stacks = Loot.worldDisks.map(_._1)
     for (stack <- stacks) {
       val pb = new SimplePacketBuilder(PacketType.LootDisk)
@@ -434,6 +437,17 @@ object PacketSender {
 
       pb.writeItemStack(stack, p.server.registryAccess())
 
+      pb.sendToPlayer(p)
+    }
+  }
+
+  def sendLootEEPROMs(p: ServerPlayer): Unit = {
+    val reset = new SimplePacketBuilder(PacketType.LootEEPROMsReset)
+    reset.sendToPlayer(p)
+
+    for (stack <- Loot.eepromsForServer) {
+      val pb = new SimplePacketBuilder(PacketType.LootEEPROM)
+      pb.writeItemStack(stack, p.server.registryAccess())
       pb.sendToPlayer(p)
     }
   }

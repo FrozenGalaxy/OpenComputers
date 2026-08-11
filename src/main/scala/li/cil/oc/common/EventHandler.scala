@@ -179,6 +179,7 @@ object EventHandler {
         EventHandler.scheduleServer(() => {
           ServerPacketSender.sendPetVisibility(None, Some(player))
           ServerPacketSender.sendLootDisks(player)
+          ServerPacketSender.sendLootEEPROMs(player)
         })
         // Do update check in local games and for OPs.
         val server = ServerLifecycleHooks.getCurrentServer
@@ -203,6 +204,7 @@ object EventHandler {
     Loot.disksForClient ++= Loot.globalDisks.map(_._1.copy())
     Loot.disksForCyclingClient.clear()
     Loot.disksForCyclingClient ++= Loot.disksForCyclingServer.map(_.copy())
+    Loot.eepromsForClient.clear()
 
     client.Sound.stopAll()
   }
