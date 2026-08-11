@@ -24,8 +24,8 @@ def githubTag = System.getenv('GITHUB_REF_TYPE') == 'tag'
 // Jenkins provides BUILD_NUMBER; GitHub Actions provides GITHUB_RUN_NUMBER.
 def ciBuildNumber = findProperty('build_number') ?:
         System.getenv('BUILD_NUMBER') ?:
-        System.getenv('GITHUB_RUN_NUMBER') ?:
-        'local'
+                System.getenv('GITHUB_RUN_NUMBER') ?:
+                        'local'
 
 version = githubTag ?: "${mod_version}-dev.${ciBuildNumber}"
 
@@ -45,15 +45,6 @@ configurations {
     implementation.extendsFrom embedded
 }
 
-sourceSets {
-    register("data") {
-        def main = sourceSets.main
-        it.compileClasspath += main.compileClasspath
-        it.runtimeClasspath += main.runtimeClasspath
-        project.dependencies.add(it.implementationConfigurationName, main.output)
-    }
-}
-
 neoForge {
     version = project.neoforge_version
 
@@ -67,22 +58,16 @@ neoForge {
     }
 
     mods {
-        register("opencomputers") {
+        opencomputers {
             sourceSet sourceSets.main
         }
-
-        register("opencomputersData") {
-            sourceSet sourceSets.main
-            sourceSet sourceSets.data
-        }
-
     }
 
     runs {
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
-            loadedMods = [mods.opencomputers]
+
         }
 
         client {
@@ -107,19 +92,14 @@ neoForge {
         data {
             data()
 
-            loadedMods = [mods.opencomputersData]
-            programArguments.addAll(
-                '--mod', project.mod_id,
-                '--all',
-                '--output', file('src/main/generatedResources/').getAbsolutePath(),
-                '--existing', file('src/main/resources/').getAbsolutePath()
-            )
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/data/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
         }
     }
 }
 
+sourceSets.main.scala { srcDir 'src/data/scala' }
 sourceSets.main.resources {
-    srcDir 'src/main/generatedResources'
+    srcDir 'src/data/resources'
     exclude '.cache/**'
 }
 
@@ -246,11 +226,6 @@ dependencies {
     // Create
     implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
     implementation("net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}")
-    // Create's MovementBehaviour API exposes Registrate's NonNullConsumer in
-    // a method signature. Keep it available while compiling the optional OC
-    // Create bridge as well as at dev-runtime.
-    compileOnly("com.tterrag.registrate:Registrate:${registrate_version}")
-    compileOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("com.tterrag.registrate:Registrate:${registrate_version}")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
@@ -291,6 +266,16 @@ publishing {
             groupId = mod_group_id
             artifactId = mod_id
             version = project.version
+
+            artifact(tasks.named("jar")) {
+                classifier = null
+            }
+            artifact(tasks.named("apiJar")) {
+                classifier = 'api'
+            }
+            artifact(tasks.named("apiSourcesJar")) {
+                classifier = 'sources'
+            }
         }
     }
 
@@ -301,30 +286,6 @@ publishing {
             credentials {
                 username = findProperty("maven_user")
                 password = findProperty("maven_password")
-            }
-        }
-    }
-}
-
-afterEvaluate {
-    publishing {
-        publications {
-            mavenJava(MavenPublication) {
-                artifact(provider {
-                    tasks.named("jar").get().outputs.files.singleFile
-                }) {
-                    builtBy tasks.named("jar")
-                    classifier = null
-                    extension = "jar"
-                }
-                artifact(tasks.named("apiJar")) {
-                    classifier = 'api'
-                    extension = "jar"
-                }
-                artifact(tasks.named("apiSourcesJar")) {
-                    classifier = 'sources'
-                    extension = "jar"
-                }
             }
         }
     }
