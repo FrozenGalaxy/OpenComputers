@@ -52,7 +52,7 @@ class Proxy(val modBus: IEventBus) {
     if (LuaStateFactory.includeLuaJ) {
       api.Machine.add(classOf[LuaJLuaArchitecture])
     }
-    
+
     api.Machine.LuaArchitecture =
       if (Settings.get.forceLuaJ) classOf[LuaJLuaArchitecture]
       else api.Machine.architectures.asScala.head
@@ -70,10 +70,6 @@ class Proxy(val modBus: IEventBus) {
       api.API.isPowerEnabled = !Settings.get.ignorePower
     }): Runnable)
   }
-
-  def registerModel(instance: Item, id: String): Unit = {}
-
-  def registerModel(instance: Block, id: String): Unit = {}
 
   def registerPacket(event: RegisterPayloadHandlersEvent): Unit = {
     val registrar: PayloadRegistrar = event.registrar(OpenComputers.ID).versioned("1")
