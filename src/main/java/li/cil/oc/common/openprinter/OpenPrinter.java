@@ -46,6 +46,8 @@ import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.function.Consumer;
+
 /**
  * OpenPrinter, integrated directly into OpenComputers.
  *
@@ -164,16 +166,16 @@ public final class OpenPrinter {
         }
     }
 
-    public static void addCreativeItems(BuildCreativeModeTabContentsEvent event) {
-        event.accept(PRINTER.get());
-        event.accept(SHREDDER.get());
-        event.accept(FILE_CABINET.get());
-        event.accept(BRIEFCASE.get());
-        event.accept(PRINTED_PAGE.get());
-        event.accept(BLACK_INK.get());
-        event.accept(COLOR_INK.get());
-        event.accept(PAPER_SHREDS.get());
-        event.accept(FOLDER.get());
+    public static void addCreativeItems(Consumer<ItemStack> event) {
+        event.accept(PRINTER.toStack());
+        event.accept(SHREDDER.toStack());
+        event.accept(FILE_CABINET.toStack());
+        event.accept(BRIEFCASE.toStack());
+        event.accept(PRINTED_PAGE.toStack());
+        event.accept(BLACK_INK.toStack());
+        event.accept(COLOR_INK.toStack());
+        event.accept(PAPER_SHREDS.toStack());
+        event.accept(FOLDER.toStack());
         // The tools disk is registered through OpenComputers' public floppy API,
         // which already adds it to the OpenComputers creative tab.
     }

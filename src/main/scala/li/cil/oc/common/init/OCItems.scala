@@ -7,6 +7,7 @@ import li.cil.oc.common.block.SimpleBlock
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.item.data._
 import li.cil.oc.common.item.traits.SimpleItem
+import li.cil.oc.common.openprinter.OpenPrinter
 import li.cil.oc.common.{Loot, Tier, item}
 import li.cil.oc.integration.opencomputers.ModOpenComputers
 import li.cil.oc.server.machine.luac.LuaStateFactory
@@ -557,16 +558,6 @@ object OCItems extends ItemAPI {
       excluded += I.RedstoneCardTier2
     }
 
-    def accept(id: String, info: ItemInfo): Unit = {
-      if (id != B.PowerConverter || !Settings.get.ignorePower) {
-        val stack = info.createItemStack(1)
-        if (!stack.isEmpty) {
-          displayItems.accept(stack);
-          searchItems.accept(stack);
-        }
-      }
-    }
-
     val sectionMap = new util.HashMap[String, util.List[ItemStack]]
     for ((id, info) <- descriptors if !excluded.contains(id)){
       val sectionId = ITEM_TO_SECTION.get(id)
@@ -613,6 +604,8 @@ object OCItems extends ItemAPI {
     displayItems.accept(OCItems.createConfiguredRobot())
     displayItems.accept(OCItems.createConfiguredTablet())
 
+    //TODO: revove this line
+    OpenPrinter.addCreativeItems(displayItems)
 
   }
 }
