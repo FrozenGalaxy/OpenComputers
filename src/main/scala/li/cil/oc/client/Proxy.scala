@@ -6,15 +6,13 @@ import li.cil.oc.client.renderer._
 import li.cil.oc.client.renderer.block.{ModelInitialization, NetSplitterModel}
 import li.cil.oc.client.renderer.entity.{DroneRenderer, ModelQuadcopter, TrainRobotRenderer}
 import li.cil.oc.client.renderer.tileentity._
+import li.cil.oc.common.{PacketHandler => CommonPacketHandler, Proxy => CommonProxy}
 import li.cil.oc.common.blockentity.BlockEntityTypes
 import li.cil.oc.common.component.TextBuffer
 import li.cil.oc.common.entity.EntityTypes
 import li.cil.oc.common.event.{NanomachinesHandler, RackMountableRenderHandler}
-import li.cil.oc.common.{PacketHandler => CommonPacketHandler, Proxy => CommonProxy}
 import li.cil.oc.util.Audio
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderers
-import net.minecraft.world.item.Item
-import net.minecraft.world.level.block.Block
 import net.neoforged.bus.api.{IEventBus, SubscribeEvent}
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent
 import net.neoforged.neoforge.client.event.{EntityRenderersEvent, RegisterKeyMappingsEvent}
@@ -39,23 +37,18 @@ private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
 
     CommonPacketHandler.clientHandler = PacketHandler
 
-    e.enqueueWork((() => {
-      ModelInitialization.preInit()
-
-      NeoForge.EVENT_BUS.register(HighlightRenderer)
-      NeoForge.EVENT_BUS.register(NanomachinesHandler.Client)
-      NeoForge.EVENT_BUS.register(PetRenderer)
-      NeoForge.EVENT_BUS.register(RackMountableRenderHandler)
-      NeoForge.EVENT_BUS.register(Sound)
-      NeoForge.EVENT_BUS.register(TextBuffer)
-      NeoForge.EVENT_BUS.register(MFUTargetRenderer)
-      NeoForge.EVENT_BUS.register(WirelessNetworkDebugRenderer)
-      NeoForge.EVENT_BUS.register(Audio)
-      NeoForge.EVENT_BUS.register(HologramRenderer)
-      NeoForge.EVENT_BUS.register(ScreenRenderer)
-      NeoForge.EVENT_BUS.register(TabletRenderer)
-    }): Runnable)
-
+    NeoForge.EVENT_BUS.register(HighlightRenderer)
+    NeoForge.EVENT_BUS.register(NanomachinesHandler.Client)
+    NeoForge.EVENT_BUS.register(PetRenderer)
+    NeoForge.EVENT_BUS.register(RackMountableRenderHandler)
+    NeoForge.EVENT_BUS.register(Sound)
+    NeoForge.EVENT_BUS.register(TextBuffer)
+    NeoForge.EVENT_BUS.register(MFUTargetRenderer)
+    NeoForge.EVENT_BUS.register(WirelessNetworkDebugRenderer)
+    NeoForge.EVENT_BUS.register(Audio)
+    NeoForge.EVENT_BUS.register(HologramRenderer)
+    NeoForge.EVENT_BUS.register(ScreenRenderer)
+    NeoForge.EVENT_BUS.register(TabletRenderer)
   }
 
   @SubscribeEvent
@@ -99,8 +92,4 @@ private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
   def onRegisterPayloads(event: RegisterPayloadHandlersEvent): Unit = {
     registerPacket(event)
   }
-
-  override def registerModel(instance: Item, id: String): Unit = ModelInitialization.registerModel(instance, id)
-
-  override def registerModel(instance: Block, id: String): Unit = ModelInitialization.registerModel(instance, id)
 }

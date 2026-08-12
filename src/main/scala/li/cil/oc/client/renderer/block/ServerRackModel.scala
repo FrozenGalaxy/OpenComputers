@@ -63,7 +63,7 @@ class ServerRackModel(val parent: BakedModel) extends SmartBlockModelBase {
           case _ =>
         }
 
-        faces.toList.asJava
+        faces.asJava
       case _ => super.getQuads(state, side, rand)
     }
 
