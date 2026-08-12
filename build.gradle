@@ -40,12 +40,26 @@ java {
 }
 
 configurations {
+    // Jars which are bundled/shadowed in the final jar.
     embedded
-    requiredMods
-    compileClasspath.extendsFrom embedded
-    runtimeClasspath.extendsFrom embedded
-    runtimeClasspath.extendsFrom requiredMods
-    implementation.extendsFrom embedded
+    compileClasspath.extendsFrom(embedded)
+    runtimeClasspath.extendsFrom(embedded)
+
+    // Equivalent of implementation/runtimeOnly, but which are not exposed as
+    // public dependencies.
+    devImplementation
+    devRuntimeOnly
+    compileClasspath.extendsFrom(devImplementation)
+    runtimeClasspath.extendsFrom(devImplementation, devRuntimeOnly)
+}
+
+sourceSets {
+    register("data") {
+        def main = sourceSets.main
+        it.compileClasspath += main.compileClasspath
+        it.runtimeClasspath += main.runtimeClasspath
+        project.dependencies.add(it.implementationConfigurationName, main.output)
+    }
 }
 
 sourceSets {
@@ -137,82 +151,74 @@ tasks.named('processResources', ProcessResources).configure {
 
 repositories {
     mavenCentral()
-    maven {
-        name "MightyPirates"
-        url "https://maven.cil.li/"
-        metadataSources {
-            mavenPom()
-            artifact()
-        }
-    }
-    maven {
-        url "https://maven.squiddev.cc"
-        content {
+
+    exclusiveContent {
+        forRepositories(maven { url = "https://maven.squiddev.cc" })
+        filter {
             includeGroup "cc.tweaked"
         }
     }
-    maven {
-        url "https://api.modrinth.com/maven"
-        content {
+    exclusiveContent {
+        forRepositories(maven { url = "https://api.modrinth.com/maven" })
+        filter {
             includeGroup "maven.modrinth"
         }
     }
-    maven {
-        url "https://cursemaven.com"
-        content {
+    exclusiveContent {
+        forRepositories(maven { url = "https://cursemaven.com" })
+        filter {
             includeGroup "curse.maven"
         }
     }
-    maven {
-        url "https://modmaven.dev"
-        content {
+    exclusiveContent {
+        forRepositories(maven { url = "https://modmaven.dev" })
+        filter {
             includeGroup "mezz.jei"
             includeGroup "org.appliedenergistics"
         }
     }
-    maven {
-        url "https://chickenbones.net/maven/"
-        content {
+    exclusiveContent {
+        forRepositories(maven { url = "https://chickenbones.net/maven/" })
+        filter {
             includeGroup "codechicken"
             includeGroup "mrtjp"
         }
     }
-    maven {
-        url "https://modmaven.dev/"
-        content {
+    exclusiveContent {
+        forRepositories(maven { url = "https://modmaven.dev/" })
+        filter {
             includeGroup "appeng"
             includeGroup "mekanism"
         }
     }
-    maven {
-        url "https://proxy-maven.covers1624.net/"
-        content {
-            includeModule "net.minecraftforge", "Scorge"
+    exclusiveContent {
+        forRepositories(maven { url = "https://maven.createmod.net" })
+        filter {
+            includeGroup "net.createmod.ponder"
+            includeGroup "com.simibubi.create"
+            includeGroup "dev.engine-room.flywheel"
         }
     }
-    maven {
-        name = "kotori316"
-        url = "https://maven.kotori316.com"
+    exclusiveContent {
+        forRepositories(maven { url = "https://maven.kotori316.com" })
+        filter {
+            includeModule("com.kotori316", "scalablecatsforce-neoforge")
+        }
     }
-    maven {
-        name = "Jared's maven"
-        url = "https://maven.blamejared.com/"
+    exclusiveContent {
+        forRepositories(maven { url = "https://maven.ithundxr.dev/snapshots" })
+        filter {
+            includeGroup "com.tterrag.registrate"
+        }
     }
-    maven {
-        url = "https://maven.createmod.net"
-    }
-    maven {
-        url = "https://maven.ithundxr.dev/mirror"
-    }
-    maven { url = "https://maven.ithundxr.dev/snapshots" } // Registrate
+
     flatDir { dirs 'libs' }
 }
 
 dependencies {
     compileOnly("org.scala-lang:scala-library:2.13.12")
-    compileOnly("org.typelevel:cats-core_2.13:2.8.1-kotori")
-    requiredMods("com.kotori316:scalablecatsforce-neoforge:3.3.3-build-15:with-library") {
-        transitive(false)
+    runtimeOnly("com.kotori316:scalablecatsforce-neoforge:3.3.3-build-15:with-library") {
+        transitive = false
     }
 
     embedded "com.typesafe:config:1.4.5"
@@ -230,13 +236,11 @@ dependencies {
     def jeiSlug = "jei-${minecraft_version}"
 
     // CC: Tweaked
-    compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-common-api:${cct_version}")
-    compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-core-api:${cct_version}")
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cct_version}")
-    runtimeOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cct_version}")
+    devRuntimeOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cct_version}")
 
     // Modern Fix
-    runtimeOnly("maven.modrinth:modernfix:${modernfix_version}")
+    devRuntimeOnly("maven.modrinth:modernfix:${modernfix_version}")
 
     // CoFH & Thermal
     // not currently available for 1.21+
@@ -266,7 +270,7 @@ dependencies {
 
     // JEI
     compileOnly("mezz.jei:${jeiSlug}-neoforge-api:${jei_version}")
-    runtimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
+    devRuntimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
 
     // CodeChicken
     compileOnly("curse.maven:cb-multipart-258426:${cbmultipart_file_id}")
@@ -283,6 +287,7 @@ dependencies {
     runtimeOnly("mrtjp:ProjectRed:${projred_version}:core")
     runtimeOnly("mrtjp:ProjectRed:${projred_version}:transmission")
 
+    testImplementation("com.typesafe:config:1.4.5")
     testImplementation("org.scala-lang:scala-library:2.13.12")
     testImplementation("org.scalatest:scalatest_2.13:3.2.18")
     testImplementation("org.scalatestplus:junit-4-13_2.13:3.2.18.0")
@@ -358,15 +363,6 @@ tasks.named('jar', Jar).configure {
     }
 
 //    finalizedBy 'reobfJar'
-}
-
-tasks.register('copyRequiredMods', Copy) {
-    from configurations.requiredMods
-    into layout.buildDirectory.dir('libs')
-}
-
-tasks.named('assemble') {
-    dependsOn tasks.named('copyRequiredMods')
 }
 
 tasks.register('apiJar', Jar) {

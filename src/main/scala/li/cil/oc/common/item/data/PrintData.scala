@@ -1,6 +1,5 @@
 package li.cil.oc.common.item.data
 
-import cats.implicits.catsSyntaxOrder
 import com.mojang.serialization.Codec
 import com.mojang.serialization.codecs.RecordCodecBuilder
 import io.netty.buffer.ByteBuf
@@ -271,7 +270,7 @@ object PrintData {
       if (a.bounds.maxX != b.bounds.maxX) return a.bounds.maxX compare b.bounds.maxX
       if (a.bounds.maxY != b.bounds.maxY) return a.bounds.maxY compare b.bounds.maxY
       if (a.bounds.maxZ != b.bounds.maxZ) return a.bounds.maxZ compare b.bounds.maxZ
-      if (a.tint != b.tint) return a.tint compare b.tint
+      if (a.tint != b.tint) return Ordering[Option[Int]].compare(a.tint, b.tint)
       if (a.texture != b.texture) return a.texture compare b.texture
       0
     }
