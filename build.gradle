@@ -17,15 +17,15 @@ group = mod_group_id
 // - GitHub CI build 154    -> 1.9.2-dev.154
 // - Local build            -> 1.9.2-dev.local
 def githubTag = System.getenv('GITHUB_REF_TYPE') == 'tag'
-        ? System.getenv('GITHUB_REF_NAME')?.replaceFirst(/^v/, '')
-        : null
+    ? System.getenv('GITHUB_REF_NAME')?.replaceFirst(/^v/, '')
+    : null
 
 // Non-release builds identify the current development line plus the CI build.
 // Jenkins provides BUILD_NUMBER; GitHub Actions provides GITHUB_RUN_NUMBER.
-def ciBuildNumber = findProperty('build_number') ?:
-        System.getenv('BUILD_NUMBER') ?:
-                System.getenv('GITHUB_RUN_NUMBER') ?:
-                        'local'
+def ciBuildNumber = findProperty('build_number')
+    ?: System.getenv('BUILD_NUMBER')
+    ?: System.getenv('GITHUB_RUN_NUMBER')
+    ?: 'local'
 
 version = githubTag ?: "${mod_version}-dev.${ciBuildNumber}"
 
@@ -34,7 +34,10 @@ base {
     archivesName = mod_id
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
 
 configurations {
     embedded
@@ -43,6 +46,15 @@ configurations {
     runtimeClasspath.extendsFrom embedded
     runtimeClasspath.extendsFrom requiredMods
     implementation.extendsFrom embedded
+}
+
+sourceSets {
+    register("data") {
+        def main = sourceSets.main
+        it.compileClasspath += main.compileClasspath
+        it.runtimeClasspath += main.runtimeClasspath
+        project.dependencies.add(it.implementationConfigurationName, main.output)
+    }
 }
 
 neoForge {
@@ -58,16 +70,22 @@ neoForge {
     }
 
     mods {
-        opencomputers {
+        register("opencomputers") {
             sourceSet sourceSets.main
         }
+
+        register("opencomputersData") {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.data
+        }
+
     }
 
     runs {
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
-
+            loadedMods = [mods.opencomputers]
         }
 
         client {
@@ -92,14 +110,19 @@ neoForge {
         data {
             data()
 
-            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/data/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+            loadedMods = [mods.opencomputersData]
+            programArguments.addAll(
+                '--mod', project.mod_id,
+                '--all',
+                '--output', file('src/main/generatedResources/').getAbsolutePath(),
+                '--existing', file('src/main/resources/').getAbsolutePath()
+            )
         }
     }
 }
 
-sourceSets.main.scala { srcDir 'src/data/scala' }
 sourceSets.main.resources {
-    srcDir 'src/data/resources'
+    srcDir 'src/main/generatedResources'
     exclude '.cache/**'
 }
 
@@ -226,6 +249,11 @@ dependencies {
     // Create
     implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
     implementation("net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}")
+    // Create's MovementBehaviour API exposes Registrate's NonNullConsumer in
+    // a method signature. Keep it available while compiling the optional OC
+    // Create bridge as well as at dev-runtime.
+    compileOnly("com.tterrag.registrate:Registrate:${registrate_version}")
+    compileOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     runtimeOnly("com.tterrag.registrate:Registrate:${registrate_version}")
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
@@ -266,16 +294,6 @@ publishing {
             groupId = mod_group_id
             artifactId = mod_id
             version = project.version
-
-            artifact(tasks.named("jar")) {
-                classifier = null
-            }
-            artifact(tasks.named("apiJar")) {
-                classifier = 'api'
-            }
-            artifact(tasks.named("apiSourcesJar")) {
-                classifier = 'sources'
-            }
         }
     }
 
@@ -359,12 +377,6 @@ tasks.register('apiJar', Jar) {
     }
 }
 
-tasks.register('apiSourcesJar', Jar) {
-    archiveClassifier = 'sources'
-    from sourceSets.main.allJava
-    include 'li/cil/oc/api/**'
-}
-
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
@@ -376,4 +388,13 @@ tasks.named('test', Test).configure {
 tasks.withType(ScalaCompile).configureEach {
     scalaCompileOptions.forkOptions.memoryMaximumSize = '2g'
     scalaCompileOptions.forkOptions.jvmArgs = ['-Xss4m']
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from(components["java"])
+            artifact(tasks.named("apiJar"))
+        }
+    }
 }
