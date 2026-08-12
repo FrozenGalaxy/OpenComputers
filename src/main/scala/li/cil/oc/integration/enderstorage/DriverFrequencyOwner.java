@@ -45,9 +45,9 @@ public final class DriverFrequencyOwner extends DriverSidedBlockEntity {
         public Object[] getFrequency(final Context context, final Arguments args) {
             Object[] frequencies = new Object[3];
             Frequency frequency = blockEntity.getFrequency();
-            frequencies[0] = frequency.getLeft().ordinal();
-            frequencies[1] = frequency.getMiddle().ordinal();
-            frequencies[2] = frequency.getRight().ordinal();
+            frequencies[0] = frequency.left().ordinal();
+            frequencies[1] = frequency.middle().ordinal();
+            frequencies[2] = frequency.right().ordinal();
             return new Object[] {frequencies};
         }
 
@@ -72,20 +72,17 @@ public final class DriverFrequencyOwner extends DriverSidedBlockEntity {
                     throw new IllegalArgumentException("invalid frequency");
                 }
             }
-            blockEntity.setFreq(
-                    new Frequency(
-                        EnumColour.fromWoolMeta(left),
-                        EnumColour.fromWoolMeta(middle),
-                        EnumColour.fromWoolMeta(right),
-                        blockEntity.getFrequency().owner,
-                        blockEntity.getFrequency().ownerName));
+            blockEntity.setFreq(blockEntity.getFrequency().withColours(new EnumColour[]{
+                    EnumColour.fromWoolMeta(left),
+                    EnumColour.fromWoolMeta(middle),
+                    EnumColour.fromWoolMeta(right)}));
             return null;
         }
 
         @Callback(doc = "function():string or nil -- Get the name of the owner, which is usually a player's name or nil.")
         public Object[] getOwner(final Context context, final Arguments args) {
             Frequency freq = blockEntity.getFrequency();
-            return new Object[]{freq.hasOwner() ? freq.ownerName.getString() : null};
+            return new Object[]{freq.ownerName().map(name -> name.getString()).orElse(null)};
         }
 
         @Callback(doc = "function():table -- Get the currently set frequency as a table of color names.")

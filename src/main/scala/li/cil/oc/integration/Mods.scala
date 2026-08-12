@@ -24,20 +24,24 @@ object Mods {
   val ComputerCraft = new SimpleMod(IDs.ComputerCraft)
   val NeoForge = new SimpleMod(IDs.Forge)
   val JustEnoughItems = new SimpleMod(IDs.JustEnoughItems)
+  val AppliedEnergistics2 = new SimpleMod(IDs.AppliedEnergistics2)
   val Mekanism = new SimpleMod(IDs.Mekanism)
   val Minecraft = new SimpleMod(IDs.Minecraft)
   val OpenComputers = new SimpleMod(IDs.OpenComputers)
   val EnderStorage = new SimpleMod(IDs.EnderStorage)
+  val ProjectRedTransmission = new SimpleMod(IDs.ProjectRedTransmission)
 
   // ----------------------------------------------------------------------- //
 
   val Proxies = Array(
     integration.create.ModCreate,
     integration.neoforge.ModNeoForge,
-    integration.mekanism.ModMekanism,
+    integration.mekanism.ModMekanism.INSTANCE,
     integration.minecraft.ModMinecraft,
     integration.computercraft.ModComputerCraft,
+    integration.appeng.ModAppliedEnergistics2.INSTANCE,
     integration.enderstorage.ModEnderStorage,
+    integration.projectred.ModProjectRed,
 
     // We go late to ensure all other mod integration is done, e.g. to
     // allow properly checking if wireless redstone is present.
@@ -95,10 +99,12 @@ object Mods {
     final val ComputerCraft = "computercraft"
     final val Forge = "forge"
     final val JustEnoughItems = "jei"
+    final val AppliedEnergistics2 = "ae2"
     final val Mekanism = "mekanism"
     final val Minecraft = "minecraft"
     final val OpenComputers = "opencomputers"
     final val EnderStorage = "enderstorage"
+    final val ProjectRedTransmission = "projectred_transmission"
   }
 
   // ----------------------------------------------------------------------- //

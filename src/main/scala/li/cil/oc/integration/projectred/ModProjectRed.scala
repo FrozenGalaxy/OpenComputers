@@ -1,4 +1,3 @@
-/*
 package li.cil.oc.integration.projectred
 
 import li.cil.oc.api
@@ -28,4 +27,3 @@ object ModProjectRed extends ModProxy with RedstoneProvider {
       fold(null: Array[Int])(_.map(_ & 0xFF))
   }
 }
-*/

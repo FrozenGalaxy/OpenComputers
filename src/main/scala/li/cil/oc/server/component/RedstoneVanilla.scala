@@ -72,7 +72,6 @@ trait RedstoneVanilla extends RedstoneSignaller with DeviceInfo {
     }) {
       if (Settings.get.redstoneDelay > 0)
         context.pause(Settings.get.redstoneDelay)
-      ret = result(null)
     }
     ret
   }
