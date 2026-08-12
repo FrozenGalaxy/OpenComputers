@@ -250,24 +250,15 @@ class Settings(val config: Config) {
 
   // power.value
   private val valueAppliedEnergistics2 = config.getDouble("power.value.AppliedEnergistics2")
-  private val valueFactorization = config.getDouble("power.value.Factorization")
-  private val valueGalacticraft = config.getDouble("power.value.Galacticraft")
-  private val valueIndustrialCraft2 = config.getDouble("power.value.IndustrialCraft2")
   private val valueMekanism = config.getDouble("power.value.Mekanism")
-  private val valuePowerAdvantage = config.getDouble("power.value.PowerAdvantage")
   private val valueRedstoneFlux = config.getDouble("power.value.RedstoneFlux")
-  private val valueRotaryCraft = config.getDouble("power.value.RotaryCraft") / 11256.0
   private val valueForgeEnergy = if (config.hasPath("power.value.ForgeEnergy")) config.getDouble("power.value.ForgeEnergy") else valueRedstoneFlux
 
   private val valueInternal = 1000
 
-  val ratioFactorization = valueFactorization / valueInternal
-  val ratioGalacticraft = valueGalacticraft / valueInternal
-  val ratioIndustrialCraft2 = valueIndustrialCraft2 / valueInternal
+  val ratioAppliedEnergistics2 = valueAppliedEnergistics2 / valueInternal
   val ratioMekanism = valueMekanism / valueInternal
-  val ratioPowerAdvantage = valuePowerAdvantage / valueInternal
   val ratioRedstoneFlux = valueRedstoneFlux / valueInternal
-  val ratioRotaryCraft = valueRotaryCraft / valueInternal
   val ratioForgeEnergy = valueForgeEnergy / valueInternal
 
   // ----------------------------------------------------------------------- //

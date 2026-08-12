@@ -167,7 +167,7 @@ repositories {
         url "https://modmaven.dev"
         content {
             includeGroup "mezz.jei"
-            includeGroup 'appeng'
+            includeGroup "org.appliedenergistics"
         }
     }
     maven {
@@ -229,9 +229,6 @@ dependencies {
 
     def jeiSlug = "jei-${minecraft_version}"
 
-    // Jade
-    compileOnly("curse.maven:jade-324717:${jade_version}")
-
     // CC: Tweaked
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-common-api:${cct_version}")
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-core-api:${cct_version}")
@@ -259,10 +256,11 @@ dependencies {
     compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
 
     // AE2
-    compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}:api")
+    compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
 
     // Mekanism
-    compileOnly("mekanism:Mekanism:${mekanism_version}:api")
+    compileOnly("mekanism:Mekanism:${mekanism_version}")
     runtimeOnly("mekanism:Mekanism:${mekanism_version}")
     runtimeOnly("mekanism:Mekanism:${mekanism_version}:generators")
 
@@ -271,15 +269,19 @@ dependencies {
     runtimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
 
     // CodeChicken
-    compileOnly("curse.maven:cb-multipart-258426:5292585")
-    compileOnly("curse.maven:codechicken-lib-1-8-242818:5753868")
+    compileOnly("curse.maven:cb-multipart-258426:${cbmultipart_file_id}")
+    runtimeOnly("curse.maven:cb-multipart-258426:${cbmultipart_file_id}")
+    compileOnly("curse.maven:codechicken-lib-1-8-242818:${ccl_file_id}")
+    runtimeOnly("curse.maven:codechicken-lib-1-8-242818:${ccl_file_id}")
 
     // EnderStorage
-    compileOnly("curse.maven:ender-storage-1-8-245174:5292573")
+    compileOnly("curse.maven:ender-storage-1-8-245174:${enderstorage_file_id}")
+    runtimeOnly("curse.maven:ender-storage-1-8-245174:${enderstorage_file_id}")
 
     // Project: Red
-    compileOnly("mrtjp:ProjectRed:${projred_version}:core")
     compileOnly("mrtjp:ProjectRed:${projred_version}:api")
+    runtimeOnly("mrtjp:ProjectRed:${projred_version}:core")
+    runtimeOnly("mrtjp:ProjectRed:${projred_version}:transmission")
 
     testImplementation("org.scala-lang:scala-library:2.13.12")
     testImplementation("org.scalatest:scalatest_2.13:3.2.18")
