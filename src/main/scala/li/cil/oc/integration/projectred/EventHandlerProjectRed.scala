@@ -1,4 +1,3 @@
-/*
 package li.cil.oc.integration.projectred
 
 import li.cil.oc.server.agent.Player
@@ -23,4 +22,3 @@ object EventHandlerProjectRed {
 
   def isWrench(stack: ItemStack): Boolean = stack.getItem.isInstanceOf[IScrewdriver]
 }
-*/

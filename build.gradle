@@ -62,6 +62,15 @@ sourceSets {
     }
 }
 
+sourceSets {
+    register("data") {
+        def main = sourceSets.main
+        it.compileClasspath += main.compileClasspath
+        it.runtimeClasspath += main.runtimeClasspath
+        project.dependencies.add(it.implementationConfigurationName, main.output)
+    }
+}
+
 neoForge {
     version = project.neoforge_version
 
@@ -165,7 +174,7 @@ repositories {
         forRepositories(maven { url = "https://modmaven.dev" })
         filter {
             includeGroup "mezz.jei"
-            includeGroup 'appeng'
+            includeGroup "org.appliedenergistics"
         }
     }
     exclusiveContent {
@@ -226,9 +235,6 @@ dependencies {
 
     def jeiSlug = "jei-${minecraft_version}"
 
-    // Jade
-    compileOnly("curse.maven:jade-324717:${jade_version}")
-
     // CC: Tweaked
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge-api:${cct_version}")
     devRuntimeOnly("cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cct_version}")
@@ -242,36 +248,44 @@ dependencies {
 //    compileOnly("curse.maven:thermal-foundation-222880:4788649")
 
     // Create
-    devImplementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
-    devImplementation("net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}")
-    devImplementation("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
+    implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
+    implementation("net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}")
     // Create's MovementBehaviour API exposes Registrate's NonNullConsumer in
     // a method signature. Keep it available while compiling the optional OC
     // Create bridge as well as at dev-runtime.
-    devImplementation("com.tterrag.registrate:Registrate:${registrate_version}")
+    compileOnly("com.tterrag.registrate:Registrate:${registrate_version}")
+    compileOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
+    runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
+    runtimeOnly("com.tterrag.registrate:Registrate:${registrate_version}")
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.4.1"))
 
     // AE2
-    compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}:api")
+    compileOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    runtimeOnly("org.appliedenergistics:appliedenergistics2:${ae2_version}")
 
     // Mekanism
-    compileOnly("mekanism:Mekanism:${mekanism_version}:api")
-    devRuntimeOnly("mekanism:Mekanism:${mekanism_version}")
-    devRuntimeOnly("mekanism:Mekanism:${mekanism_version}:generators")
+    compileOnly("mekanism:Mekanism:${mekanism_version}")
+    runtimeOnly("mekanism:Mekanism:${mekanism_version}")
+    runtimeOnly("mekanism:Mekanism:${mekanism_version}:generators")
 
     // JEI
     compileOnly("mezz.jei:${jeiSlug}-neoforge-api:${jei_version}")
     devRuntimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
 
     // CodeChicken
-    compileOnly("curse.maven:cb-multipart-258426:5292585")
-    compileOnly("curse.maven:codechicken-lib-1-8-242818:5753868")
+    compileOnly("curse.maven:cb-multipart-258426:${cbmultipart_file_id}")
+    runtimeOnly("curse.maven:cb-multipart-258426:${cbmultipart_file_id}")
+    compileOnly("curse.maven:codechicken-lib-1-8-242818:${ccl_file_id}")
+    runtimeOnly("curse.maven:codechicken-lib-1-8-242818:${ccl_file_id}")
 
     // EnderStorage
-    compileOnly("curse.maven:ender-storage-1-8-245174:5292573")
+    compileOnly("curse.maven:ender-storage-1-8-245174:${enderstorage_file_id}")
+    runtimeOnly("curse.maven:ender-storage-1-8-245174:${enderstorage_file_id}")
 
     // Project: Red
-    compileOnly("mrtjp:ProjectRed:${projred_version}:core")
     compileOnly("mrtjp:ProjectRed:${projred_version}:api")
+    runtimeOnly("mrtjp:ProjectRed:${projred_version}:core")
+    runtimeOnly("mrtjp:ProjectRed:${projred_version}:transmission")
 
     testImplementation("com.typesafe:config:1.4.5")
     testImplementation("org.scala-lang:scala-library:2.13.12")
