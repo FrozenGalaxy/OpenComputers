@@ -63,7 +63,6 @@ object ModelInitialization {
     registry.put(PrintBlockLocation,           PrintModel)
     registry.put(PrintItemLocation,            PrintModel)
     registry.put(RobotItemLocation,            RobotModel)
-    registry.put(loc(Constants.ItemName.Drone, "inventory"), DroneModel)
 
     val modelOverrides = Map[String, BakedModel => BakedModel](
       Constants.BlockName.ScreenTier1 -> (_ => ScreenModel),
