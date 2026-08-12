@@ -62,15 +62,6 @@ sourceSets {
     }
 }
 
-sourceSets {
-    register("data") {
-        def main = sourceSets.main
-        it.compileClasspath += main.compileClasspath
-        it.runtimeClasspath += main.runtimeClasspath
-        project.dependencies.add(it.implementationConfigurationName, main.output)
-    }
-}
-
 neoForge {
     version = project.neoforge_version
 
@@ -174,7 +165,6 @@ repositories {
         forRepositories(maven { url = "https://modmaven.dev" })
         filter {
             includeGroup "mezz.jei"
-            includeGroup "org.appliedenergistics"
         }
     }
     exclusiveContent {
