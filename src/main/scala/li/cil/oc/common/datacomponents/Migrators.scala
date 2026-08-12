@@ -2,7 +2,6 @@ package li.cil.oc.common.datacomponents
 
 import li.cil.oc.api.ImmutableFluidStack
 
-import cats.NonEmptyTraverse.ops.toAllNonEmptyTraverseOps
 import li.cil.oc.Settings
 import li.cil.oc.api.ImmutableItemStack
 import li.cil.oc.api.network.Visibility
