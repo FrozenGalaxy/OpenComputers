@@ -32,8 +32,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 object OCItems extends ItemAPI {
-  private val ITEM_TO_SECTION = new util.HashMap[String, String]
-  var SECTION_Y_VALUES = new util.HashMap[String, Int]
+  val ITEM_TO_SECTION = new mutable.HashMap[String, String]
+  val SECTION_Y_VALUES = new mutable.HashMap[String, Int]
   private val ITEMS: DeferredRegister.Items = DeferredRegister.createItems(Settings.resourceDomain)
 
   val descriptors = mutable.LinkedHashMap.empty[String, ItemInfo]
@@ -551,10 +551,8 @@ object OCItems extends ItemAPI {
 
     val sectionMap = new util.HashMap[String, util.List[ItemStack]]
     for ((id, info) <- descriptors if !excluded.contains(id)){
-      val sectionId = ITEM_TO_SECTION.get(id)
+      val sectionId = ITEM_TO_SECTION.getOrElse(id, "99_misc")
       val stack = info.createItemStack(1)
-      if(sectionId == null)
-        sectionMap.computeIfAbsent("99_misc", (s) => new util.LinkedList).add(stack)
       sectionMap.computeIfAbsent(sectionId, (s) => new util.LinkedList).add(stack)
     }
 
