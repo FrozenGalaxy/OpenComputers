@@ -76,13 +76,13 @@ object OCItems extends ItemAPI {
     instance
   }
 
-  def registerBlock[T <: Block](instance: T, id: String, itemProps: Properties, section_id: String): T = {
+  def registerBlock[T <: Block](instance: T, id: String, itemProps: Properties, section_id: String= null): T = {
     if (!descriptors.contains(id)) {
       instance match {
         case simple: SimpleBlock =>
           simple.setUnlocalizedName("oc." + id)
 
-          ITEM_TO_SECTION.put(id, section_id);
+          if (section_id != null)  ITEM_TO_SECTION.put(id, section_id);
           val ro: DeferredItem[Item] = ITEMS.register(id, () => new common.block.Item(simple, itemProps))
 
           descriptors += id -> new ItemInfo {
@@ -104,12 +104,12 @@ object OCItems extends ItemAPI {
     instance
   }
 
-  def registerItem[T <: Item](makeItem: => T, id: String, section_id: String): DeferredItem[T] = {
+  def registerItem[T <: Item](makeItem: => T, id: String, section_id: String= null): DeferredItem[T] = {
     if (descriptors.contains(id)) {
       throw new IllegalArgumentException("Duplicate item " + id)
     }
 
-    ITEM_TO_SECTION.put(id, section_id);
+    if (section_id != null)   ITEM_TO_SECTION.put(id, section_id);
     // Construct items inside the supplier while the registry is writable.
     val ro: DeferredItem[T] = ITEMS.register(id, () => {
       val instance = makeItem
@@ -135,8 +135,9 @@ object OCItems extends ItemAPI {
 
   private def registerBasicTieredItem(id: String, section_id: String, props: Item.Properties): DeferredItem[Item] = registerItem(new item.BasicTieredItem(props, id), id, section_id)
 
-  def registerStack(stack: ItemStack, id: String): ItemStack = {
+  def registerStack(stack: ItemStack, id: String, section_id: String = null): ItemStack = {
     val immutableStack = stack.copy()
+    if (section_id != null)  ITEM_TO_SECTION.put(id, section_id);
     descriptors += id -> new ItemInfo {
       override def name: String = id
 
@@ -164,13 +165,13 @@ object OCItems extends ItemAPI {
 
   override def registerFloppy(name: String, loc: ResourceLocation, color: DyeColor, factory: Callable[FileSystem], doRecipeCycling: Boolean): ItemStack = {
     val stack = Loot.registerLootDisk(name, loc, color, factory, doRecipeCycling)
-    OCItems.registerStack(stack, name)
+    OCItems.registerStack(stack, name, null)
     stack.copy()
   }
 
   override def registerEEPROM(name: String, code: Array[Byte], data: Array[Byte], readonly: Boolean): ItemStack = {
     val stack = createEEPROM(name, code, data, readonly)
-    OCItems.registerStack(stack, name)
+    OCItems.registerStack(stack, name, null)
     stack.copy()
   }
 
@@ -529,7 +530,7 @@ object OCItems extends ItemAPI {
       val count = OpenComputers.getClass.getResourceAsStream(Settings.scriptPath + "bios.lua").read(code)
       createEEPROM("EEPROM (Lua BIOS)", code.take(count), null, readonly = false)
     }
-    registerStack(luaBios, Constants.ItemName.LuaBios)
+    registerStack(luaBios, Constants.ItemName.LuaBios, null)
   }
 
   /////////////////////////////////////////////////////////////////
@@ -592,9 +593,6 @@ object OCItems extends ItemAPI {
     displayItems.accept(OCItems.createConfiguredMicrocontroller())
     displayItems.accept(OCItems.createConfiguredRobot())
     displayItems.accept(OCItems.createConfiguredTablet())
-
-    //TODO: revove this line
-    OpenPrinter.addCreativeItems(displayItems)
 
   }
 }

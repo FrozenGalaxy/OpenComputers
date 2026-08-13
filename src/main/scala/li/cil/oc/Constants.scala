@@ -3,7 +3,6 @@ package li.cil.oc
 import li.cil.oc.util.ItemUtils
 
 object Constants {
-
   object BlockName {
     final val Adapter = "adapter"
     final val Assembler = "assembler"

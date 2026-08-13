@@ -1,19 +1,18 @@
 package li.cil.oc.mixin
 
 import com.mojang.blaze3d.systems.RenderSystem
-import li.cil.oc.{CreativeTab, OpenComputers}
 import li.cil.oc.CreativeTab.CURRENT_ROW
 import li.cil.oc.common.init.OCItems
-import li.cil.oc.common.init.OCItems.SECTION_Y_VALUES
 import li.cil.oc.mixin.accessor.{AbstractContainerScreenAccess, CreativeModeInventoryScreenAccess}
+import li.cil.oc.{CreativeTab, OpenComputers}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import org.spongepowered.asm.mixin.Mixin
-import org.spongepowered.asm.mixin.injection.{At, Inject}
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
+import org.spongepowered.asm.mixin.injection.{At, Inject}
 
 // Inspired by :
 //  https://github.com/Creators-of-Aeronautics/Simulated-Project/blob/main/simulated/common/src/main/java/dev/simulated_team/simulated/mixin/creative_tab_sections/CreativeModeInventoryScreenMixin.java
@@ -44,7 +43,7 @@ class CreativeModeInventoryScreenMixin {
     }
   }
 
-  def renderBanners(screen: CreativeModeInventoryScreen, graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
+  private def renderBanners(screen: CreativeModeInventoryScreen, graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
     val ps = graphics.pose
     ps.pushPose()
     RenderSystem.enableDepthTest()

@@ -83,4 +83,16 @@ public interface ItemAPI {
      * adding a recipe for your custom BIOS, for example.
      */
     ItemStack registerEEPROM(String name, byte[] code, byte[] data, boolean readonly);
+
+    /**
+     * The stack will be listed in the creative tab of OpenComputers.
+     *
+     * Call this in the init phase or later, <em>not</em> in pre-init.
+     *
+     * @param stack     the stack to add in the creative tab.
+     * @param name      the label of the EEPROM.
+     * @param sectionId the section to put the stack in.
+     *
+     */
+    ItemStack registerStack(ItemStack stack, String name, String sectionId);
 }

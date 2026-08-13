@@ -164,20 +164,19 @@ public final class OpenPrinter {
         } catch (RuntimeException exception) {
             LOGGER.warn("Could not register the OpenPrinter tools disk", exception);
         }
-    }
 
-    public static void addCreativeItems(Consumer<ItemStack> event) {
-        event.accept(PRINTER.toStack());
-        event.accept(SHREDDER.toStack());
-        event.accept(FILE_CABINET.toStack());
-        event.accept(BRIEFCASE.toStack());
-        event.accept(PRINTED_PAGE.toStack());
-        event.accept(BLACK_INK.toStack());
-        event.accept(COLOR_INK.toStack());
-        event.accept(PAPER_SHREDS.toStack());
-        event.accept(FOLDER.toStack());
-        // The tools disk is registered through OpenComputers' public floppy API,
-        // which already adds it to the OpenComputers creative tab.
+
+        li.cil.oc.api.Items.registerStack(PRINTER.toStack(), PRINTER.getRegisteredName(), "25_components");
+
+        li.cil.oc.api.Items.registerStack(SHREDDER.toStack(), SHREDDER.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(FILE_CABINET.toStack(), FILE_CABINET.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(BRIEFCASE.toStack(), BRIEFCASE.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(PRINTED_PAGE.toStack(), PRINTED_PAGE.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(FOLDER.toStack(), PRINTED_PAGE.getRegisteredName(), "49_tools");
+
+        li.cil.oc.api.Items.registerStack(BLACK_INK.toStack(), BLACK_INK.getRegisteredName(), "50_materials");
+        li.cil.oc.api.Items.registerStack(COLOR_INK.toStack(), COLOR_INK.getRegisteredName(), "50_materials");
+        li.cil.oc.api.Items.registerStack(PAPER_SHREDS.toStack(), PAPER_SHREDS.getRegisteredName(), "50_materials");
     }
 
     /**
