@@ -78,7 +78,7 @@ public final class Items {
                                            Callable<li.cil.oc.api.fs.FileSystem> factory, boolean doRecipeCycling) {
 
         if (API.items != null)
-            return API.items.registerFloppy(name, loc, color, factory, doRecipeCycling);
+            return API.items.registerFloppy(name, name, loc, color, factory, doRecipeCycling);
         return ItemStack.EMPTY;
     }
 

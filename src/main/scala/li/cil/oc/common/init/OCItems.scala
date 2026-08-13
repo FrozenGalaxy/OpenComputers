@@ -163,8 +163,8 @@ object OCItems extends ItemAPI {
 
   // ----------------------------------------------------------------------- //
 
-  override def registerFloppy(name: String, loc: ResourceLocation, color: DyeColor, factory: Callable[FileSystem], doRecipeCycling: Boolean): ItemStack = {
-    val stack = Loot.registerLootDisk(name, loc, color, factory, doRecipeCycling)
+  override def registerFloppy(display_name:String, name: String, loc: ResourceLocation, color: DyeColor, factory: Callable[FileSystem], doRecipeCycling: Boolean): ItemStack = {
+    val stack = Loot.registerLootDisk(display_name, name, loc, color, factory, doRecipeCycling)
     OCItems.registerStack(stack, name, null)
     stack.copy()
   }
