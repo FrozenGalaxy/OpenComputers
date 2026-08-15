@@ -17,7 +17,7 @@ object RobotFlags {
     Flag(name, ResourceLocation.fromNamespaceAndPath(OpenComputers.ID, name + "_flag"), height)
 
   val Progress = flag("progress")
-  val Lesbian = flag("lesbian")
+  val Lesbian = flag("lesbian", 5f)
   val Bisexual = flag("bisexual")
   val Pansexual = flag("pansexual")
   val Asexual = flag("asexual")
