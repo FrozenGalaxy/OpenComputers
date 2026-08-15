@@ -1,6 +1,8 @@
 package li.cil.oc.client.renderer;
 
 import java.util.OptionalDouble;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -43,6 +45,15 @@ public class RenderTypes extends RenderType {
                         .setLightmapState(LIGHTMAP)
                         .setCullState(NO_CULL)
                         .createCompositeState(true));
+    }
+
+    private static final Map<ResourceLocation, RenderType> ROBOT_FLAGS = new ConcurrentHashMap<>();
+
+    public static RenderType robotFlag(ResourceLocation flag) {
+        return ROBOT_FLAGS.computeIfAbsent(flag, id -> createRobotFlag(
+                id.getPath(),
+                ResourceLocation.fromNamespaceAndPath(id.getNamespace(), "model/robot_" + id.getPath())
+        ));
     }
 
     public static final RenderType ROBOT_RAINBOW_FLAG = createRobotFlag("rainbow", Textures.Model$.MODULE$.RobotRainbowFlag());

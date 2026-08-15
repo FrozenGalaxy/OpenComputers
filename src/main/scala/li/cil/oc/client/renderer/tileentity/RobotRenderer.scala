@@ -8,6 +8,7 @@ import li.cil.oc.api.driver.item.UpgradeRenderer.MountPointName
 import li.cil.oc.api.event.RobotRenderEvent
 import li.cil.oc.client.renderer.RenderTypes
 import li.cil.oc.common.EventHandler
+import li.cil.oc.common.RobotFlags
 import li.cil.oc.common.blockentity
 import li.cil.oc.util.RenderState
 import li.cil.oc.util.StackOption
@@ -83,11 +84,12 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
                         light: Int,
                         flag: ResourceLocation
                       ): Unit = {
-    val (renderType, flagHeight) = flag match {
-      case RobotRenderer.RainbowFlag => (RenderTypes.ROBOT_RAINBOW_FLAG, 6f)
-      case RobotRenderer.TransFlag => (RenderTypes.ROBOT_TRANS_FLAG, 5f)
+    val definition = RobotFlags.byId(flag) match {
+      case Some(value) => value
       case _ => return
     }
+    val renderType = RenderTypes.robotFlag(definition.id)
+    val flagHeight = definition.height
 
     val r = buffer.getBuffer(renderType)
     val x = 2f / 16f

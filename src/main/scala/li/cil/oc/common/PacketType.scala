@@ -109,5 +109,7 @@ object PacketType extends Enumeration {
   LootEEPROMsReset,
   LootEEPROM,
 
+  RobotFlagChange,
+
   EndOfList = Value
 }

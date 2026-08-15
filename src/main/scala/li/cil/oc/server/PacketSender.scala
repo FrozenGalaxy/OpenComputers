@@ -683,6 +683,15 @@ object PacketSender {
     pb.sendToPlayersNearTileEntity(t)
   }
 
+  def sendRobotFlagChange(t: blockentity.Robot): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.RobotFlagChange)
+
+    pb.writeTileEntity(t.proxy)
+    pb.writeUTF(t.info.flag.map(_.toString).getOrElse(""))
+
+    pb.sendToPlayersNearTileEntity(t)
+  }
+
   def sendRobotNameChange(t: blockentity.Robot): Unit = {
     val pb = new SimplePacketBuilder(PacketType.RobotNameChange)
 

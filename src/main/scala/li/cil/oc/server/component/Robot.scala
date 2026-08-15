@@ -17,6 +17,7 @@ import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.common.ToolDurabilityProviders
 import li.cil.oc.common.blockentity
 import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.common.RobotFlags
 import li.cil.oc.server.PacketSender
 import li.cil.oc.util.BlockPosition
 import li.cil.oc.util.ExtendedArguments._
@@ -72,6 +73,32 @@ class Robot(val agent: blockentity.Robot) extends AbstractManagedEnvironment wit
     agent.setLightColor(args.checkInteger(0))
     context.pause(0.1)
     result(agent.info.lightColor)
+  }
+
+  @Callback(direct = true, doc = "function():string or nil -- Gets the currently displayed pride flag name, if any.")
+  def getFlag(context: Context, args: Arguments): Array[AnyRef] =
+    agent.info.flag.flatMap(RobotFlags.byId) match {
+      case Some(flag) => result(flag.name)
+      case _ => result(null)
+    }
+
+  @Callback(doc = "function(name:string):string -- Sets the displayed pride flag and returns its canonical name.")
+  def setFlag(context: Context, args: Arguments): Array[AnyRef] = {
+    RobotFlags.byName(args.checkString(0)) match {
+      case Some(flag) =>
+        agent.setFlag(Some(flag.id))
+        context.pause(0.1)
+        result(flag.name)
+      case _ =>
+        result(null, "unknown pride flag")
+    }
+  }
+
+  @Callback(doc = "function() -- Hides the currently displayed pride flag.")
+  def clearFlag(context: Context, args: Arguments): Array[AnyRef] = {
+    agent.setFlag(None)
+    context.pause(0.1)
+    result(true)
   }
 
   // ----------------------------------------------------------------------- //

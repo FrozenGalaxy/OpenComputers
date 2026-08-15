@@ -18,6 +18,7 @@ import li.cil.oc.common.container.InventoryProxy
 import li.cil.oc.common.container.InventorySelection
 import li.cil.oc.common.container.TankSelection
 import li.cil.oc.common.datacomponents.{OCComponents, Owner, RobotCurrentAnimation}
+import li.cil.oc.common.RobotFlags
 import li.cil.oc.common.item.data.RobotData
 import li.cil.oc.integration.opencomputers.DriverKeyboard
 import li.cil.oc.integration.opencomputers.DriverRedstoneCard
@@ -169,6 +170,12 @@ class Robot(pos: BlockPos, state: BlockState)
   def setLightColor(value: Int): Unit = {
     info.lightColor = value
     ServerPacketSender.sendRobotLightChange(this)
+  }
+
+  def setFlag(value: Option[net.minecraft.resources.ResourceLocation]): Unit = {
+    info.flag = value.flatMap(RobotFlags.byId).map(_.id)
+    setChanged()
+    ServerPacketSender.sendRobotFlagChange(this)
   }
 
   override def shouldAnimate: Boolean = isRunning

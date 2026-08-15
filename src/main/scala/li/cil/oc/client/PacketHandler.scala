@@ -12,7 +12,7 @@ import li.cil.oc.common.blockentity.traits._
 import li.cil.oc.common.datacomponents.{CompoundStorage, OCComponents, ScalaStreamCodec}
 import li.cil.oc.common.item.Tablet
 import li.cil.oc.common.nanomachines.ControllerImpl
-import li.cil.oc.common.{Loot, PacketType, component, menu, PacketHandler => CommonPacketHandler}
+import li.cil.oc.common.{Loot, PacketType, RobotFlags, component, menu, PacketHandler => CommonPacketHandler}
 import li.cil.oc.integration.Mods
 
 import java.io.{EOFException, InputStream}
@@ -110,6 +110,7 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.RobotAssemblingState => onRobotAssemblingState(p)
       case PacketType.RobotInventoryChange => onRobotInventoryChange(p)
       case PacketType.RobotLightChange => onRobotLightChange(p)
+      case PacketType.RobotFlagChange => onRobotFlagChange(p)
       case PacketType.RobotMove => onRobotMove(p)
       case PacketType.RobotNameChange => onRobotNameChange(p)
       case PacketType.RobotSelectedSlotChange => onRobotSelectedSlotChange(p)
@@ -680,6 +681,14 @@ object PacketHandler extends CommonPacketHandler {
   def onRobotLightChange(p: PacketParser): Unit =
     p.readBlockEntity[RobotProxy]() match {
       case Some(t) => t.robot.info.lightColor = p.readInt()
+      case _ => // Invalid packet.
+    }
+
+  def onRobotFlagChange(p: PacketParser): Unit =
+    p.readBlockEntity[RobotProxy]() match {
+      case Some(t) =>
+        val id = ResourceLocation.tryParse(p.readUTF())
+        t.robot.info.flag = RobotFlags.byId(id).map(_.id)
       case _ => // Invalid packet.
     }
 
