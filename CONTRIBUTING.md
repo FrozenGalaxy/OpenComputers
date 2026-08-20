@@ -64,3 +64,6 @@ significant amount of your contribution.
 
 See [SDL's `AGENTS.md`](https://github.com/libsdl-org/SDL/blob/main/AGENTS.md)
 for some additional rationale.
+
+Even in cases otherwise deemed acceptable, Any use of AI output in contributions
+submitted to this repository must be disclosed when submitting your PR.
