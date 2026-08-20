@@ -42,7 +42,7 @@ trait CPULike extends SimpleItem {
               val archClass = architectures(newIndex)
               val archName = api.Machine.getArchitectureName(archClass)
               driver.setArchitecture(stack, archClass)
-              player.sendSystemMessage(Component.translatable(Settings.namespace + "tooltip.cpu.Architecture", archName))
+              player.displayClientMessage(Component.translatable(Settings.namespace + "tooltip.cpu.Architecture", archName), true)
             }
             player.swing(InteractionHand.MAIN_HAND)
           case _ => // No known driver for this processor.
