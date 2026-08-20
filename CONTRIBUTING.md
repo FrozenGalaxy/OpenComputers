@@ -18,6 +18,26 @@ Translations live in
 The English locale is the source of truth for keys. Instructions for adding
 loot-disk programs are in the [loot README](src/main/resources/assets/opencomputers/loot/README.md).
 
+## Regarding Drivers For Other Mods
+
+In general, the main OpenComputers mod is not the place to add driver support
+for components from other mods.
+
+- In the ideal case, drivers should originate from the mod providing the
+  component, especially if that mod already provides ComputerCraft peripheral
+  integration.
+- If this is not possible, then a separate driver-providing compatibility mod
+  should be created and used instead.
+
+Integrations with other mods requires more flexibility than direct support from
+within OpenComputers allows. Individual drivers need to be able to update and
+release independently according to the needs of their integrations. It does not
+make sense for the OpenComputers team to maintain drivers that logically belong
+to other mods.
+
+Exceptions can be made on a case-by-case basis if there is a compelling reason
+to do so.
+
 ## AI Policy
 
 It's not a secret that this 1.21 port was started from a 1.20 port that heavily
