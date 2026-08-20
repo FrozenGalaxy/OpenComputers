@@ -31,7 +31,7 @@ trait CPULike extends SimpleItem {
   }
 
   override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
-    if (player.isCrouching) {
+    if (!player.isCrouching) {
       if (!level.isClientSide) {
         api.Driver.driverFor(stack) match {
           case driver: MutableProcessor =>
