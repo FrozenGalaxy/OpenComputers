@@ -36,7 +36,12 @@ make sense for the OpenComputers team to maintain drivers that logically belong
 to other mods.
 
 Exceptions can be made on a case-by-case basis if there is a compelling reason
-to do so.
+to do so. The current exceptions for mod drivers that live in OpenComputers
+directly:
+- Create (base Create only, none of the add-ons)
+- Mekanism
+- Applied Energistics 2
+- Project Red
 
 ## AI Policy
 
