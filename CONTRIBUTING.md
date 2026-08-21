@@ -13,6 +13,12 @@ We're currently focusing on getting the 1.21 version up to date with modern
 modding practices (such as being easily configurable with datapacks) and
 squishing bugs.
 
+It is unlikely that we are going to add any more new blocks or items to the base
+mod at this time. However, we are happy to collaborate on extending the
+OpenComputers API if it doesn't yet have everything you need to implement your
+ideas as an add-on! In that case, drop us a line on Github or our IRC channels
+and we can discuss how to make things work for everyone.
+
 Translations live in
 [`src/main/resources/assets/opencomputers/lang`](src/main/resources/assets/opencomputers/lang).
 The English locale is the source of truth for keys. Instructions for adding
@@ -36,7 +42,12 @@ make sense for the OpenComputers team to maintain drivers that logically belong
 to other mods.
 
 Exceptions can be made on a case-by-case basis if there is a compelling reason
-to do so.
+to do so. The current exceptions for mod drivers that live in OpenComputers
+directly:
+- Create (base Create only, none of the add-ons)
+- Mekanism
+- Applied Energistics 2
+- Project Red
 
 ## AI Policy
 
@@ -64,3 +75,6 @@ significant amount of your contribution.
 
 See [SDL's `AGENTS.md`](https://github.com/libsdl-org/SDL/blob/main/AGENTS.md)
 for some additional rationale.
+
+Even in cases otherwise deemed acceptable, Any use of AI output in contributions
+submitted to this repository must be disclosed when submitting your PR.
