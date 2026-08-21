@@ -117,6 +117,7 @@ public final class OpenPrinter {
         MENUS.register(modBus);
         modBus.addListener(OpenPrinter::registerCapabilities);
         container.registerConfig(ModConfig.Type.SERVER, PrinterConfig.SPEC, "opencomputers-openprinter.toml");
+        container.registerConfig(ModConfig.Type.CLIENT, PrinterClientConfig.SPEC, "opencomputers-openprinter-client.toml");
         modBus.addListener((net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent event) ->
                 event.enqueueWork(OpenPrinter::registerOpenComputersIntegration));
     }
