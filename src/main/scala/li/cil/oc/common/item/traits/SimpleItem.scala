@@ -77,6 +77,8 @@ trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExt
   @Deprecated
   def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = false
 
+  override def use(world: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] = use(player.getItemInHand(hand), world, player)
+
   @Deprecated
   def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] =
     new InteractionResultHolder(InteractionResult.PASS, stack)
