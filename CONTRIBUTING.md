@@ -13,6 +13,12 @@ We're currently focusing on getting the 1.21 version up to date with modern
 modding practices (such as being easily configurable with datapacks) and
 squishing bugs.
 
+It is unlikely that we are going to add any more new blocks or items to the base
+mod at this time. However, we are happy to collaborate on extending the
+OpenComputers API if it doesn't yet have everything you need to implement your
+ideas as an add-on! In that case, drop us a line on Github or our IRC channels
+and we can discuss how to make things work for everyone.
+
 Translations live in
 [`src/main/resources/assets/opencomputers/lang`](src/main/resources/assets/opencomputers/lang).
 The English locale is the source of truth for keys. Instructions for adding
