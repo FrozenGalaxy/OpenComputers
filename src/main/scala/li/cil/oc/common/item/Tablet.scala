@@ -2,34 +2,35 @@ package li.cil.oc.common.item
 
 import com.google.common.cache.{CacheBuilder, RemovalListener, RemovalNotification}
 import com.google.common.collect.ImmutableMap
+import li.cil.oc.{api, client, server, Constants, Localization, OpenComputers, Settings}
+import li.cil.oc.api.{internal, Driver, Machine}
 import li.cil.oc.api.driver.item.Container
 import li.cil.oc.api.machine.MachineHost
 import li.cil.oc.api.network.{Connector, Message, Node}
-import li.cil.oc.api.{Driver, Machine, internal}
-import li.cil.oc.client.{KeyBindings, gui}
+import li.cil.oc.client.{gui, KeyBindings}
+import li.cil.oc.common.{menu, Slot, Tier}
 import li.cil.oc.common.container.ComponentInventory
 import li.cil.oc.common.item.data.TabletData
 import li.cil.oc.common.menu.MenuTypes
-import li.cil.oc.common.{Slot, Tier, menu}
 import li.cil.oc.integration.opencomputers.DriverScreen
 import li.cil.oc.server.component.{Tablet => TabletComponent}
 import li.cil.oc.util._
-import li.cil.oc.{Constants, Localization, OpenComputers, Settings, api, client, server}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.model.ModelResourceLocation
 import net.minecraft.client.server.IntegratedServer
+import net.minecraft.core.{Direction, HolderLookup}
 import net.minecraft.core.component.{DataComponentHolder, DataComponents}
-import net.minecraft.core.{BlockPos, Direction, HolderLookup}
 import net.minecraft.nbt.{CompoundTag, Tag}
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world._
-import net.minecraft.world.entity.player.{Inventory, Player}
 import net.minecraft.world.entity.{Entity, LivingEntity}
+import net.minecraft.world.entity.player.{Inventory, Player}
+import net.minecraft.world.item.{Item, ItemStack}
 import net.minecraft.world.item.Item.Properties
 import net.minecraft.world.item.component.CustomData
-import net.minecraft.world.item.{Item, ItemStack}
+import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.level.Level
 import net.neoforged.api.distmarker.{Dist, OnlyIn}
 import net.neoforged.bus.api.SubscribeEvent
@@ -124,23 +125,20 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
       case _ =>
     }
 
-  override def onItemUseFirst(stack: ItemStack, player: Player, level: Level, pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float, hand: InteractionHand): InteractionResult = {
-    Tablet.currentlyAnalyzing = Some((BlockPosition(pos, level), side, hitX, hitY, hitZ))
-    super.onItemUseFirst(stack, player, level, pos, side, hitX, hitY, hitZ, hand)
-  }
-
-  override def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
-    player.startUsingItem(if (player.getItemInHand(InteractionHand.MAIN_HAND) == stack) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND)
-    true
+  override def onItemUseFirst(stack: ItemStack, ctx: UseOnContext): InteractionResult = {
+    Tablet.currentlyAnalyzing = Some((
+      BlockPosition(ctx.getClickedPos, ctx.getLevel), ctx.getClickedFace,
+      (ctx.getClickLocation.x - ctx.getClickedPos.getX).toFloat,
+      (ctx.getClickLocation.y - ctx.getClickedPos.getY).toFloat,
+      (ctx.getClickLocation.z - ctx.getClickedPos.getZ).toFloat
+    ))
+    super.onItemUseFirst(stack, ctx)
   }
 
   @Deprecated
-  override def use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] =
-    use(player.getItemInHand(hand), level, player)
-
-  override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
-    player.startUsingItem(if (player.getItemInHand(InteractionHand.MAIN_HAND) == stack) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND)
-    new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
+  override def use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] = {
+    player.startUsingItem(hand)
+    InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide)
   }
 
   override def getUseDuration(stack: ItemStack, entity: LivingEntity): Int = 72000

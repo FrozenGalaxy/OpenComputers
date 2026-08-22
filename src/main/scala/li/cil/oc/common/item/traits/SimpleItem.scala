@@ -8,16 +8,14 @@ import li.cil.oc.client.renderer.item.ItemUpgradeRenderer
 import li.cil.oc.common.blockentity
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.util.ExtendedDataComponentHolder.convert
-import li.cil.oc.util.{BlockPosition, Tooltip}
+import li.cil.oc.util.Tooltip
 import net.minecraft.client.renderer.MultiBufferSource
-import net.minecraft.core.{BlockPos, Direction}
+import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item.TooltipContext
-import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.item.{Item, ItemStack, TooltipFlag}
-import net.minecraft.world.level.{Level, LevelReader}
-import net.minecraft.world.{InteractionHand, InteractionResult, InteractionResultHolder}
+import net.minecraft.world.level.LevelReader
 import net.neoforged.api.distmarker.{Dist, OnlyIn}
 import net.neoforged.neoforge.common.extensions.IItemExtension
 
@@ -40,38 +38,6 @@ trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExt
     }
   }
 
-  @Deprecated
-  override def onItemUseFirst(stack: ItemStack, ctx: UseOnContext): InteractionResult = {
-    val pos = ctx.getClickedPos
-    val hitPos = ctx.getClickLocation
-    onItemUseFirst(stack, ctx.getPlayer, ctx.getPlayer.level, pos, ctx.getClickedFace,
-      (hitPos.x - pos.getX).toFloat, (hitPos.y - pos.getY).toFloat, (hitPos.z - pos.getZ).toFloat, ctx.getHand)
-  }
-
-  @Deprecated
-  def onItemUseFirst(stack: ItemStack, player: Player, level: Level, pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float, hand: InteractionHand): InteractionResult = InteractionResult.PASS
-
-  @Deprecated
-  override def useOn(ctx: UseOnContext): InteractionResult =
-    ctx.getItemInHand match {
-      case stack: ItemStack => {
-        val world = ctx.getLevel
-        val pos = BlockPosition(ctx.getClickedPos, world)
-        val hitPos = ctx.getClickLocation
-        val success = onItemUse(stack, ctx.getPlayer, pos, ctx.getClickedFace,
-          (hitPos.x - pos.x).toFloat, (hitPos.y - pos.y).toFloat, (hitPos.z - pos.z).toFloat)
-        if (success) InteractionResult.sidedSuccess(world.isClientSide) else InteractionResult.PASS
-      }
-      case _ => super.useOn(ctx)
-    }
-
-  @Deprecated
-  def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = false
-
-  @Deprecated
-  def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] =
-    new InteractionResultHolder(InteractionResult.PASS, stack)
-
   protected def tierFromDriver(stack: ItemStack): Int =
     api.Driver.driverFor(stack) match {
       case driver: api.driver.DriverItem => driver.tier(stack)
@@ -82,7 +48,6 @@ trait SimpleItem extends Item with api.driver.item.UpgradeRenderer with IItemExt
 
   protected def tooltipData = Seq.empty[Any]
 
-  @OnlyIn(Dist.CLIENT)
   override def appendHoverText(stack: ItemStack, context: TooltipContext, tooltip: util.List[Component], flag: TooltipFlag): Unit = {
     if (tooltipName.isDefined) {
       for (curr <- Tooltip.get(tooltipName.get, tooltipData: _*)) {

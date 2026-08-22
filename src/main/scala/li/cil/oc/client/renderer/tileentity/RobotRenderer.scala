@@ -8,6 +8,7 @@ import li.cil.oc.api.driver.item.UpgradeRenderer.MountPointName
 import li.cil.oc.api.event.RobotRenderEvent
 import li.cil.oc.client.renderer.RenderTypes
 import li.cil.oc.common.EventHandler
+import li.cil.oc.common.RobotFlags
 import li.cil.oc.common.blockentity
 import li.cil.oc.util.RenderState
 import li.cil.oc.util.StackOption
@@ -40,12 +41,13 @@ object RobotRenderer extends BlockEntityRendererProvider[blockentity.RobotProxy]
   private val instance = new RobotRenderer()
 
   def renderChassis(
-                     stack: PoseStack,
-                     buffer: MultiBufferSource,
-                     light: Int,
-                     offset: Double = 0,
-                     isRunningOverride: Boolean = false
-                   ): Unit = instance.renderChassis(stack, buffer, light, null, offset, isRunningOverride)
+                      stack: PoseStack,
+                      buffer: MultiBufferSource,
+                      light: Int,
+                      offset: Double = 0,
+                      isRunningOverride: Boolean = false,
+                      flag: Option[ResourceLocation] = None
+                    ): Unit = instance.renderChassis(stack, buffer, light, null, offset, isRunningOverride, flag)
 }
 
 class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
@@ -83,11 +85,12 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
                         light: Int,
                         flag: ResourceLocation
                       ): Unit = {
-    val (renderType, flagHeight) = flag match {
-      case RobotRenderer.RainbowFlag => (RenderTypes.ROBOT_RAINBOW_FLAG, 6f)
-      case RobotRenderer.TransFlag => (RenderTypes.ROBOT_TRANS_FLAG, 5f)
+    val definition = RobotFlags.byId(flag) match {
+      case Some(value) => value
       case _ => return
     }
+    val renderType = RenderTypes.robotFlag(definition.id)
+    val flagHeight = definition.height
 
     val r = buffer.getBuffer(renderType)
     val x = 2f / 16f
@@ -212,7 +215,8 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
                      light: Int,
                      robot: blockentity.Robot = null,
                      offset: Double = 0,
-                     isRunningOverride: Boolean = false
+                     isRunningOverride: Boolean = false,
+                     flag: Option[ResourceLocation] = None
                    ): Unit = {
     val isRunning = if (robot == null) isRunningOverride else robot.isRunning
 
@@ -240,7 +244,7 @@ class RobotRenderer extends TileEntityRenderer[blockentity.RobotProxy] {
       if (!isRunning) stack.translate(0, -2 * gap, 0)
       drawTop(stack, buffer, light, cr, cg, cb)
 
-      if (robot != null) robot.info.flag.foreach(drawFlag(stack, buffer, light, _))
+      (if (robot != null) robot.info.flag else flag).foreach(drawFlag(stack, buffer, light, _))
 
       if (isRunning) {
         val lightColor = if (event.lightColor < 0) {
