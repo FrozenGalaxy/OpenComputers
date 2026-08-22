@@ -11,6 +11,7 @@ import li.cil.oc.common.openprinter.menu.DeviceMenu;
 import li.cil.oc.common.openprinter.menu.PortableStorageMenu;
 import li.cil.oc.common.openprinter.printer.PrinterBlockEntity;
 import li.cil.oc.common.openprinter.printer.PrinterConfig;
+import li.cil.oc.common.openprinter.printer.PrinterClientConfig;
 
 import li.cil.oc.api.FileSystem;
 import li.cil.oc.api.manual.PathProvider;
