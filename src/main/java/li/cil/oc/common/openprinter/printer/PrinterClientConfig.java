@@ -10,7 +10,7 @@ public final class PrinterClientConfig {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.push("printer");
         ENABLE_CUSTOM_MODEL = builder.comment("Use the detailed OpenPrinter model; disable to render a simple cube.")
-                .define("enableCustomModel", true);
+                .define("enableCustomModel", false);
         builder.pop();
         SPEC = builder.build();
     }
