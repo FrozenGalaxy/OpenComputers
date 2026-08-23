@@ -10,6 +10,8 @@ import li.cil.oc.client.KeyBindings
 import li.cil.oc.client.Textures
 import li.cil.oc.integration.util.ItemSearch
 import li.cil.oc.util.RenderState
+//NEW
+import li.cil.oc.OpenComputers
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.renderer.GameRenderer
@@ -35,13 +37,14 @@ trait InputBuffer extends DisplayBuffer {
   private var hasQueuedKey = false
   private var queuedKey = 0
   private var queuedChar = '\u0000'
+  private var queuedCharMods = 0
   private var highSurrogate = '\u0000'
 
-  protected def pushQueuedKey(keyCode: Int): Unit = {
+  protected def pushQueuedKey(keyCode: Int, mods: Int): Unit = {
     flushQueuedKey()
     hasQueuedKey = true
     queuedKey = keyCode
-    queuedChar = GLFWTranslator.keyToChar(keyCode)
+    queuedChar = GLFWTranslator.keyToChar(keyCode, mods)
   }
 
   protected def pushQueuedChar(char: Char): Unit = {
@@ -151,7 +154,7 @@ trait InputBuffer extends DisplayBuffer {
       }
       if (onInput(InputConstants.getKey(keyCode, scanCode))) return true
       if (buffer != null && keyCode != GLFW.GLFW_KEY_UNKNOWN) {
-        if (hasKeyboard) pushQueuedKey(keyCode)
+        if (hasKeyboard) pushQueuedKey(keyCode, mods)
         else showKeyboardMissing = System.currentTimeMillis()
         return true
       }
@@ -334,12 +337,46 @@ object GLFWTranslator {
 
   def glfwToLWJGL(keyCode: Int): Int = if (keyCode >= 0 && keyCode < toLWJGL.size) toLWJGL(keyCode) else -1
 
-  def keyToChar(keyCode: Int): Char = {
+  def keyToChar(keyCode: Int, mods: Int): Char = {
     if (keyCode == GLFW.GLFW_KEY_ESCAPE) '\u001B'
     else if (keyCode == GLFW.GLFW_KEY_ENTER) '\r'
     else if (keyCode == GLFW.GLFW_KEY_TAB) '\t'
     else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) '\b'
     else if (keyCode == GLFW.GLFW_KEY_KP_ENTER) '\r'
+    else if (mods == 2) (keyCode) match {
+      case GLFW.GLFW_KEY_A => 0x01
+      case GLFW.GLFW_KEY_B => 0x02
+      case GLFW.GLFW_KEY_C => 0x03
+      case GLFW.GLFW_KEY_D => 0x04
+      case GLFW.GLFW_KEY_E => 0x05
+      case GLFW.GLFW_KEY_F => 0x06
+      case GLFW.GLFW_KEY_G => 0x07
+      case GLFW.GLFW_KEY_H => 0x08
+      case GLFW.GLFW_KEY_I => 0x09
+      case GLFW.GLFW_KEY_J => 0x0A
+      case GLFW.GLFW_KEY_K => 0x0B
+      case GLFW.GLFW_KEY_L => 0x0C
+      case GLFW.GLFW_KEY_M => 0x0D
+      case GLFW.GLFW_KEY_N => 0x0E
+      case GLFW.GLFW_KEY_O => 0x0F
+      case GLFW.GLFW_KEY_P => 0x10
+      case GLFW.GLFW_KEY_Q => 0x11
+      case GLFW.GLFW_KEY_R => 0x12
+      case GLFW.GLFW_KEY_S => 0x13
+      case GLFW.GLFW_KEY_T => 0x14
+      case GLFW.GLFW_KEY_U => 0x15
+      case GLFW.GLFW_KEY_V => 0x16
+      case GLFW.GLFW_KEY_W => 0x17
+      case GLFW.GLFW_KEY_X => 0x18
+      case GLFW.GLFW_KEY_Y => 0x19
+      case GLFW.GLFW_KEY_Z => 0x1A
+      case GLFW.GLFW_KEY_LEFT_BRACKET => 0x1B
+      case GLFW.GLFW_KEY_BACKSLASH => 0x1C
+      case GLFW.GLFW_KEY_RIGHT_BRACKET => 0x1D
+      case GLFW.GLFW_KEY_6 => 0x1E
+      case GLFW.GLFW_KEY_7 => 0x1F
+      case _ => '\u0000'
+    }
     else '\u0000'
   }
 }
