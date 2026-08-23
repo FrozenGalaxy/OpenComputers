@@ -13,7 +13,6 @@ import li.cil.oc.common.openprinter.printer.PrinterBlockEntity;
 import li.cil.oc.common.openprinter.printer.PrinterConfig;
 import li.cil.oc.common.openprinter.printer.PrinterClientConfig;
 
-import li.cil.oc.api.FileSystem;
 import li.cil.oc.api.manual.PathProvider;
 import li.cil.oc.api.network.Environment;
 import net.minecraft.core.BlockPos;
@@ -21,7 +20,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -66,8 +64,6 @@ public final class OpenPrinter {
             "print", "printercopypage", "printerstatus", "xerox", "printmap"
     };
     private static final String[] LUA_ARCHITECTURES = {"Lua 5.2", "Lua 5.3", "LuaJ"};
-    private static ItemStack toolsDisk = ItemStack.EMPTY;
-
     public static final Blocks BLOCKS = DeferredRegister.createBlocks(MOD_ID);
     public static final Items ITEMS = DeferredRegister.createItems(MOD_ID);
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
@@ -157,9 +153,6 @@ public final class OpenPrinter {
 
     private static void registerOpenComputersIntegration() {
         try {
-            ResourceLocation location = id("loot/printer/printercopy");
-            toolsDisk = li.cil.oc.api.Items.registerFloppy(TOOLS_DISK_LABEL, location, DyeColor.GREEN,
-                    () -> FileSystem.asReadOnly(FileSystem.fromResource(location)), true);
             for (String program : TOOLS_DISK_PROGRAMS) {
                 li.cil.oc.api.IMC.registerProgramDiskLabel(program, TOOLS_DISK_LABEL, LUA_ARCHITECTURES);
             }

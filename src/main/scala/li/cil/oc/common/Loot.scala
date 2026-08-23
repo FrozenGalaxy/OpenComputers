@@ -16,7 +16,6 @@ import li.cil.oc.util.Color
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.item.DyeColor
 import net.minecraft.world.item.ItemStack
-import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.AddReloadListenerEvent
@@ -28,9 +27,7 @@ import scala.collection.mutable
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.storage.LevelResource
-import net.minecraft.nbt.Tag
 import net.minecraft.network.chat.Component
-import net.minecraft.world.item.component.CustomData
 import net.neoforged.neoforge.event.level.LevelEvent
 
 import scala.jdk.CollectionConverters._
@@ -44,8 +41,6 @@ object Loot {
   //    ChestGenHooks.STRONGHOLD_LIBRARY)
 
   val factories = mutable.Map.empty[ResourceLocation, Callable[FileSystem]]
-
-  val globalDisks = mutable.ArrayBuffer.empty[(ItemStack, Int)]
 
   val worldDisks = mutable.ArrayBuffer.empty[(ItemStack, Int)]
 
@@ -64,13 +59,23 @@ object Loot {
 
   private val datapackDisks = mutable.ArrayBuffer.empty[(ItemStack, Int)]
   private val datapackCyclingDisks = mutable.ArrayBuffer.empty[ItemStack]
-  private val datapackEEPROMs = mutable.ArrayBuffer.empty[ItemStack]
+  private val datapackEEPROMs = mutable.ArrayBuffer.empty[(ResourceLocation, ItemStack)]
   private val datapackFactories = mutable.Map.empty[ResourceLocation, Callable[FileSystem]]
   private val datapackPreviousFactories = mutable.Map.empty[ResourceLocation, Option[Callable[FileSystem]]]
 
+  private val defaultEEPROMId = ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, Constants.ItemName.LuaBios)
+
+  def defaultEEPROM: ItemStack = synchronized {
+    datapackEEPROMs.collectFirst {
+      case (id, stack) if id == defaultEEPROMId => stack.copy()
+    }.orElse {
+      eepromsForClient.find(_.get(OCComponents.LABEL.get()) == "EEPROM (Lua BIOS)").map(_.copy())
+    }.getOrElse(ItemStack.EMPTY)
+  }
+
   def resetDisksForClient(): Unit = synchronized {
     disksForClient.clear()
-    for ((stack, _) <- globalDisks ++ datapackDisks
+    for ((stack, _) <- datapackDisks
          if !disksForClient.exists(ItemStack.isSameItemSameComponents(_, stack))) {
       disksForClient += stack.copy()
     }
@@ -107,14 +112,6 @@ object Loot {
     stack.copy()
   }
 
-  def init(): Unit = {
-
-    val list = new java.util.Properties()
-    val listStream = getClass.getResourceAsStream("/assets/" + Settings.resourceDomain + "/loot/loot.properties")
-    list.load(listStream)
-    listStream.close()
-    parseLootDisks(list, globalDisks, external = false)
-  }
 
   @SubscribeEvent
   def addReloadListener(e: AddReloadListenerEvent): Unit = {
@@ -161,7 +158,7 @@ object Loot {
       }
     }
 
-    for (entry <- globalDisks ++ datapackDisks if !worldDisks.exists(existing => sameLootDisk(existing._1, entry._1))) {
+    for (entry <- datapackDisks if !worldDisks.exists(existing => sameLootDisk(existing._1, entry._1))) {
       worldDisks += entry
     }
     for ((stack, count) <- worldDisks if count > 0) {
@@ -259,9 +256,9 @@ object Loot {
 
   private def applyDatapackEEPROMs(definitions: java.util.Map[ResourceLocation, JsonElement], manager: ResourceManager): Unit = synchronized {
     eepromsForServer --= eepromsForServer.filter(existing =>
-      datapackEEPROMs.exists(previous => ItemStack.isSameItemSameComponents(existing, previous)))
+      datapackEEPROMs.exists(previous => ItemStack.isSameItemSameComponents(existing, previous._2)))
     eepromsForClient --= eepromsForClient.filter(existing =>
-      datapackEEPROMs.exists(previous => ItemStack.isSameItemSameComponents(existing, previous)))
+      datapackEEPROMs.exists(previous => ItemStack.isSameItemSameComponents(existing, previous._2)))
     datapackEEPROMs.clear()
 
     definitions.asScala.toSeq.sortBy(_._1.toString).foreach { case (id, element) =>
@@ -281,7 +278,7 @@ object Loot {
         val code = readEEPROMResource(json, "code", id, root, manager)
         val data = readEEPROMResource(json, "data", id, root, manager)
         val stack = OCItems.registerEEPROM(label, code.orNull, data.orNull, readonly)
-        datapackEEPROMs += stack
+        datapackEEPROMs += ((id, stack))
         eepromsForServer += stack
         eepromsForClient += stack.copy()
       }
@@ -321,15 +318,12 @@ object Loot {
         case Array(name, count, color) =>
           val stack = createLootDisk(name, key, external, Some(Color.byName(color)))
           acc += ((stack, count.toInt))
-          if (acc eq globalDisks) disksForClient += stack
         case Array(name, count) =>
           val stack = createLootDisk(name, key, external)
           acc += ((stack, count.toInt))
-          if (acc eq globalDisks) disksForClient += stack
         case _ =>
           val stack = createLootDisk(value, key, external)
           acc += ((stack, 1))
-          if (acc eq globalDisks) disksForClient += stack
       }
       catch {
         case t: Throwable => OpenComputers.log.warn("Bad loot descriptor: " + value, t)

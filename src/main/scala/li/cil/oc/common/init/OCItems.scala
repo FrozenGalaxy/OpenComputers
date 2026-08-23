@@ -13,15 +13,13 @@ import li.cil.oc.integration.opencomputers.ModOpenComputers
 import li.cil.oc.server.machine.luac.LuaStateFactory
 import li.cil.oc.util.{Rarity => OCRarity}
 import li.cil.oc.{Constants, OpenComputers, Settings, common}
-import net.minecraft.core.registries.Registries
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.Item.Properties
 import net.minecraft.world.item._
 import net.minecraft.world.level.block.Block
-import net.neoforged.bus.api.{EventPriority, IEventBus}
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent
-import net.neoforged.neoforge.registries.{DeferredItem, DeferredRegister, RegisterEvent}
+import net.neoforged.bus.api.IEventBus
+import net.neoforged.neoforge.registries.{DeferredItem, DeferredRegister}
 
 import java.nio.ByteBuffer
 import java.util
@@ -193,7 +191,7 @@ object OCItems extends ItemAPI {
 
   // ----------------------------------------------------------------------- //
 
-  private def safeGetStack(name: String) = Option(get(name)).map(_.createItemStack(1)).getOrElse(ItemStack.EMPTY)
+  private def safeGetStack(name: String) = if (name == Constants.ItemName.LuaBios) Loot.defaultEEPROM.copy() else Option(get(name)).map(_.createItemStack(1)).getOrElse(ItemStack.EMPTY)
 
   def createConfiguredDrone(): ItemStack = {
     val data = new DroneData()
@@ -331,14 +329,6 @@ object OCItems extends ItemAPI {
   private def defaultProps = new Properties()
 
   def init(bus: IEventBus): Unit = {
-    // DeferredRegister listens at HIGHEST priority, so our LOW-priority listener
-    // runs after all items are registered — safe to call ro.get() / createItemStack.
-    bus.addListener(EventPriority.LOW, (event: RegisterEvent) => {
-      if (event.getRegistryKey == Registries.ITEM) {
-        initPostStorage()
-      }
-    })
-
     ITEMS.register(bus)
   }
 
@@ -524,14 +514,6 @@ object OCItems extends ItemAPI {
   val SSDTier2: DeferredItem[item.SolidStateDrive] = registerItem(new item.SolidStateDrive(defaultProps.rarity(Rarity.RARE), Tier.Two), Constants.ItemName.SSDTier2, Constants.SectionName.Component)
   val SSDTier3: DeferredItem[item.SolidStateDrive] = registerItem(new item.SolidStateDrive(defaultProps.rarity(OCRarity.LEGENDARY), Tier.Three), Constants.ItemName.SSDTier3, Constants.SectionName.Component)
 
-  private def initPostStorage(): Unit = {
-    val luaBios = {
-      val code = new Array[Byte](4 * 1024)
-      val count = OpenComputers.getClass.getResourceAsStream(Settings.scriptPath + "bios.lua").read(code)
-      createEEPROM("EEPROM (Lua BIOS)", code.take(count), null, readonly = false)
-    }
-    registerStack(luaBios, Constants.ItemName.LuaBios, null)
-  }
 
   /////////////////////////////////////////////////////////////////
   // Special purpose items that don't fit into any other category.
