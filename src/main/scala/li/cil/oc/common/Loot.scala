@@ -68,6 +68,14 @@ object Loot {
   private val datapackFactories = mutable.Map.empty[ResourceLocation, Callable[FileSystem]]
   private val datapackPreviousFactories = mutable.Map.empty[ResourceLocation, Option[Callable[FileSystem]]]
 
+  def resetDisksForClient(): Unit = synchronized {
+    disksForClient.clear()
+    for ((stack, _) <- globalDisks ++ datapackDisks
+         if !disksForClient.exists(ItemStack.isSameItemSameComponents(_, stack))) {
+      disksForClient += stack.copy()
+    }
+  }
+
   // IDs registered into Items.descriptors via Items.registerStack for loot disks
   // (see createLootDisk below). decorateCreativeTab must skip these when iterating
   // descriptors, since the same stacks are already added via disksForClient — iterating
@@ -214,6 +222,7 @@ object Loot {
         val hadCyclingDisk = disksForCyclingServer.exists(_.get(OCComponents.LOOT_DISK.get()) == id)
         val stack = registerLootDisk(label, label,  id, color, factory, recipeCycling)
         datapackDisks += ((stack, weight))
+        if (!disksForClient.exists(ItemStack.isSameItemSameComponents(_, stack))) disksForClient += stack.copy()
         if (recipeCycling && !hadCyclingDisk) datapackCyclingDisks += stack
       }
       catch {
@@ -225,6 +234,8 @@ object Loot {
   }
 
   private def clearDatapackDisks(): Unit = {
+    disksForClient --= disksForClient.filter(existing =>
+      datapackDisks.exists(previous => ItemStack.isSameItemSameComponents(existing, previous._1)))
     for ((stack, _) <- datapackDisks) {
       worldDisks --= worldDisks.filter(entry => sameLootDisk(entry._1, stack))
       disksForSampling --= disksForSampling.filter(existing => sameLootDisk(existing, stack))

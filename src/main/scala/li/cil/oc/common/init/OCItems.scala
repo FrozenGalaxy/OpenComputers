@@ -541,6 +541,12 @@ object OCItems extends ItemAPI {
   val Present: DeferredItem[item.Present] = registerItem(new item.Present(defaultProps), Constants.ItemName.Present, Constants.SectionName.Misc)
 
   def decorateCreativeTab(displayItems: Consumer[ItemStack], searchItems: Consumer[ItemStack]): Unit = {
+    decorateCreativeTab(displayItems, searchItems, util.Collections.emptyList(), util.Collections.emptySet())
+  }
+
+  def decorateCreativeTab(displayItems: Consumer[ItemStack], searchItems: Consumer[ItemStack],
+                          additionalDisplayItems: util.Collection[ItemStack],
+                          additionalSearchItems: util.Collection[ItemStack]): Unit = {
     import Constants.{BlockName => B, ItemName => I}
     // Assembled devices are not usable without their component data. Their
     // configured creative variants are added explicitly below.
@@ -551,11 +557,23 @@ object OCItems extends ItemAPI {
     }
 
     val sectionMap = new util.HashMap[String, util.List[ItemStack]]
+    val sectionStacks = mutable.ArrayBuffer.empty[ItemStack]
+
+    def addToSection(sectionId: String, stack: ItemStack): Unit = {
+      if (!stack.isEmpty && !sectionStacks.exists(ItemStack.isSameItemSameComponents(_, stack))) {
+        sectionMap.computeIfAbsent(sectionId, (s) => new util.LinkedList).add(stack)
+        sectionStacks += stack
+      }
+    }
+
     for ((id, info) <- descriptors if !excluded.contains(id)){
       val sectionId = ITEM_TO_SECTION.getOrElse(id, Constants.SectionName.Misc)
-      val stack = info.createItemStack(1)
-      sectionMap.computeIfAbsent(sectionId, (s) => new util.LinkedList).add(stack)
+      addToSection(sectionId, info.createItemStack(1))
     }
+
+    Loot.disksForClient.foreach(addToSection(Constants.SectionName.Misc, _))
+    Loot.eepromsForClient.foreach(addToSection(Constants.SectionName.Component, _))
+    additionalDisplayItems.forEach(addToSection(Constants.SectionName.Misc, _))
 
     for (i <- 0 until 9) {
       displayItems.accept(ItemStack.EMPTY)
@@ -588,6 +606,8 @@ object OCItems extends ItemAPI {
         }
       }
     })
+
+    additionalSearchItems.forEach(stack => searchItems.accept(stack))
 
     displayItems.accept(OCItems.createConfiguredDrone())
     displayItems.accept(OCItems.createConfiguredMicrocontroller())

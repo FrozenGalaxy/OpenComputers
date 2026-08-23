@@ -23,9 +23,18 @@ import java.util
   @WrapMethod(method = Array("buildContents")) private def openComputers$buildContents(parameters: CreativeModeTab.ItemDisplayParameters, original: Operation[Void]): Unit = {
     val self = this.asInstanceOf[AnyRef].asInstanceOf[CreativeModeTab]
     if (self eq CreativeTab.MAIN.get()) {
+      val sectionDisplayItems = displayItems
+      val sectionSearchItems = displayItemsSearchTab
+
+      original.call(parameters)
+      val additionalDisplayItems = new util.ArrayList[ItemStack](displayItems)
+      val additionalSearchItems = new util.ArrayList[ItemStack](displayItemsSearchTab)
+
+      displayItems = sectionDisplayItems
+      displayItemsSearchTab = sectionSearchItems
       displayItems.clear()
       displayItemsSearchTab.clear()
-      OCItems.decorateCreativeTab(displayItems.add, displayItemsSearchTab.add)
+      OCItems.decorateCreativeTab(displayItems.add, displayItemsSearchTab.add, additionalDisplayItems, additionalSearchItems)
       return
     }
     original.call(parameters)
