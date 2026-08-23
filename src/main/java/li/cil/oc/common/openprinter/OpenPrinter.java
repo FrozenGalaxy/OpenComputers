@@ -47,6 +47,8 @@ import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.function.Consumer;
+
 /**
  * OpenPrinter, integrated directly into OpenComputers.
  *
@@ -164,20 +166,19 @@ public final class OpenPrinter {
         } catch (RuntimeException exception) {
             LOGGER.warn("Could not register the OpenPrinter tools disk", exception);
         }
-    }
 
-    public static void addCreativeItems(BuildCreativeModeTabContentsEvent event) {
-        event.accept(PRINTER.get());
-        event.accept(SHREDDER.get());
-        event.accept(FILE_CABINET.get());
-        event.accept(BRIEFCASE.get());
-        event.accept(PRINTED_PAGE.get());
-        event.accept(BLACK_INK.get());
-        event.accept(COLOR_INK.get());
-        event.accept(PAPER_SHREDS.get());
-        event.accept(FOLDER.get());
-        // The tools disk is registered through OpenComputers' public floppy API,
-        // which already adds it to the OpenComputers creative tab.
+
+        li.cil.oc.api.Items.registerStack(PRINTER.toStack(), PRINTER.getRegisteredName(), "25_components");
+
+        li.cil.oc.api.Items.registerStack(SHREDDER.toStack(), SHREDDER.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(FILE_CABINET.toStack(), FILE_CABINET.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(BRIEFCASE.toStack(), BRIEFCASE.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(PRINTED_PAGE.toStack(), PRINTED_PAGE.getRegisteredName(), "49_tools");
+        li.cil.oc.api.Items.registerStack(FOLDER.toStack(), PRINTED_PAGE.getRegisteredName(), "49_tools");
+
+        li.cil.oc.api.Items.registerStack(BLACK_INK.toStack(), BLACK_INK.getRegisteredName(), "50_materials");
+        li.cil.oc.api.Items.registerStack(COLOR_INK.toStack(), COLOR_INK.getRegisteredName(), "50_materials");
+        li.cil.oc.api.Items.registerStack(PAPER_SHREDS.toStack(), PAPER_SHREDS.getRegisteredName(), "50_materials");
     }
 
     /**
