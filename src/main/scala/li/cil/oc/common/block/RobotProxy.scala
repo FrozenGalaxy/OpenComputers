@@ -1,11 +1,12 @@
 package li.cil.oc.common.block
 
-import li.cil.oc.{Constants, Settings, api}
+import li.cil.oc.Settings
 import li.cil.oc.client.KeyBindings
 import li.cil.oc.common.item.data.RobotData
 import li.cil.oc.common.menu.MenuTypes
 import li.cil.oc.common.blockentity
 import li.cil.oc.common.blockentity.BlockEntityTypes
+import li.cil.oc.common.init.OCBlocks
 import li.cil.oc.common.entity.TrainRobot
 import li.cil.oc.server.{PacketSender, agent}
 import li.cil.oc.server.loot.LootFunctions
@@ -250,7 +251,7 @@ class RobotProxy(props: Properties) extends RedstoneAware(props) with traits.Sta
 
       robot.moveFrom.foreach(fromPos => {
         val targetState = world.getBlockState(fromPos)
-        if (targetState.getBlock == api.Items.get(Constants.BlockName.RobotAfterimage).block) {
+        if (targetState.is(OCBlocks.RobotAfterimage.get())) {
           world.setBlock(fromPos, Blocks.AIR.defaultBlockState, 3)
         }
       })

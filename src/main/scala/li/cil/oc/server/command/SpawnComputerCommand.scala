@@ -1,15 +1,16 @@
 package li.cil.oc.server.command
 
 import com.mojang.brigadier.CommandDispatcher
-import li.cil.oc.{Constants, api}
+import li.cil.oc.{api, Constants}
 import li.cil.oc.common.Loot
 import li.cil.oc.common.blockentity.{Case => CaseBlockEntity}
 import li.cil.oc.common.blockentity.traits.Rotatable
+import li.cil.oc.common.init.{OCBlocks, OCItems}
 import li.cil.oc.server.machine.luac.LuaStateFactory
-import net.minecraft.commands.{CommandSourceStack, Commands}
+import net.minecraft.commands.{Commands, CommandSourceStack}
 import net.minecraft.core.Direction
 import net.minecraft.network.chat.Component
-import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.{BlockHitResult, HitResult}
 
 object SpawnComputerCommand {
@@ -40,9 +41,6 @@ object SpawnComputerCommand {
           return 0
         }
 
-        def place(pos: net.minecraft.core.BlockPos, name: String): Unit =
-          level.setBlockAndUpdate(pos, api.Items.get(name).block().defaultBlockState())
-
         def rotateProperly(pos: net.minecraft.core.BlockPos): Option[Rotatable] =
           level.getBlockEntity(pos) match {
             case rotatable: Rotatable =>
@@ -55,17 +53,17 @@ object SpawnComputerCommand {
             case _ => None
           }
 
-        place(casePos, Constants.BlockName.CaseCreative)
+        level.setBlockAndUpdate(casePos, OCBlocks.CaseCreative.get().defaultBlockState())
         rotateProperly(casePos)
 
-        place(screenPos, Constants.BlockName.ScreenTier2)
+        level.setBlockAndUpdate(screenPos, OCBlocks.ScreenTier2.get().defaultBlockState())
         rotateProperly(screenPos).foreach { rotatable =>
           if (rotatable.pitch == Direction.UP || rotatable.pitch == Direction.DOWN) {
             rotatable.pitch = Direction.NORTH
           }
         }
 
-        place(keyboardPos, Constants.BlockName.Keyboard)
+        level.setBlockAndUpdate(keyboardPos, OCBlocks.Keyboard.get().defaultBlockState())
         level.getBlockEntity(keyboardPos) match {
           case rotatable: Rotatable =>
             rotatable.setFromEntityPitchAndYaw(player)
