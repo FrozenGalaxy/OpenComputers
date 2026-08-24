@@ -10,8 +10,6 @@ import li.cil.oc.client.KeyBindings
 import li.cil.oc.client.Textures
 import li.cil.oc.integration.util.ItemSearch
 import li.cil.oc.util.RenderState
-//NEW
-import li.cil.oc.OpenComputers
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.renderer.GameRenderer
