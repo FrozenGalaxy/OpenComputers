@@ -41,6 +41,23 @@ object SpawnComputerCommand {
           return 0
         }
 
+        val apu = Option(api.Items.get(Constants.ItemName.APUCreative)).map(_.createItemStack(1))
+        val components = Seq(
+          apu,
+          Option(api.Items.get(Constants.ItemName.RAMTier6)).map(_.createItemStack(1)),
+          Option(api.Items.get(Constants.ItemName.RAMTier6)).map(_.createItemStack(1)),
+          Option(api.Items.get(Constants.ItemName.HDDTier3)).map(_.createItemStack(1)),
+          Option(Loot.defaultEEPROM).filter(stack => !stack.isEmpty),
+          Option(Loot.defaultOpenOS).filter(stack => !stack.isEmpty)
+        ).flatten
+
+        if (components.size != 6 || components.exists(_.isEmpty)) {
+          source.sendFailure(Component.literal("OpenComputers default EEPROM/OpenOS data is not loaded; reload the server resources and try again."))
+          return 0
+        }
+
+        val apuStack = components.head
+
         def rotateProperly(pos: net.minecraft.core.BlockPos): Option[Rotatable] =
           level.getBlockEntity(pos) match {
             case rotatable: Rotatable =>
@@ -73,19 +90,9 @@ object SpawnComputerCommand {
 
         api.Network.joinOrCreateNetwork(level.getBlockEntity(casePos))
 
-        val apu = api.Items.get(Constants.ItemName.APUCreative).createItemStack(1)
-        LuaStateFactory.setDefaultArch(apu)
+        LuaStateFactory.setDefaultArch(apuStack)
         level.getBlockEntity(casePos) match {
           case computer: CaseBlockEntity =>
-            val components = Seq(
-              apu,
-              api.Items.get(Constants.ItemName.RAMTier6).createItemStack(1),
-              api.Items.get(Constants.ItemName.RAMTier6).createItemStack(1),
-              api.Items.get(Constants.ItemName.HDDTier3).createItemStack(1),
-              Loot.defaultEEPROM,
-              api.Items.get(Constants.ItemName.OpenOS).createItemStack(1)
-            )
-
             for (component <- components) {
               val slot = (0 until computer.getContainerSize)
                 .find(i => computer.getItem(i).isEmpty && computer.canPlaceItem(i, component))
