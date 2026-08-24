@@ -42,6 +42,15 @@ class GraphicsCard(val tier: Int, val vramScreens: Option[Double] = None, val vi
 
   private val maxResolution = Settings.screenResolutionsByTier(tier)
 
+  private val defaultResolution = {
+    val (width, height) = Settings.screenResolutionsByTier(tier)
+    val (configuredWidth, configuredHeight) = Settings.get.defaultResolution
+    (
+      if (configuredWidth > 0) width min configuredWidth else width,
+      if (configuredHeight > 0) height min configuredHeight else height
+    )
+  }
+
   private val maxDepth = Settings.screenDepthsByTier(tier)
 
   private var screenAddress: Option[String] = None
@@ -438,6 +447,15 @@ class GraphicsCard(val tier: Int, val vramScreens: Option[Double] = None, val vi
       val smw = s.getMaximumWidth
       val smh = s.getMaximumHeight
       result(math.min(gmw, smw), math.min(gmh, smh))
+    })
+
+  @Callback(direct = true, doc = """function():number, number -- Get the default screen resolution.""")
+  def getDefaultResolution(context: Context, args: Arguments): Array[AnyRef] =
+    screen(s => {
+      val (gdw, gdh) = defaultResolution
+      val smw = s.getMaximumWidth
+      val smh = s.getMaximumHeight
+      result(math.min(gdw, smw), math.min(gdh, smh))
     })
 
     @Callback(direct = true, doc = """function():number, number -- Get the maximum screen resolution supported by the GPU.""")
