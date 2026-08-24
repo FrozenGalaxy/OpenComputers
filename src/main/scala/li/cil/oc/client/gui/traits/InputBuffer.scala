@@ -343,39 +343,10 @@ object GLFWTranslator {
     else if (keyCode == GLFW.GLFW_KEY_TAB) '\t'
     else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) '\b'
     else if (keyCode == GLFW.GLFW_KEY_KP_ENTER) '\r'
-    else if (mods == 2) (keyCode) match {
-      case GLFW.GLFW_KEY_A => 0x01
-      case GLFW.GLFW_KEY_B => 0x02
-      case GLFW.GLFW_KEY_C => 0x03
-      case GLFW.GLFW_KEY_D => 0x04
-      case GLFW.GLFW_KEY_E => 0x05
-      case GLFW.GLFW_KEY_F => 0x06
-      case GLFW.GLFW_KEY_G => 0x07
-      case GLFW.GLFW_KEY_H => 0x08
-      case GLFW.GLFW_KEY_I => 0x09
-      case GLFW.GLFW_KEY_J => 0x0A
-      case GLFW.GLFW_KEY_K => 0x0B
-      case GLFW.GLFW_KEY_L => 0x0C
-      case GLFW.GLFW_KEY_M => 0x0D
-      case GLFW.GLFW_KEY_N => 0x0E
-      case GLFW.GLFW_KEY_O => 0x0F
-      case GLFW.GLFW_KEY_P => 0x10
-      case GLFW.GLFW_KEY_Q => 0x11
-      case GLFW.GLFW_KEY_R => 0x12
-      case GLFW.GLFW_KEY_S => 0x13
-      case GLFW.GLFW_KEY_T => 0x14
-      case GLFW.GLFW_KEY_U => 0x15
-      case GLFW.GLFW_KEY_V => 0x16
-      case GLFW.GLFW_KEY_W => 0x17
-      case GLFW.GLFW_KEY_X => 0x18
-      case GLFW.GLFW_KEY_Y => 0x19
-      case GLFW.GLFW_KEY_Z => 0x1A
-      case GLFW.GLFW_KEY_LEFT_BRACKET => 0x1B
-      case GLFW.GLFW_KEY_BACKSLASH => 0x1C
-      case GLFW.GLFW_KEY_RIGHT_BRACKET => 0x1D
-      case GLFW.GLFW_KEY_6 => 0x1E
-      case GLFW.GLFW_KEY_7 => 0x1F
-      case _ => '\u0000'
+    else if ((mods & GLFW.GLFW_MOD_CONTROL) != 0) {
+      var c = (keyCode-64).max(0).toChar
+      if (c > 32) 0
+      else c
     }
     else '\u0000'
   }
