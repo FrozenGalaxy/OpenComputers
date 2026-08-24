@@ -98,12 +98,17 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
       if (inventoryContainer.isRunning) Localization.Computer.TurnOff else Localization.Computer.TurnOn
     )))
 
-    power.level = inventoryContainer.globalBuffer.toDouble / inventoryContainer.globalBufferSize
-    val format = Localization.Computer.Power + ": %d%% (%d/%d)"
-    power.setTooltip(Tooltip.create(Component.literal(format.format(
-      100 * inventoryContainer.globalBuffer / inventoryContainer.globalBufferSize,
-      inventoryContainer.globalBuffer, inventoryContainer.globalBufferSize
-    ))))
+    if (inventoryContainer.globalBufferSize == 0) {
+      power.level = 0
+      power.setTooltip(null)
+    } else {
+      power.level = inventoryContainer.globalBuffer.toDouble / inventoryContainer.globalBufferSize
+      val format = Localization.Computer.Power + ": %d%% (%d/%d)"
+      power.setTooltip(Tooltip.create(Component.literal(format.format(
+        100 * inventoryContainer.globalBuffer / inventoryContainer.globalBufferSize,
+        inventoryContainer.globalBuffer, inventoryContainer.globalBufferSize
+      ))))
+    }
 
     scrollButton.active = canScroll
     scrollButton.hoverOverride = isScrolling
