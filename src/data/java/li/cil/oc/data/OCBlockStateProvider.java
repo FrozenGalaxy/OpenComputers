@@ -6,6 +6,7 @@ import li.cil.oc.common.block.property.PropertyRotatable;
 import li.cil.oc.common.block.property.PropertyRunning;
 import li.cil.oc.common.init.OCBlocks;
 import li.cil.oc.common.openprinter.OpenPrinter;
+import li.cil.oc.common.openprinter.block.DeviceBlock;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.PackOutput;
@@ -146,7 +147,7 @@ public class OCBlockStateProvider extends BlockStateProvider {
         horizontalBlock(OpenPrinter.BRIEFCASE.get(), existingModel(OpenPrinter.BRIEFCASE.get()));
         itemModels().simpleBlockItem(OpenPrinter.BRIEFCASE.get());
 
-        horizontalBlock(OpenPrinter.PRINTER.get(), existingModel(OpenPrinter.PRINTER.get()));
+        printerBlock();
         itemModels().simpleBlockItem(OpenPrinter.PRINTER.get());
 
         cableBlock();
@@ -294,6 +295,16 @@ public class OCBlockStateProvider extends BlockStateProvider {
     private void horizontalBlockGenericTop(Block block) {
         horizontalBlock(block, models().orientable(
             modelName(block), textureName(block, "side"), textureName(block, "front"), GENERIC_TOP)
+        );
+    }
+
+    private void printerBlock() {
+        var block = OpenPrinter.PRINTER.get();
+        var model = existingModel(block);
+        getVariantBuilder(block).forAllStates(state -> ConfiguredModel.builder()
+            .modelFile(model)
+            .rotationY(getYRotation(state.getValue(DeviceBlock.FACING), 0))
+            .build()
         );
     }
 
