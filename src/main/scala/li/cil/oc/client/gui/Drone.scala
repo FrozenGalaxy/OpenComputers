@@ -1,7 +1,6 @@
 package li.cil.oc.client.gui
 
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, Tesselator, VertexFormat}
 import li.cil.oc.Localization
 import li.cil.oc.client.{Textures, PacketSender => ClientPacketSender}
 import li.cil.oc.client.gui.widget.ProgressBar
@@ -47,8 +46,6 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
   private var power: ProgressBar = _
 
   private val selectionSize = 20
-  private val selectionsStates = 17
-  private val selectionStepV = 1 / selectionsStates.toFloat
 
   override protected def init(): Unit = {
     super.init()
@@ -109,22 +106,13 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
   override protected def drawSlotBackground(graphics: GuiGraphics, x: Int, y: Int): Unit = {}
 
   private def drawSelection(graphics: GuiGraphics): Unit = {
-    val stack = graphics.pose()
     val slot = inventoryContainer.selectedSlot
     if (slot >= 0 && slot < 16) {
-      Textures.bind(Textures.GUI.RobotSelection)
-      val now = System.currentTimeMillis() % 1000 / 1000.0f
-      val offsetV = (now * selectionsStates).toInt * selectionStepV
       val x = leftPos + inventoryX - 1 + (slot % 4) * (selectionSize - 2)
       val y = topPos + inventoryY - 1 + (slot / 4) * (selectionSize - 2)
-
-      val t = Tesselator.getInstance
-      val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
-      r.addVertex(stack.last.pose(), x.toFloat, y.toFloat, 0f).setUv(0f, offsetV)
-      r.addVertex(stack.last.pose(), x.toFloat, (y + selectionSize).toFloat, 0f).setUv(0f, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, (y + selectionSize).toFloat, 0f).setUv(1f, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, y.toFloat, 0f).setUv(1f, offsetV)
-      BufferUploader.drawWithShader(r.buildOrThrow())
+      RenderSystem.enableBlend()
+      graphics.blitSprite(Textures.GUISprites.RobotSelection, x, y, selectionSize, selectionSize)
+      RenderSystem.disableBlend()
     }
   }
 }

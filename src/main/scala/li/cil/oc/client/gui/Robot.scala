@@ -1,7 +1,7 @@
 package li.cil.oc.client.gui
 
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, PoseStack, Tesselator, VertexFormat}
+import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.{Localization, Settings}
 import li.cil.oc.api.internal.TextBuffer
 import li.cil.oc.client.{ComponentTracker, Textures, PacketSender => ClientPacketSender}
@@ -77,8 +77,6 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
   private var power: ProgressBar = _
 
   private val selectionSize = 20
-  private val selectionsStates = 17
-  private val selectionStepV = 1 / selectionsStates.toFloat
 
   override protected def init(): Unit = {
     super.init()
@@ -156,7 +154,7 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
     graphics.blit(if (buffer != null) Textures.GUI.Robot else Textures.GUI.RobotNoScreen, leftPos, topPos, 0, 0, imageWidth, imageHeight)
 
     if (inventoryContainer.info.mainInvSize > 0) {
-      drawSelection(graphics.pose)
+      drawSelection(graphics)
     }
 
     drawInventorySlots(graphics)
@@ -239,22 +237,14 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
     math.min(scaleX, scaleY)
   }
 
-  private def drawSelection(stack: PoseStack): Unit = {
+  private def drawSelection(graphics: GuiGraphics): Unit = {
     val slot = inventoryContainer.selectedSlot - inventoryOffset * 4
     if (slot >= 0 && slot < 16) {
-      Textures.bind(Textures.GUI.RobotSelection)
-      val now = System.currentTimeMillis() % 1000 / 1000.0f
-      val offsetV = (now * selectionsStates).toInt * selectionStepV
       val x = leftPos + inventoryX - 1 + (slot % 4) * (selectionSize - 2)
       val y = topPos + inventoryY - 1 + (slot / 4) * (selectionSize - 2)
-
-      val t = Tesselator.getInstance
-      val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
-      r.addVertex(stack.last.pose(), x.toFloat, y.toFloat, 0f).setUv(0f, offsetV)
-      r.addVertex(stack.last.pose(), x.toFloat, (y + selectionSize).toFloat, 0f).setUv(0f, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, (y + selectionSize).toFloat, 0f).setUv(1f, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, y.toFloat, 0f).setUv(1f, offsetV)
-      BufferUploader.drawWithShader(r.buildOrThrow())
+      RenderSystem.enableBlend()
+      graphics.blitSprite(Textures.GUISprites.RobotSelection, x, y, selectionSize, selectionSize)
+      RenderSystem.disableBlend()
     }
   }
 }
