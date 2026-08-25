@@ -36,7 +36,6 @@ object Textures {
     val Drive = L("drive")
     val Drone = L("drone")
     val Manual = L("manual")
-    val ManualMissingItem = L("manual_missing_item")
     val Nanomachines = L("nanomachines_power")
     val NanomachinesBar = L("nanomachines_power_bar")
     val Printer = L("printer")
@@ -63,6 +62,7 @@ object Textures {
     val PrinterMaterial: ResourceLocation = L("printer_material")
     val PrinterProgress: ResourceLocation = L("printer_progress")
     val UpgradeTab: ResourceLocation = L("upgrade_tab")
+    val ManualMissingItem = L("manual_missing_item")
 
     val ButtonDriveMode: WidgetSprites = new WidgetSprites(L("button_drive_mode"), L("button_drive_mode_disabled"), L("button_drive_mode_highlight"))
     val ButtonPower: WidgetSprites = new WidgetSprites(
