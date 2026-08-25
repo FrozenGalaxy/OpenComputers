@@ -7,21 +7,18 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Simple implementation of a tab icon renderer using a full texture as its graphic.
- *
- * @deprecated Use {@link SpriteTabIconRenderer}.
+ * Simple implementation of a tab icon renderer using a sprite on the default texture atlas as its graphic.
  */
-@Deprecated
-public class TextureTabIconRenderer implements TabIconRenderer {
+public class SpriteTabIconRenderer implements TabIconRenderer {
     private final ResourceLocation location;
 
-    public TextureTabIconRenderer(ResourceLocation location) {
+    public SpriteTabIconRenderer(ResourceLocation location) {
         this.location = location;
     }
 
     @Override
     @OnlyIn(Dist.CLIENT)
     public void render(GuiGraphics graphics) {
-        graphics.blit(location, 0, 0, 0, 0, 16, 16, 16, 16);
+        graphics.blitSprite(location, 0, 0, 16, 16);
     }
 }

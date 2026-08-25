@@ -23,7 +23,7 @@ class Case(state: menu.Case, playerInventory: Inventory, name: Component)
 
   override protected def init(): Unit = {
     super.init()
-    powerButton = addRenderableWidget(new ImageButton(leftPos + 70, topPos + 33, 18, 18, (_: Button) => ClientPacketSender.sendComputerPower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUI.ButtonPower, canToggle = true))
+    powerButton = addRenderableWidget(new ImageButton(leftPos + 70, topPos + 33, 18, 18, (_: Button) => ClientPacketSender.sendComputerPower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUISprites.ButtonPower))
   }
 
   override def drawSecondaryBackgroundLayer(graphics: GuiGraphics): Unit = {

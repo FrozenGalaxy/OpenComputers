@@ -1,7 +1,7 @@
 package li.cil.oc.client.gui
 
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, PoseStack, Tesselator, VertexFormat}
+import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, Tesselator, VertexFormat}
 import li.cil.oc.Localization
 import li.cil.oc.client.{Textures, PacketSender => ClientPacketSender}
 import li.cil.oc.client.gui.widget.ProgressBar
@@ -53,8 +53,8 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
   override protected def init(): Unit = {
     super.init()
     powerButton = addRenderableWidget(new ImageButton(leftPos + 7, topPos + 45, 18, 18, (_: Button) =>
-      ClientPacketSender.sendDronePower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUI.ButtonPower, canToggle = true))
-    power = addRenderableWidget(new ProgressBar(leftPos + 28,topPos + 48))
+      ClientPacketSender.sendDronePower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUISprites.ButtonPower))
+    power = addRenderableWidget(new ProgressBar(leftPos + 28, topPos + 48))
   }
 
   override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
@@ -76,13 +76,15 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
     super.render(graphics, mouseX, mouseY, dt)
   }
 
-  override protected def drawBuffer(stack: PoseStack): Unit = {
+  override protected def drawBuffer(graphics: GuiGraphics): Unit = {
+    val stack = graphics.pose()
     stack.translate(bufferX.toFloat, bufferY.toFloat, 0f)
     RenderState.makeItBlend()
     stack.scale(scale.toFloat, scale.toFloat, 1)
     RenderSystem.depthMask(false)
     RenderSystem.setShaderColor(0.5f, 0.5f, 1f, 1f)
     TextBufferRenderCache.render(stack, bufferRenderer)
+    RenderSystem.setShaderColor(1, 1, 1, 1)
   }
 
   override protected def changeSize(w: Double, h: Double) = 2.0
@@ -91,7 +93,7 @@ class Drone(state: menu.Drone, playerInventory: Inventory, name: Component)
     drawSecondaryForegroundLayer(graphics, mouseX, mouseY)
 
   override protected def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
-    drawBufferLayer(graphics.pose)
+    drawBufferLayer(graphics)
   }
 
   override protected def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {

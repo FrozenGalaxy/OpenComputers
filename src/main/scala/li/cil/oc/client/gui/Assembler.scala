@@ -27,7 +27,6 @@ class Assembler(val state: menu.Assembler, playerInventory: Inventory, name: Com
 
   private def onSlotChanged(slot: Slot): Unit = {
     runButton.active = canBuild
-    runButton.toggled = !runButton.active
     info = validate
   }
 
@@ -43,7 +42,7 @@ class Assembler(val state: menu.Assembler, playerInventory: Inventory, name: Com
 
   override protected def init(): Unit = {
     super.init()
-    runButton = addRenderableWidget(new ImageButton(leftPos + 7, topPos + 89, 18, 18, (b: Button) => if (canBuild) ClientPacketSender.sendRobotAssemblerStart(inventoryContainer), Textures.GUI.ButtonRun, canToggle = true))
+    runButton = addRenderableWidget(new ImageButton(leftPos + 7, topPos + 89, 18, 18, (b: Button) => if (canBuild) ClientPacketSender.sendRobotAssemblerStart(inventoryContainer), Textures.GUISprites.ButtonRun))
     progress = addRenderableWidget(new ProgressBar(leftPos + 28, topPos + 92))
   }
 

@@ -21,9 +21,9 @@ class Printer(state: menu.Printer, playerInventory: Inventory, name: Component)
 
   override protected def init(): Unit = {
     super.init()
-    materialBar = addRenderableWidget(new ProgressBar(leftPos + 40, topPos + 21, width = 62, height = 12, texture = Textures.GUI.PrinterMaterial))
-    inkBar = addRenderableWidget(new ProgressBar(leftPos + 40, topPos + 53, width = 62, height = 12, texture = Textures.GUI.PrinterInk))
-    progressBar = addRenderableOnly(new ProgressBar(leftPos + 105, topPos + 20, width = 46, height = 46, texture = Textures.GUI.PrinterProgress))
+    materialBar = addRenderableWidget(new ProgressBar(leftPos + 40, topPos + 21, width = 62, height = 12, sprite = Textures.GUISprites.PrinterMaterial))
+    inkBar = addRenderableWidget(new ProgressBar(leftPos + 40, topPos + 53, width = 62, height = 12, sprite = Textures.GUISprites.PrinterInk))
+    progressBar = addRenderableOnly(new ProgressBar(leftPos + 105, topPos + 20, width = 46, height = 46, sprite = Textures.GUISprites.PrinterProgress))
   }
 
   override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {

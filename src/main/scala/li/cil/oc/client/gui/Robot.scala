@@ -85,10 +85,9 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
     powerButton = addRenderableWidget(new ImageButton(
       leftPos + 5, topPos + 153 - deltaY, 18, 18,
       _ => ClientPacketSender.sendRobotPower(inventoryContainer, !inventoryContainer.isRunning),
-      Textures.GUI.ButtonPower,
-      canToggle = true
+      Textures.GUISprites.ButtonPower
     ))
-    scrollButton = addRenderableWidget(new ImageButton(leftPos + scrollX + 1, topPos + scrollY + 1, 6, 13, _ => (), Textures.GUI.ButtonScroll))
+    scrollButton = addRenderableWidget(new ImageButton(leftPos + scrollX + 1, topPos + scrollY + 1, 6, 13, _ => (), Textures.GUISprites.ButtonScroll))
     power = addRenderableWidget(new ProgressBar(leftPos + 26, topPos + 156 - deltaY))
   }
 
@@ -118,8 +117,9 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
     super.render(graphics, mouseX, mouseY, dt)
   }
 
-  override def drawBuffer(stack: PoseStack): Unit = {
+  override def drawBuffer(graphics: GuiGraphics): Unit = {
     if (buffer != null) {
+      val stack = graphics.pose()
       stack.translate(bufferX.toFloat, bufferY.toFloat, 0f)
       stack.pushPose()
       stack.translate(-3, -3, 0)
@@ -149,7 +149,7 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
   }
 
   override protected def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
-    drawBufferLayer(graphics.pose())
+    drawBufferLayer(graphics)
   }
 
   override protected def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {

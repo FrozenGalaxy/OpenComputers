@@ -24,7 +24,7 @@ class Tablet(state: menu.Tablet, playerInventory: Inventory, name: Component)
 
   override protected def init(): Unit = {
     super.init()
-    powerButton = addRenderableWidget(new ImageButton(leftPos + 68, topPos + 34, 18, 18, (_: Button) => ClientPacketSender.sendTabletPower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUI.ButtonPower, canToggle = true))
+    powerButton = addRenderableWidget(new ImageButton(leftPos + 68, topPos + 34, 18, 18, (_: Button) => ClientPacketSender.sendTabletPower(inventoryContainer, !inventoryContainer.isRunning), Textures.GUISprites.ButtonPower))
   }
 
   override def lockedStack = inventoryContainer.stack

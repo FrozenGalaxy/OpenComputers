@@ -27,12 +27,9 @@ class Server(state: menu.Server, playerInventory: Inventory, name: Component)
 
   override protected def init() = {
     super.init()
-    powerButton = new ImageButton(leftPos + 48, topPos + 33, 18, 18, new Button.OnPress {
-      override def onPress(b: Button) = if (inventoryContainer.rackSlot >= 0) {
-        ClientPacketSender.sendServerPower(inventoryContainer, inventoryContainer.rackSlot, !inventoryContainer.isRunning)
-      }
-    }, Textures.GUI.ButtonPower, canToggle = true)
-    addRenderableWidget(powerButton)
+    powerButton = addRenderableWidget(new ImageButton(leftPos + 48, topPos + 33, 18, 18, (_: Button) => if (inventoryContainer.rackSlot >= 0) {
+      ClientPacketSender.sendServerPower(inventoryContainer, inventoryContainer.rackSlot, !inventoryContainer.isRunning)
+    }, Textures.GUISprites.ButtonPower))
   }
 
   override def drawSecondaryBackgroundLayer(graphics: GuiGraphics) = {
