@@ -422,6 +422,13 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
         case Some(buffer: api.internal.TextBuffer) =>
           buffer.setMaximumColorDepth(colorDepth)
           buffer.setMaximumResolution(80, 25)
+          buffer match {
+            case concrete: li.cil.oc.common.component.TextBuffer => {
+              // For some reason the TextBuffer needs re-initilization here, might be an X/Y Problem though.
+              concrete.markInitialized()
+            }
+            case _ =>
+          }
       }
 
       client.PacketSender.sendMachineItemStateRequest(stack, level.registryAccess())
