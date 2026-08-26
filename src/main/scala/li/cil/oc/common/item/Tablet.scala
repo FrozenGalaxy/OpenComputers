@@ -176,8 +176,10 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
           }
           else {
             if (!level.isClientSide) {
-              val computer = Tablet.get(stack, player).machine
+              val tablet = Tablet.get(stack, player)
+              val computer = tablet.machine
               computer.start()
+              tablet.syncRunningState()
               computer.lastError match {
                 case message if message != null => player.sendSystemMessage(Localization.Analyzer.LastError(message))
                 case _ =>
@@ -386,6 +388,27 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
 
   // ----------------------------------------------------------------------- //
 
+  /** Synchronize the running flag after a direct power-state change. */
+  def syncRunningState(): Unit = {
+    val running = machine.isRunning
+    val changed = lastRunning != running || data.isRunning != running
+    data.isRunning = running
+    if (changed) {
+      lastRunning = running
+      setChanged()
+      player match {
+        case mp: ServerPlayer => server.PacketSender.sendMachineItemState(mp, stack, running)
+        case _ =>
+      }
+      if (running) {
+        componentSlots collect {
+          case Some(buffer: api.internal.TextBuffer) =>
+            buffer.setPowerState(true)
+        }
+      }
+    }
+  }
+
   def update(level: Level, player: Player, slot: Int, selected: Boolean): Unit = {
     this.player = player
     if (!isInitialized) {
@@ -409,26 +432,9 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
       }
       machine.update()
       updateComponents()
-      data.isRunning = machine.isRunning
       data.energy = tablet.node.globalBuffer()
       data.maxEnergy = tablet.node.globalBufferSize()
-
-      if (lastRunning != machine.isRunning) {
-        lastRunning = machine.isRunning
-        setChanged()
-
-        player match {
-          case mp: ServerPlayer => server.PacketSender.sendMachineItemState(mp, stack, machine.isRunning)
-          case _ =>
-        }
-
-        if (machine.isRunning) {
-          componentSlots collect {
-            case Some(buffer: api.internal.TextBuffer) =>
-              buffer.setPowerState(true)
-          }
-        }
-      }
+      syncRunningState()
     }
   }
 
@@ -609,13 +615,7 @@ object Tablet {
     override protected def timeout = 5
 
     def getWeak(stack: ItemStack): Option[TabletWrapper] = {
-      val key = getId(stack)
-      if (key.nonEmpty) {
-        val map = cache.asMap
-        if (map.containsKey(key)) map.entrySet.find(entry => entry.getKey == key.get).get.getValue
-      }
-
-      None
+      getId(stack).flatMap(key => Option(cache.asMap.get(key)))
     }
 
     def get(stack: ItemStack): Option[TabletWrapper] = {
@@ -628,6 +628,17 @@ object Tablet {
   }
 
   object Server extends Cache {
+    def invalidate(stack: ItemStack): Unit = {
+      val id = getOrCreateId(stack)
+      cache.synchronized {
+        // Inventory transfers commonly give the charger a copy of the
+        // player's stack. Make cache teardown persist into that actual stack.
+        Option(cache.getIfPresent(id)).foreach(_.stack = stack)
+        cache.invalidate(id)
+        cache.cleanUp()
+      }
+    }
+
     def save(player: Player): Unit = {
       cache.synchronized {
         for (tablet <- cache.asMap.values if tablet.player == player) {
