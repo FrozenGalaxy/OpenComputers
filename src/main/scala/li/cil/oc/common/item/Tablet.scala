@@ -422,6 +422,13 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
         case Some(buffer: api.internal.TextBuffer) =>
           buffer.setMaximumColorDepth(colorDepth)
           buffer.setMaximumResolution(80, 25)
+          buffer match {
+            case concrete: li.cil.oc.common.component.TextBuffer => {
+              // For some reason the TextBuffer needs re-initilization here, might be an X/Y Problem though.
+              concrete.markInitialized()
+            }
+            case _ =>
+          }
       }
 
       client.PacketSender.sendMachineItemStateRequest(stack, level.registryAccess())
@@ -579,16 +586,17 @@ object Tablet {
       val tablet = e.getValue
       if (tablet.node != null) {
         // Server.
-        if (tablet.autoSave) tablet.writeToNBT(tablet.player.registryAccess())
         tablet.machine.stop()
-        for (node <- tablet.machine.node.network.nodes) {
-          node.remove()
-        }
+
         // Cache eviction tears down the live machine. Persist that stopped
         // state as well, otherwise a tablet that was just turned off may
         // retain its previous running flag while it is in a charger.
         tablet.data.isRunning = tablet.machine.isRunning
         if (tablet.autoSave) tablet.writeToNBT(tablet.player.registryAccess())
+
+        for (node <- tablet.machine.node.network.nodes) {
+          node.remove()
+        }
         tablet.setChanged()
       }
     }
