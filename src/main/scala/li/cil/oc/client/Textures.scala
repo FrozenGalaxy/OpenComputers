@@ -45,7 +45,6 @@ object Textures {
     val Robot = L("robot")
     val RobotAssembler = L("robot_assembler")
     val RobotNoScreen = L("robot_noscreen")
-    val RobotSelection = L("robot_selection")
     val Server = L("server")
     val Slot = L("slot")
     val Waypoint = L("waypoint")
@@ -58,11 +57,12 @@ object Textures {
 
     val Bar: ResourceLocation = L("bar")
     val KeyboardMissing: ResourceLocation = L("keyboard_missing")
+    val ManualMissingItem = L("manual_missing_item")
     val PrinterInk: ResourceLocation = L("printer_ink")
     val PrinterMaterial: ResourceLocation = L("printer_material")
     val PrinterProgress: ResourceLocation = L("printer_progress")
+    val RobotSelection: ResourceLocation = L("robot_selection")
     val UpgradeTab: ResourceLocation = L("upgrade_tab")
-    val ManualMissingItem = L("manual_missing_item")
 
     val ButtonDriveMode: WidgetSprites = new WidgetSprites(L("button_drive_mode"), L("button_drive_mode_disabled"), L("button_drive_mode_highlight"))
     val ButtonPower: WidgetSprites = new WidgetSprites(
