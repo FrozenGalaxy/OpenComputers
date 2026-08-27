@@ -23,7 +23,6 @@ class Drive(playerInventory: Inventory, val driveStack: () => ItemStack) extends
     val data = new DriveData(driveStack())
     unmanagedButton.active = !data.isUnmanaged
     managedButton.active = data.isUnmanaged
-    lockedButton.active = data.isLocked
     lockedButton.active = !data.isLocked
   }
 
