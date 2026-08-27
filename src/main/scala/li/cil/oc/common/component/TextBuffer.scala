@@ -229,9 +229,9 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
 
   @Callback(doc = """function(enabled:boolean):boolean -- Set whether to use high precision mode (sub-pixel mouse event positions).""")
   def setPrecise(computer: Context, args: Arguments): Array[AnyRef] = {
-    // Available for T3 screens only... easiest way to check for us is to
+    // Available for T3+ screens only... easiest way to check for us is to
     // base it off of the maximum color depth.
-    if (maxDepth == Settings.screenDepthsByTier(Tier.Four)) {
+    if (maxDepth.compareTo(Settings.screenDepthsByTier(Tier.Three)) >= 0) {
       val oldValue = precisionMode
       precisionMode = args.checkBoolean(0)
       result(oldValue)
