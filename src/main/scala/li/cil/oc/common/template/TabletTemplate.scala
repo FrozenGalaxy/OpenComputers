@@ -11,8 +11,7 @@ import li.cil.oc.util.ItemUtils
 import net.minecraft.world.Container
 import net.minecraft.world.item.ItemStack
 
-import scala.collection.JavaConverters.asJavaIterable
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters.IterableHasAsJava
 
 object TabletTemplate extends Template {
   override protected val suggestedComponents = Array(
@@ -77,7 +76,7 @@ object TabletTemplate extends Template {
         Tier.Two,
         Tier.One
       ),
-      asJavaIterable(Iterable(
+      Iterable(
         (Slot.Card, Tier.Two),
         (Slot.Card, Tier.Two),
         null,
@@ -86,7 +85,7 @@ object TabletTemplate extends Template {
         (Slot.Memory, Tier.Two),
         (Slot.EEPROM, Tier.Any),
         (Slot.HDD, Tier.Two)
-      ).map(toPair)))
+      ).map(toPair).asJava)
 
     // Tier 2
     api.IMC.registerAssemblerTemplate(
@@ -103,7 +102,7 @@ object TabletTemplate extends Template {
         Tier.Two,
         Tier.Two
       ),
-      asJavaIterable(Iterable(
+      Iterable(
         (Slot.Card, Tier.Three),
         (Slot.Card, Tier.Two),
         null,
@@ -112,7 +111,7 @@ object TabletTemplate extends Template {
         (Slot.Memory, Tier.Two),
         (Slot.EEPROM, Tier.Any),
         (Slot.HDD, Tier.Two)
-      ).map(toPair)))
+      ).map(toPair).asJava)
 
     // Tier 3
     api.IMC.registerAssemblerTemplate(
@@ -129,7 +128,7 @@ object TabletTemplate extends Template {
         Tier.Three,
         Tier.Three
       ),
-      asJavaIterable(Iterable(
+      Iterable(
         (Slot.Card, Tier.Four),
         (Slot.Card, Tier.Three),
         null,
@@ -138,7 +137,7 @@ object TabletTemplate extends Template {
         (Slot.Memory, Tier.Three),
         (Slot.EEPROM, Tier.Any),
         (Slot.HDD, Tier.Three)
-      ).map(toPair)))
+      ).map(toPair).asJava)
 
     // Creative
     api.IMC.registerAssemblerTemplate(
@@ -148,29 +147,29 @@ object TabletTemplate extends Template {
       "li.cil.oc.common.template.TabletTemplate.assemble",
       hostClass,
       Array(
-        Tier.Three
+        Tier.Four
       ),
       Array(
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four
       ),
-      asJavaIterable(Iterable(
-        (Slot.Card, Tier.Three),
-        (Slot.Card, Tier.Three),
-        (Slot.Card, Tier.Three),
-        (Slot.CPU, Tier.Three),
-        (Slot.Memory, Tier.Three),
-        (Slot.Memory, Tier.Three),
+      Iterable(
+        (Slot.Card, Tier.Four),
+        (Slot.Card, Tier.Four),
+        (Slot.Card, Tier.Four),
+        (Slot.CPU, Tier.Four),
+        (Slot.Memory, Tier.Four),
+        (Slot.Memory, Tier.Four),
         (Slot.EEPROM, Tier.Any),
-        (Slot.HDD, Tier.Three)
-      ).map(toPair)))
+        (Slot.HDD, Tier.Four)
+      ).map(toPair).asJava)
 
     // Disassembler
     api.IMC.registerDisassemblerTemplate(

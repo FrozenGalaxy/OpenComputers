@@ -5,28 +5,32 @@ import li.cil.oc.{api, Constants}
 import li.cil.oc.common.Loot
 import li.cil.oc.common.blockentity.{Case => CaseBlockEntity}
 import li.cil.oc.common.blockentity.traits.Rotatable
-import li.cil.oc.common.init.{OCBlocks, OCItems}
+import li.cil.oc.common.init.OCBlocks
 import li.cil.oc.server.machine.luac.LuaStateFactory
 import net.minecraft.commands.{Commands, CommandSourceStack}
 import net.minecraft.core.Direction
 import net.minecraft.network.chat.Component
-import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.{BlockHitResult, HitResult}
 
 object SpawnComputerCommand {
   final val MaxDistance = 16.0
+  final val DefaultScreenTier = 2
 
   def register(dispatcher: CommandDispatcher[CommandSourceStack]): Unit = {
     def command(name: String) = Commands.literal(name)
       .requires(CommandHandler.canUse(_, 2))
-      .executes(context => execute(context.getSource))
+      .executes(context => execute(context.getSource, DefaultScreenTier, tieredComponents = false))
+      .then(Commands.literal("1").executes(context => execute(context.getSource, 1, tieredComponents = true)))
+      .then(Commands.literal("2").executes(context => execute(context.getSource, 2, tieredComponents = true)))
+      .then(Commands.literal("3").executes(context => execute(context.getSource, 3, tieredComponents = true)))
+      .then(Commands.literal("4").executes(context => execute(context.getSource, 4, tieredComponents = true)))
 
     dispatcher.register(command("oc_spawnComputer"))
     dispatcher.register(command("oc_spawncomputer"))
     dispatcher.register(command("oc_sc"))
   }
 
-  private def execute(source: CommandSourceStack): Int = {
+  private def execute(source: CommandSourceStack, screenTier: Int, tieredComponents: Boolean): Int = {
     val player = source.getPlayerOrException
     val level = player.serverLevel()
 
@@ -41,12 +45,20 @@ object SpawnComputerCommand {
           return 0
         }
 
-        val apu = Option(api.Items.get(Constants.ItemName.APUCreative)).map(_.createItemStack(1))
+        val (apuName, ramName, storageName) = if (!tieredComponents) {
+          (Constants.ItemName.APUCreative, Constants.ItemName.RAMTier6, Constants.ItemName.HDDTier3)
+        } else screenTier match {
+          case 1 => (Constants.ItemName.APUTier1, Constants.ItemName.RAMTier1, Constants.ItemName.HDDTier1)
+          case 2 => (Constants.ItemName.APUTier2, Constants.ItemName.RAMTier2, Constants.ItemName.HDDTier2)
+          case 3 => (Constants.ItemName.APUTier3, Constants.ItemName.RAMTier3, Constants.ItemName.HDDTier3)
+          case 4 => (Constants.ItemName.APUCreative, Constants.ItemName.RAMCreative, Constants.ItemName.SSDTier3)
+        }
+        val tieredApu = Option(api.Items.get(apuName)).map(_.createItemStack(1))
         val components = Seq(
-          apu,
-          Option(api.Items.get(Constants.ItemName.RAMTier6)).map(_.createItemStack(1)),
-          Option(api.Items.get(Constants.ItemName.RAMTier6)).map(_.createItemStack(1)),
-          Option(api.Items.get(Constants.ItemName.HDDTier3)).map(_.createItemStack(1)),
+          tieredApu,
+          Option(api.Items.get(ramName)).map(_.createItemStack(1)),
+          Option(api.Items.get(ramName)).map(_.createItemStack(1)),
+          Option(api.Items.get(storageName)).map(_.createItemStack(1)),
           Option(Loot.defaultEEPROM).filter(stack => !stack.isEmpty),
           Option(Loot.defaultOpenOS).filter(stack => !stack.isEmpty)
         ).flatten
@@ -73,7 +85,13 @@ object SpawnComputerCommand {
         level.setBlockAndUpdate(casePos, OCBlocks.CaseCreative.get().defaultBlockState())
         rotateProperly(casePos)
 
-        level.setBlockAndUpdate(screenPos, OCBlocks.ScreenTier2.get().defaultBlockState())
+        val screen = screenTier match {
+          case 1 => OCBlocks.ScreenTier1
+          case 2 => OCBlocks.ScreenTier2
+          case 3 => OCBlocks.ScreenTier3
+          case 4 => OCBlocks.ScreenTier4
+        }
+        level.setBlockAndUpdate(screenPos, screen.get().defaultBlockState())
         rotateProperly(screenPos).foreach { rotatable =>
           if (rotatable.pitch == Direction.UP || rotatable.pitch == Direction.DOWN) {
             rotatable.pitch = Direction.NORTH
