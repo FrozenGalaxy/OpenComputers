@@ -6,6 +6,7 @@ import li.cil.oc.api.driver.DeviceInfo.DeviceAttribute
 import li.cil.oc.api.driver.DeviceInfo.DeviceClass
 import li.cil.oc.Settings
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.animal.Cat
 import net.minecraft.world.entity.animal.Ocelot
 import net.minecraft.world.entity.animal.Sheep
 import net.minecraft.world.damagesource.DamageSource
@@ -60,7 +61,7 @@ class CarpetedCapacitor(pos: BlockPos, state: BlockState)
         .filter(_.isAlive)
         .toSet
       val sheepPower = energyFromGroup(entities.filter(_.isInstanceOf[Sheep]), Settings.get.sheepPower)
-      val ocelotPower = energyFromGroup(entities.filter(_.isInstanceOf[Ocelot]), Settings.get.ocelotPower)
+      val ocelotPower = energyFromGroup(entities.filter(e => e.isInstanceOf[Ocelot] || e.isInstanceOf[Cat]), Settings.get.ocelotPower)
       val totalPower = sheepPower + ocelotPower
       if (totalPower > 0) {
         node.changeBuffer(totalPower)
