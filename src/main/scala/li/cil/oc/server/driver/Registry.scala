@@ -157,7 +157,7 @@ private[oc] object Registry extends api.detail.DriverAPI {
     }
     else {
       valueRef match {
-        case null | None => null
+        case null | () | None => null
         case arg: java.lang.Boolean => arg
         case arg: java.lang.Byte => arg
         case arg: java.lang.Character => arg
