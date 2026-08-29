@@ -71,7 +71,9 @@ class UpgradeCrafting(val host: EnvironmentHost with internal.Robot) extends Abs
             return false
 
           val stack = craftingSlot.remove(1)
-          countCrafted += stack.getCount max 1
+          if (stack.isEmpty)
+            return false
+          countCrafted += stack.getCount
           craftingSlot.onTake(player, stack)
           val taken = stack
           copyItemsToHost(player.inventory)
