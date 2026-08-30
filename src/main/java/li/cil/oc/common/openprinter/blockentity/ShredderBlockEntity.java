@@ -2,6 +2,7 @@ package li.cil.oc.common.openprinter.blockentity;
 
 import li.cil.oc.common.openprinter.OpenPrinter;
 import li.cil.oc.common.openprinter.block.DeviceBlock;
+import li.cil.oc.common.openprinter.menu.PortableInventory;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -20,7 +21,8 @@ public final class ShredderBlockEntity extends BlockEntity implements InventoryD
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
             if (slot != 0) return false;
-            return stack.is(OpenPrinter.PRINTED_PAGE.get()) || stack.is(Items.WRITTEN_BOOK)
+            return stack.is(OpenPrinter.PRINTED_PAGE.get()) || stack.is(OpenPrinter.FOLDER.get())
+                    || stack.is(Items.WRITTEN_BOOK)
                     || stack.is(Items.WRITABLE_BOOK) || stack.is(Items.PAPER) || stack.is(Items.BOOK);
         }
 
@@ -49,13 +51,26 @@ public final class ShredderBlockEntity extends BlockEntity implements InventoryD
         }
         if (++processingTime <= 10) return;
 
-        int count = input.is(Items.BOOK) || input.is(Items.WRITABLE_BOOK) || input.is(Items.WRITTEN_BOOK) ? 3 : 1;
+        int count = shredsFor(input);
         ItemStack remainder = insertOutput(new ItemStack(OpenPrinter.PAPER_SHREDS.get(), count));
         if (remainder.isEmpty()) {
             inventory.extractItem(0, 1, false);
             processingTime = 0;
             setChanged();
         }
+    }
+
+    private int shredsFor(ItemStack stack) {
+        if (!stack.is(OpenPrinter.FOLDER.get())) {
+            return stack.is(Items.BOOK) || stack.is(Items.WRITABLE_BOOK) || stack.is(Items.WRITTEN_BOOK) ? 3 : 1;
+        }
+        PortableInventory contents = new PortableInventory(stack, 9, level.registryAccess(), true);
+        int count = 3; // the folder consumes three sheets of paper
+        for (int slot = 0; slot < contents.getSlots(); slot++) {
+            ItemStack content = contents.getStackInSlot(slot);
+            if (!content.isEmpty()) count += shredsFor(content);
+        }
+        return count;
     }
 
     private ItemStack insertOutput(ItemStack remainder) {

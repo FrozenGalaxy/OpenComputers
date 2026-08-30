@@ -543,5 +543,6 @@
   "gui.openprinter.status.blocked.4": "Load color ink",
   "gui.openprinter.status.blocked.5": "Clear output tray",
   "gui.openprinter.status.blocked.6": "Waiting for power",
-  "gui.openprinter.status.blocked.7": "Load empty maps"
+  "gui.openprinter.status.blocked.7": "Load empty maps",
+  "gui.openprinter.status.blocked.8": "Load a writable book"
 }

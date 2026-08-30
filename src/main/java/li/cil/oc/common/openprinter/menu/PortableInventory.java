@@ -47,7 +47,7 @@ public final class PortableInventory extends ItemStackHandler {
         saveToContainer();
     }
 
-    void saveToContainer() {
+    public void saveToContainer() {
         if (loading) return;
         CustomData.update(DataComponents.CUSTOM_DATA, container,
                 tag -> tag.put("inventory", serializeNBT(provider)));

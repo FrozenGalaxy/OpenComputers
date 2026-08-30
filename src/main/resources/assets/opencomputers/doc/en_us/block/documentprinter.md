@@ -6,7 +6,7 @@ The Document Printer is the OpenPrinter peripheral integrated into OpenComputers
 
 Load a [black or color ink cartridge](../item/printerink.md) into the left slots and paper into the paper input. The scanner slot accepts [printed pages](../item/printedpage.md) and vanilla books. Completed jobs appear in the output tray.
 
-The printer uses a persistent FIFO queue. Jobs pause automatically when paper, ink, energy, or output space runs out and resume after the problem is corrected.
+The printer uses a persistent FIFO queue. Jobs pause automatically when paper, ink, energy, or output space runs out and resume after the problem is corrected. Printed pages prefer the first folder in the output tray with an empty slot; any number of folders may be loaded, and ordinary empty output slots remain available when every folder is full.
 
 ## Modern API
 
@@ -60,6 +60,16 @@ printer.writeln("Hello, world!")
 printer.writeln("In color", 0x3366FF, "center")
 printer.print()
 ```
+
+Put a writable book in the paper input to write pages into it instead of producing printed-page items. Book jobs accept only plain black text, and the completed writable book is moved to an ordinary output slot. Use `printAndSign` with the classic buffer to seal it as a vanilla written book:
+
+```lua
+printer.writeln("This is a book page.")
+local job, reason = printer.printAndSign("My Book", "OpenPrinter")
+assert(job, reason)
+```
+
+`printAndSign(title[, author][, copies])` uses `OpenPrinter` as the default author. A writable book has up to 100 pages; `copies` appends the buffered document repeatedly to that same book, matching the classic printer behavior.
 
 Compatibility callbacks include `writeln`, `setTitle`, `clear`, `print([copies])`, `getPaperLevel`, `getBlackInkLevel`, `getColorInkLevel`, `charCount`, `width`, `maxWidth`, `scanLine`, and `scanBook`.
 

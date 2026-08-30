@@ -3,6 +3,7 @@ package li.cil.oc.common.openprinter.printer;
 import li.cil.oc.common.openprinter.OpenPrinter;
 import li.cil.oc.common.openprinter.block.DeviceBlock;
 import li.cil.oc.common.openprinter.blockentity.InventoryDevice;
+import li.cil.oc.common.openprinter.menu.PortableInventory;
 
 import li.cil.oc.api.Network;
 import li.cil.oc.api.UnrecoverablePersistanceException;
@@ -20,6 +21,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.network.Filterable;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -65,10 +67,13 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
             return switch (slot) {
                 case BLACK_INK_SLOT -> stack.is(OpenPrinter.BLACK_INK.get());
                 case COLOR_INK_SLOT -> stack.is(OpenPrinter.COLOR_INK.get());
-                case PAPER_SLOT -> stack.is(Items.PAPER) || stack.is(Items.NAME_TAG) || stack.is(Items.MAP);
+                case PAPER_SLOT -> stack.is(Items.PAPER) || stack.is(Items.NAME_TAG) || stack.is(Items.MAP)
+                        || stack.is(Items.WRITABLE_BOOK);
                 case SCANNER_SLOT -> stack.is(OpenPrinter.PRINTED_PAGE.get())
                         || stack.is(Items.WRITTEN_BOOK) || stack.is(Items.WRITABLE_BOOK);
-                default -> false;
+                default -> stack.is(OpenPrinter.PRINTED_PAGE.get()) || stack.is(OpenPrinter.FOLDER.get())
+                        || stack.is(Items.WRITABLE_BOOK) || stack.is(Items.WRITTEN_BOOK)
+                        || stack.is(Items.FILLED_MAP);
             };
         }
 
@@ -169,6 +174,7 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
             case "output tray full" -> 5;
             case "no power" -> 6;
             case "out of empty maps" -> 7;
+            case "out of writable books" -> 8;
             default -> 0;
         };
     }
@@ -241,10 +247,19 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
     }
 
     private String blocker(PrintJob job) {
-        if (emptyOutputSlot() < 0) return "output tray full";
+        if (job.kind == PrintJob.Kind.DOCUMENT) {
+            if (!hasPrintedPageOutputSpace()) return "output tray full";
+        } else if (job.kind != PrintJob.Kind.BOOK && emptyOutputSlot() < 0) {
+            return "output tray full";
+        }
         if (job.kind == PrintJob.Kind.LABEL) {
             if (!inventory.getStackInSlot(PAPER_SLOT).is(Items.NAME_TAG)) return "out of name tags";
             if (inkLevel(BLACK_INK_SLOT) < 1) return "out of black ink";
+        } else if (job.kind == PrintJob.Kind.BOOK) {
+            if (!inventory.getStackInSlot(PAPER_SLOT).is(Items.WRITABLE_BOOK)) return "out of writable books";
+            int[] cost = inkCost(job.document.page(job.pageIndex()));
+            if (inkLevel(BLACK_INK_SLOT) < cost[0]) return "out of black ink";
+            if (job.completedPages + 1 >= job.totalPages() && emptyOutputSlot() < 0) return "output tray full";
         } else if (job.kind == PrintJob.Kind.MAP) {
             if (!inventory.getStackInSlot(PAPER_SLOT).is(Items.MAP)) return "out of empty maps";
             if (inkLevel(COLOR_INK_SLOT) < MAP_COLOR_INK_COST) return "out of color ink";
@@ -282,6 +297,29 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
             return;
         }
 
+        if (job.kind == PrintJob.Kind.BOOK) {
+            ItemStack input = inventory.getStackInSlot(PAPER_SLOT);
+            if (!input.is(Items.WRITABLE_BOOK)) throw new IllegalStateException("writable book disappeared");
+            boolean finalPage = job.completedPages + 1 >= job.totalPages();
+            int bookOutputSlot = finalPage ? emptyOutputSlot() : -1;
+            if (finalPage && bookOutputSlot < 0) throw new IllegalStateException("output tray full");
+            WritableBookContent content = input.getOrDefault(DataComponents.WRITABLE_BOOK_CONTENT, WritableBookContent.EMPTY);
+            List<Filterable<String>> pages = new ArrayList<>(content.pages());
+            if (pages.size() >= WritableBookContent.MAX_PAGES) throw new IllegalStateException("book is full");
+            pages.add(Filterable.passThrough(bookPage(job.document.page(job.pageIndex()))));
+            input.set(DataComponents.WRITABLE_BOOK_CONTENT, new WritableBookContent(pages));
+            int[] cost = inkCost(job.document.page(job.pageIndex()));
+            consumeInk(BLACK_INK_SLOT, cost[0]);
+            if (finalPage) {
+                ItemStack output = input.copy();
+                inventory.setStackInSlot(PAPER_SLOT, ItemStack.EMPTY);
+                inventory.setStackInSlot(bookOutputSlot, job.sign
+                        ? signedBook(pages, job.document.title(), job.author)
+                        : output);
+            }
+            return;
+        }
+
         List<PrintDocument.Line> lines = job.document.page(job.pageIndex());
         ItemStack output = new ItemStack(OpenPrinter.PRINTED_PAGE.get());
         CompoundTag data = new CompoundTag();
@@ -304,7 +342,7 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
         consumeInk(BLACK_INK_SLOT, cost[0]);
         consumeInk(COLOR_INK_SLOT, cost[1]);
         consumePaper();
-        inventory.setStackInSlot(outputSlot, output);
+        storePrintedPage(output);
     }
 
     private static int[] inkCost(List<PrintDocument.Line> lines) {
@@ -317,6 +355,52 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
             if (line.text().matches(".*\u00a7[0-9a-fA-F].*")) color++;
         }
         return new int[]{black, color};
+    }
+
+    private boolean hasWritableBook() {
+        return inventory.getStackInSlot(PAPER_SLOT).is(Items.WRITABLE_BOOK);
+    }
+
+    private static void validateBook(PrintDocument document) {
+        for (int page = 0; page < document.pageCount(); page++) {
+            for (PrintDocument.Line line : document.page(page)) {
+                if (line.color() != 0 || line.text().indexOf('\u00a7') >= 0) {
+                    throw new IllegalArgumentException("books only support plain black text");
+                }
+            }
+        }
+    }
+
+    private static int writableBookPages(ItemStack book) {
+        WritableBookContent content = book.getOrDefault(DataComponents.WRITABLE_BOOK_CONTENT, WritableBookContent.EMPTY);
+        return content.pages().size();
+    }
+
+    private PrintJob documentJob(PrintDocument document, int copies) {
+        if (!hasWritableBook()) return PrintJob.document(document, copies);
+        validateBook(document);
+        if (writableBookPages(inventory.getStackInSlot(PAPER_SLOT)) + document.pageCount() * copies > WritableBookContent.MAX_PAGES) {
+            throw new IllegalArgumentException("book is full");
+        }
+        return PrintJob.book(document, copies, false, "OpenPrinter");
+    }
+
+    private static String bookPage(List<PrintDocument.Line> lines) {
+        StringBuilder page = new StringBuilder();
+        for (int i = 0; i < lines.size(); i++) {
+            if (i > 0) page.append('\n');
+            page.append(lines.get(i).text());
+        }
+        return page.toString();
+    }
+
+    private static ItemStack signedBook(List<Filterable<String>> pages, String title, String author) {
+        List<Filterable<Component>> signedPages = new ArrayList<>(pages.size());
+        for (Filterable<String> page : pages) signedPages.add(Filterable.passThrough(Component.literal(page.get(false))));
+        ItemStack output = new ItemStack(Items.WRITTEN_BOOK);
+        output.set(DataComponents.WRITTEN_BOOK_CONTENT,
+                new WrittenBookContent(Filterable.passThrough(title), author, 0, signedPages, true));
+        return output;
     }
 
     private void transition(PrintJob job, PrintJob.State state, String reason) {
@@ -336,6 +420,26 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
         while (history.size() > HISTORY_LIMIT) history.removeLast();
     }
 
+    private PrintDocument legacyDocument() {
+        return legacyDocument(legacyTitle);
+    }
+
+    private PrintDocument legacyDocument(String title) {
+        Map<Integer, Object> lineTable = new LinkedHashMap<>();
+        for (int i = 0; i < legacyLines.size(); i++) {
+            PrintDocument.Line line = legacyLines.get(i);
+            Map<String, Object> encoded = new LinkedHashMap<>();
+            encoded.put("text", line.text());
+            encoded.put("color", line.color());
+            encoded.put("alignment", line.alignment());
+            lineTable.put(i + 1, encoded);
+        }
+        Map<String, Object> documentValue = new LinkedHashMap<>();
+        documentValue.put("title", title);
+        documentValue.put("lines", lineTable);
+        return PrintDocument.parse(documentValue, Map.of());
+    }
+
     @Callback(direct = true, doc = "function():string -- Verifies that the printer component is available.")
     public Object[] greet(Context context, Arguments args) {
         return new Object[]{"Lasciate ogne speranza, voi ch'intrate"};
@@ -349,23 +453,11 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
         if (args.count() == 0 || args.isInteger(0)) {
             if (jobs.size() >= MAX_QUEUE) return new Object[]{false, "print queue full"};
             int copies = args.count() == 0 ? 1 : Math.max(1, Math.min(MAX_COPIES, args.checkInteger(0)));
-            Map<Integer, Object> lineTable = new LinkedHashMap<>();
-            for (int i = 0; i < legacyLines.size(); i++) {
-                PrintDocument.Line line = legacyLines.get(i);
-                Map<String, Object> encoded = new LinkedHashMap<>();
-                encoded.put("text", line.text());
-                encoded.put("color", line.color());
-                encoded.put("alignment", line.alignment());
-                lineTable.put(i + 1, encoded);
-            }
-            Map<String, Object> documentValue = new LinkedHashMap<>();
-            documentValue.put("title", legacyTitle);
-            documentValue.put("lines", lineTable);
-            PrintDocument document = PrintDocument.parse(documentValue, Map.of());
+            PrintDocument document = legacyDocument();
             if ((long) document.pageCount() * copies > MAX_JOB_PAGES) {
                 return new Object[]{false, "job exceeds 256 physical pages"};
             }
-            PrintJob job = PrintJob.document(document, copies);
+            PrintJob job = documentJob(document, copies);
             jobs.addLast(job);
             legacyLines.clear();
             legacyTitle = "";
@@ -380,8 +472,41 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
         int copies = copies(options);
         PrintDocument document = PrintDocument.parse(documentValue, options);
         if ((long) document.pageCount() * copies > MAX_JOB_PAGES) return new Object[]{null, "job exceeds 256 physical pages"};
-        PrintJob job = PrintJob.document(document, copies);
+        PrintJob job = documentJob(document, copies);
         jobs.addLast(job);
+        setChanged();
+        signalQueued(job);
+        return new Object[]{job.id.toString()};
+    }
+
+    @Callback(doc = "function(title:string[, author:string][, copies:number]):string, string -- Queues the classic buffer into a writable book and seals it.")
+    public Object[] printAndSign(Context context, Arguments args) {
+        if (jobs.size() >= MAX_QUEUE) return new Object[]{null, "print queue full"};
+        if (!hasWritableBook()) return new Object[]{null, "a writable book is required"};
+        String title = args.checkString(0);
+        String author = "OpenPrinter";
+        int copies = 1;
+        if (args.count() > 1) {
+            if (args.isString(1)) author = args.checkString(1);
+            else copies = args.checkInteger(1);
+        }
+        if (args.count() > 2) copies = args.checkInteger(2);
+        if (title.isEmpty()) return new Object[]{null, "book title cannot be empty"};
+        if (title.length() > WrittenBookContent.TITLE_MAX_LENGTH) {
+            return new Object[]{null, "book title is too long"};
+        }
+        if (author.isEmpty()) return new Object[]{null, "book author cannot be empty"};
+        if (copies < 1 || copies > MAX_COPIES) return new Object[]{null, "invalid copy count"};
+
+        PrintDocument document = legacyDocument(title);
+        validateBook(document);
+        if (writableBookPages(inventory.getStackInSlot(PAPER_SLOT)) + document.pageCount() * copies > WritableBookContent.MAX_PAGES) {
+            return new Object[]{null, "book is full"};
+        }
+        PrintJob job = PrintJob.book(document, copies, true, limit(author, 64));
+        jobs.addLast(job);
+        legacyLines.clear();
+        legacyTitle = "";
         setChanged();
         signalQueued(job);
         return new Object[]{job.id.toString()};
@@ -424,6 +549,9 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
     @Callback(direct = true, doc = "function():number -- Returns loaded paper count.")
     public Object[] getPaperLevel(Context context, Arguments args) {
         ItemStack paper = inventory.getStackInSlot(PAPER_SLOT);
+        if (paper.is(Items.WRITABLE_BOOK)) {
+            return new Object[]{WritableBookContent.MAX_PAGES - writableBookPages(paper)};
+        }
         return new Object[]{paper.is(Items.PAPER) ? paper.getCount() : 0};
     }
 
@@ -607,6 +735,8 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
         Map<String, Object> result = new LinkedHashMap<>();
         ItemStack paper = inventory.getStackInSlot(PAPER_SLOT);
         result.put("paper", paper.is(Items.PAPER) ? paper.getCount() : 0);
+        result.put("bookPages", paper.is(Items.WRITABLE_BOOK)
+                ? WritableBookContent.MAX_PAGES - writableBookPages(paper) : 0);
         result.put("nameTags", paper.is(Items.NAME_TAG) ? paper.getCount() : 0);
         result.put("emptyMaps", paper.is(Items.MAP) ? paper.getCount() : 0);
         result.put("blackInk", inkLevel(BLACK_INK_SLOT));
@@ -648,6 +778,47 @@ public final class PrinterBlockEntity extends BlockEntityEnvironment implements 
 
     private static int copies(Map<?, ?> options) {
         return Math.max(1, Math.min(MAX_COPIES, PrintDocument.intValue(options.get("copies"), 1)));
+    }
+
+    private boolean hasPrintedPageOutputSpace() {
+        return folderOutputSlotWithSpace() >= 0 || emptyOutputSlot() >= 0;
+    }
+
+    private int folderOutputSlotWithSpace() {
+        if (level == null) return -1;
+        for (int slot = OUTPUT_START; slot < OUTPUT_END; slot++) {
+            ItemStack folder = inventory.getStackInSlot(slot);
+            if (!folder.is(OpenPrinter.FOLDER.get())) continue;
+            PortableInventory contents = new PortableInventory(folder, 9, level.registryAccess(), true);
+            for (int contentSlot = 0; contentSlot < contents.getSlots(); contentSlot++) {
+                if (contents.getStackInSlot(contentSlot).isEmpty()) return slot;
+            }
+        }
+        return -1;
+    }
+
+    private int emptyFolderSlot(ItemStack folder) {
+        PortableInventory contents = new PortableInventory(folder, 9, level.registryAccess(), true);
+        for (int slot = 0; slot < contents.getSlots(); slot++) {
+            if (contents.getStackInSlot(slot).isEmpty()) return slot;
+        }
+        return -1;
+    }
+
+    private void storePrintedPage(ItemStack page) {
+        int folderSlot = folderOutputSlotWithSpace();
+        if (folderSlot >= 0) {
+            ItemStack folder = inventory.getStackInSlot(folderSlot);
+            PortableInventory contents = new PortableInventory(folder, 9, level.registryAccess(), true);
+            int contentSlot = emptyFolderSlot(folder);
+            if (contentSlot < 0) throw new IllegalStateException("folder is full");
+            contents.setStackInSlot(contentSlot, page);
+            contents.saveToContainer();
+            return;
+        }
+        int outputSlot = emptyOutputSlot();
+        if (outputSlot < 0) throw new IllegalStateException("output tray full");
+        inventory.setStackInSlot(outputSlot, page);
     }
 
     private int emptyOutputSlot() {
