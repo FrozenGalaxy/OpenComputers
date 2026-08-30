@@ -26,6 +26,8 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.Container
 import net.minecraft.world.item.ItemStack
 
+import scala.collection.mutable
+
 class UpgradeCrafting(val host: EnvironmentHost with internal.Robot) extends AbstractManagedEnvironment with DeviceInfo {
   override val node = Network.newNode(this, Visibility.Network).
     withComponent("crafting").
@@ -54,6 +56,9 @@ class UpgradeCrafting(val host: EnvironmentHost with internal.Robot) extends Abs
       val player = host.player
       copyItemsFromHost(player.inventory)
       var countCrafted = 0
+      // Do not let crafted results occupy an empty slot in the crafting grid
+      // before all requested rounds have been attempted.
+      val craftedStacks = mutable.ArrayBuffer.empty[ItemStack]
       val manager = host.getEnvironmentLevel.getRecipeManager
       val initialCraft = manager.getRecipeFor(RecipeType.CRAFTING, this.asCraftInput(), host.getEnvironmentLevel)
       if (initialCraft.isPresent) {
@@ -75,19 +80,31 @@ class UpgradeCrafting(val host: EnvironmentHost with internal.Robot) extends Abs
             return false
           countCrafted += stack.getCount
           craftingSlot.onTake(player, stack)
-          val taken = stack
           copyItemsToHost(player.inventory)
-          if (taken.getCount > 0) {
-            InventoryUtils.addToPlayerInventory(taken, player)
-          }
           copyItemsFromHost(player.inventory)
+          craftedStacks += stack
           true
         }
         while (countCrafted < wantedCount && tryCraft()) {
           //
         }
       }
+      val craftingSlots = (0 until getContainerSize).map(toParentSlot).toSet
+      val outputSlots = (0 until player.inventory.getContainerSize).filterNot(craftingSlots)
+      craftedStacks.foreach(addCraftedStack(_, player, outputSlots))
       Seq(countCrafted > 0, countCrafted)
+    }
+
+    private def addCraftedStack(stack: ItemStack, player: Player, outputSlots: Iterable[Int]): Unit = {
+      if (!stack.isEmpty) {
+        val inventory = player.inventory
+        InventoryUtils.insertIntoInventory(stack, InventoryUtils.asItemHandler(inventory), slots = Some(outputSlots))
+        if (stack.getCount > 0)
+          player.drop(stack, false, false)
+        inventory.setChanged()
+        if (player.containerMenu != null)
+          player.containerMenu.broadcastChanges()
+      }
     }
 
     def copyItemsFromHost(inventory: Container): Unit = {
