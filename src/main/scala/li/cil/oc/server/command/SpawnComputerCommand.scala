@@ -45,25 +45,45 @@ object SpawnComputerCommand {
           return 0
         }
 
-        val (apuName, ramName, storageName) = if (!tieredComponents) {
-          (Constants.ItemName.APUCreative, Constants.ItemName.RAMTier6, Constants.ItemName.HDDTier3)
+        val componentNames = if (!tieredComponents) {
+          Seq(
+            Constants.ItemName.APUCreative,
+            Constants.ItemName.RAMTier6,
+            Constants.ItemName.RAMTier6,
+            Constants.ItemName.HDDTier3)
         } else screenTier match {
-          case 1 => (Constants.ItemName.APUTier1, Constants.ItemName.RAMTier1, Constants.ItemName.HDDTier1)
-          case 2 => (Constants.ItemName.APUTier2, Constants.ItemName.RAMTier2, Constants.ItemName.HDDTier2)
-          case 3 => (Constants.ItemName.APUTier3, Constants.ItemName.RAMTier3, Constants.ItemName.HDDTier3)
-          case 4 => (Constants.ItemName.APUCreative, Constants.ItemName.RAMCreative, Constants.ItemName.SSDTier3)
+          case 1 => Seq(
+            Constants.ItemName.CPUTier1,
+            Constants.ItemName.GraphicsCardTier1,
+            Constants.ItemName.RAMTier2,
+            Constants.ItemName.RAMTier2,
+            Constants.ItemName.HDDTier1)
+          case 2 => Seq(
+            Constants.ItemName.CPUTier2,
+            Constants.ItemName.GraphicsCardTier2,
+            Constants.ItemName.RAMTier4,
+            Constants.ItemName.RAMTier4,
+            Constants.ItemName.HDDTier2)
+          case 3 => Seq(
+            Constants.ItemName.CPUTier3,
+            Constants.ItemName.GraphicsCardTier3,
+            Constants.ItemName.RAMTier6,
+            Constants.ItemName.RAMTier6,
+            Constants.ItemName.HDDTier3)
+          case 4 => Seq(
+            Constants.ItemName.CPUTier4,
+            Constants.ItemName.GraphicsCardTier4,
+            Constants.ItemName.RAMTier8,
+            Constants.ItemName.RAMTier8,
+            Constants.ItemName.SSDTier3)
         }
-        val tieredApu = Option(api.Items.get(apuName)).map(_.createItemStack(1))
-        val components = Seq(
-          tieredApu,
-          Option(api.Items.get(ramName)).map(_.createItemStack(1)),
-          Option(api.Items.get(ramName)).map(_.createItemStack(1)),
-          Option(api.Items.get(storageName)).map(_.createItemStack(1)),
+        val components = (componentNames.map(name =>
+          Option(api.Items.get(name)).map(_.createItemStack(1))) ++ Seq(
           Option(Loot.defaultEEPROM).filter(stack => !stack.isEmpty),
           Option(Loot.defaultOpenOS).filter(stack => !stack.isEmpty)
-        ).flatten
+        )).flatten
 
-        if (components.size != 6 || components.exists(_.isEmpty)) {
+        if (components.size != componentNames.size + 2 || components.exists(_.isEmpty)) {
           source.sendFailure(Component.literal("OpenComputers default EEPROM/OpenOS data is not loaded; reload the server resources and try again."))
           return 0
         }
