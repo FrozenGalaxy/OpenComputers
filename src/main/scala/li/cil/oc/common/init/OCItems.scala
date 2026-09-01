@@ -532,7 +532,7 @@ object OCItems extends ItemAPI {
     import Constants.{BlockName => B, ItemName => I}
     // Assembled devices are not usable without their component data. Their
     // configured creative variants are added explicitly below.
-    val excluded = mutable.Set(B.Microcontroller, B.Print, B.Robot, I.Drone, I.Tablet)
+    val excluded = mutable.Set(B.Microcontroller, B.Print, B.RobotAfterimage, B.Robot, I.Drone, I.Tablet)
 
     if (!ModOpenComputers.hasRedstoneCardT2){
       excluded += I.RedstoneCardTier2
