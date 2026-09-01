@@ -13,7 +13,7 @@ object Tooltip {
 
   val DefaultStyle: Style = Style.EMPTY.withColor(ChatFormatting.GRAY)
 
-  def showExtendedTooltip(flag: TooltipFlag): Boolean = flag.hasShiftDown || flag.shouldDisplayAllInformation
+  def showExtendedTooltip(flag: TooltipFlag): Boolean = flag.hasShiftDown || flag.isAdvanced
 
   private def format(key: String, args: Any*): Component = {
     val component = if (args.isEmpty) {
