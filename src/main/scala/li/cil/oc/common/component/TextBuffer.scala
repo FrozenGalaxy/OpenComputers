@@ -442,6 +442,7 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
     super.onConnect(node)
     if (node == this.node) {
       ServerComponentTracker.add(host.getEnvironmentLevel, node.address, this)
+      if (pendingExternalLoad) loadExternalData()
     }
   }
 
@@ -455,6 +456,26 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
   // ----------------------------------------------------------------------- //
 
   private def bufferPath = node.address + "_buffer"
+  private var pendingExternalLoad = false
+
+  private def loadExternalData(): Unit = {
+    val level = host.getEnvironmentLevel
+    if (level == null) {
+      // Block entities can deserialize their components before Minecraft has
+      // attached them to a Level. Retry from onConnect once the environment
+      // has a valid dimension instead of dereferencing null here.
+      pendingExternalLoad = true
+      return
+    }
+
+    pendingExternalLoad = false
+    val saved = SaveHandler.loadNBT(level.dimension().location(),
+      new ChunkPos(new BlockPos(host.xPosition().toInt, host.yPosition().toInt, host.zPosition().toInt)), bufferPath)
+    if (!saved.isEmpty) {
+      val storage = CompoundStorage.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow()
+      data.loadData(storage)
+    }
+  }
 
   override def loadData(holder: DataComponentHolder): Unit = {
     super.loadData(holder)
@@ -467,12 +488,7 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
       else {
         holder.getComponent(OCComponents.TEXT_BUFFER) match {
           case Some(_) => data.loadData(holder)
-          case None =>
-            val saved = SaveHandler.loadNBT(host.getEnvironmentLevel.dimension().location(), new ChunkPos(new BlockPos(host.xPosition().toInt, host.yPosition().toInt, host.zPosition().toInt)), bufferPath)
-            if (!saved.isEmpty) {
-              val storage = CompoundStorage.CODEC.parse(NbtOps.INSTANCE, saved).getOrThrow()
-              data.loadData(storage)
-            }
+          case None => loadExternalData()
         }
       }
     }
@@ -529,6 +545,11 @@ class TextBuffer(val host: EnvironmentHost) extends AbstractManagedEnvironment w
       // with its ScreenTier1 constructor buffer and can overwrite the saved
       // higher resolution before the auxiliary state is recovered.
       case _: api.internal.Tablet | _: RemoteTerminalHost => data.saveData(holder)
+      // Projectors embed this screen directly in a block entity. Their
+      // component data must be inline because the external SaveHandler path
+      // runs while the block entity is still being deserialized, before it
+      // has a Level or dimension.
+      case _: blockentity.Projector => data.saveData(holder)
       // Create's moving block entities are restored at the train's current
       // coordinates, while physical screen buffers normally live in a
       // SaveHandler file keyed by the chunk where they were saved. That makes

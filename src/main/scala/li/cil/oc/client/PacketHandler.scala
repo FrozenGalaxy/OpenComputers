@@ -19,7 +19,7 @@ import java.io.{EOFException, InputStream}
 import li.cil.oc.util.{Audio, ClientAccessHelper}
 import li.cil.oc.util.ExtendedLevel._
 import net.minecraft.client.Minecraft
-import net.minecraft.core.Direction
+import net.minecraft.core.{BlockPos, Direction}
 import net.minecraft.core.component.DataComponentMap
 import net.minecraft.core.registries.Registries
 import net.minecraft.core.particles.ParticleOptions
@@ -35,8 +35,27 @@ import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.connection.ConnectionType
 import net.neoforged.neoforge.registries.NeoForgeRegistries
 
+import scala.collection.mutable
+
 object PacketHandler extends CommonPacketHandler {
   private val audioSessions = scala.collection.mutable.Map[Int, AudioSession]()
+
+  private final case class PendingProjectorFrame(
+    dimension: ResourceLocation,
+    blockX: Int,
+    blockY: Int,
+    blockZ: Int,
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    data: Array[Int]
+  )
+
+  // Chunk watch packets can beat the client-side block-entity construction.
+  // Keep the latest frame until the projector exists instead of dropping the
+  // only full-frame snapshot sent when a chunk becomes visible.
+  private val pendingProjectorFrames = mutable.LinkedHashMap.empty[(ResourceLocation, Int, Int, Int), PendingProjectorFrame]
 
   def update(): Unit = {
     audioSessions.synchronized {
@@ -47,6 +66,38 @@ object PacketHandler extends CommonPacketHandler {
         audioSessions.remove(handle)
       }
     }
+    applyPendingProjectorFrames()
+  }
+
+  def clearPendingProjectorFrames(): Unit = pendingProjectorFrames.synchronized {
+    pendingProjectorFrames.clear()
+  }
+
+  private def findProjector(frame: PendingProjectorFrame, player: Player): Option[Projector] = {
+    world(player, frame.dimension) match {
+      case Some(level) =>
+        val pos = new BlockPos(frame.blockX, frame.blockY, frame.blockZ)
+        if (level.isLoaded(pos)) level.getBlockEntity(pos) match {
+          case projector: Projector => Some(projector)
+          case _ => None
+        }
+        else None
+      case _ => None
+    }
+  }
+
+  private def applyPendingProjectorFrames(): Unit = {
+    val player = Minecraft.getInstance.player
+    if (player == null) return
+
+    val frames = pendingProjectorFrames.synchronized(pendingProjectorFrames.toVector)
+    val applied = frames.collect {
+      case (key, frame) if findProjector(frame, player).exists { projector =>
+        projector.clientFrame(frame.x, frame.y, frame.width, frame.height, frame.data)
+        true
+      } => key
+    }
+    if (applied.nonEmpty) pendingProjectorFrames.synchronized(applied.foreach(pendingProjectorFrames.remove))
   }
 
   protected override def world(player: Player, dimension: ResourceLocation): Option[Level] = {
@@ -87,6 +138,8 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.HologramScale => onHologramScale(p)
       case PacketType.HologramTranslation => onHologramPositionOffsetY(p)
       case PacketType.HologramValues => onHologramValues(p)
+      case PacketType.ProjectorFrame => onProjectorFrame(p)
+      case PacketType.ProjectorPowerChange => onProjectorPowerChange(p)
       case PacketType.LootDisksReset => onLootDisksReset(p)
       case PacketType.LootDisk => onLootDisk(p)
       case PacketType.CyclingDisk => onCyclingDisk(p)
@@ -387,6 +440,39 @@ object PacketHandler extends CommonPacketHandler {
           t.volume(x + z * t.width + t.width * t.width) = p.readInt()
         }
         t.needsRendering = true
+      case _ => // Invalid packet.
+    }
+
+  def onProjectorFrame(p: PacketParser): Unit = {
+    val dimension = ResourceLocation.tryParse(p.readUTF())
+    val blockX = p.readInt()
+    val blockY = p.readInt()
+    val blockZ = p.readInt()
+    val x = p.readInt()
+    val y = p.readInt()
+    val width = p.readInt()
+    val height = p.readInt()
+    val valid = dimension != null && x >= 0 && y >= 0 && width >= 0 && height >= 0 &&
+      x + width <= Projector.Width && y + height <= Projector.Height &&
+      width.toLong * height <= Projector.Width.toLong * Projector.Height
+    if (!valid) return
+
+    val data = Array.fill(width * height)(0)
+    for (i <- data.indices) data(i) = p.readInt()
+    val frame = PendingProjectorFrame(dimension, blockX, blockY, blockZ, x, y, width, height, data)
+    findProjector(frame, p.player) match {
+      case Some(projector) => projector.clientFrame(x, y, width, height, data)
+      case _ => pendingProjectorFrames.synchronized {
+        pendingProjectorFrames.update((dimension, blockX, blockY, blockZ), frame)
+      }
+    }
+  }
+
+  def onProjectorPowerChange(p: PacketParser): Unit =
+    p.readBlockEntity[Projector]() match {
+      case Some(t) =>
+        t.isOn = p.readBoolean()
+        t.hasPower = p.readBoolean()
       case _ => // Invalid packet.
     }
 

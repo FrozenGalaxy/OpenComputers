@@ -58,6 +58,7 @@ class OCBlockLoot extends BlockLootSubProvider {
         dropSelf(OCBlocks.HologramTier1().get());
         dropSelf(OCBlocks.HologramTier2().get());
         dropSelf(OCBlocks.HologramTier3().get());
+        dropSelf(OCBlocks.Projector().get());
         dropSelf(OCBlocks.HoloScreenTier1().get());
         dropSelf(OCBlocks.HoloScreenTier2().get());
         dropSelf(OCBlocks.HoloScreenTier3().get());

@@ -384,6 +384,35 @@ object PacketSender {
     pb.sendToPlayersNearTileEntity(t)
   }
 
+  def sendProjectorPowerChange(t: blockentity.Projector): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.ProjectorPowerChange)
+    pb.writeTileEntity(t)
+    pb.writeBoolean(t.isOn)
+    pb.writeBoolean(t.hasPower)
+    pb.sendToPlayersNearTileEntity(t)
+  }
+
+  def sendProjectorFrame(t: blockentity.Projector, fromX: Int, fromY: Int, untilX: Int, untilY: Int): Unit = {
+    projectorFramePacket(t, fromX, fromY, untilX, untilY).sendToPlayersNearTileEntity(t)
+  }
+
+  def sendProjectorFrameToPlayer(t: blockentity.Projector, player: ServerPlayer): Unit = {
+    projectorFramePacket(t, 0, 0, t.width, t.height).sendToPlayer(player)
+  }
+
+  private def projectorFramePacket(t: blockentity.Projector, fromX: Int, fromY: Int, untilX: Int, untilY: Int): CompressedPacketBuilder = {
+    val pb = new CompressedPacketBuilder(PacketType.ProjectorFrame)
+    pb.writeTileEntity(t)
+    pb.writeInt(fromX)
+    pb.writeInt(fromY)
+    pb.writeInt(untilX - fromX)
+    pb.writeInt(untilY - fromY)
+    for (y <- fromY until untilY; x <- fromX until untilX) {
+      pb.writeInt(t.pixels(x + y * t.width))
+    }
+    pb
+  }
+
   def sendHologramOffset(t: blockentity.Hologram): Unit = {
     val pb = new SimplePacketBuilder(PacketType.HologramTranslation)
 

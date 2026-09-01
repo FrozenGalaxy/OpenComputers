@@ -31,6 +31,8 @@ object PacketType extends Enumeration {
   HologramScale,
   HologramTranslation,
   HologramValues,
+  ProjectorFrame,
+  ProjectorPowerChange,
   LootDisk,
   CyclingDisk,
   NanomachinesConfiguration,

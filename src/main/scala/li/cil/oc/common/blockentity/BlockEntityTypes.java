@@ -78,6 +78,11 @@ public final class BlockEntityTypes {
                             OCBlocks.HologramTier3().get())
                     .build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<Projector>> PROJECTOR =
+            BLOCK_ENTITY_TYPES.register("projector", () -> BlockEntityType.Builder
+                    .of(Projector::new, OCBlocks.Projector().get())
+                    .build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<Keyboard>> KEYBOARD =
             BLOCK_ENTITY_TYPES.register("keyboard", () -> BlockEntityType.Builder
                     .of(Keyboard::new, OCBlocks.Keyboard().get())

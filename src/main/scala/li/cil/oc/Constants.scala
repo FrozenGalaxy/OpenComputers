@@ -31,6 +31,7 @@ object Constants {
     final val HologramTier1 = "hologram1"
     final val HologramTier2 = "hologram2"
     final val HologramTier3 = "hologram3"
+    final val Projector = "projector"
     final val HoloScreenTier1 = "holoscreen1"
     final val HoloScreenTier2 = "holoscreen2"
     final val HoloScreenTier3 = "holoscreen3"

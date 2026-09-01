@@ -1550,6 +1550,19 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.PrintedCircuitBoard()), has(OCItems.PrintedCircuitBoard()))
             .save(output);
 
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.Projector())
+            .pattern("GLG")
+            .pattern("XTD")
+            .pattern("GBG")
+            .define('G', Tags.Items.INGOTS_GOLD)
+            .define('L', Items.REDSTONE_LAMP)
+            .define('X', OCItems.ComponentBusTier1())
+            .define('T', OCItems.Transistor())
+            .define('D', Tags.Items.GEMS_DIAMOND)
+            .define('B', OCItems.PrintedCircuitBoard())
+            .unlockedBy(getHasName(OCItems.PrintedCircuitBoard()), has(OCItems.PrintedCircuitBoard()))
+            .save(output);
+
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.Keyboard())
             .pattern("BBB")
             .pattern("BAN")

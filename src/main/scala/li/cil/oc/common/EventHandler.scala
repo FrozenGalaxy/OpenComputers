@@ -12,7 +12,7 @@ import net.neoforged.neoforge.common.util.FakePlayer
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent
 import net.neoforged.neoforge.event.entity.player.PlayerEvent._
-import net.neoforged.neoforge.event.level.{BlockEvent, ChunkEvent, LevelEvent}
+import net.neoforged.neoforge.event.level.{BlockEvent, ChunkEvent, ChunkWatchEvent, LevelEvent}
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import net.neoforged.neoforge.server.ServerLifecycleHooks
 
@@ -198,6 +198,7 @@ object EventHandler {
   @SubscribeEvent
   @OnlyIn(Dist.CLIENT)
   def clientLoggedIn(e: ClientPlayerNetworkEvent.LoggingIn): Unit = {
+    li.cil.oc.client.PacketHandler.clearPendingProjectorFrames()
     PetRenderer.isInitialized = false
     PetRenderer.hidden.clear()
     Loot.resetDisksForClient()
@@ -436,6 +437,15 @@ object EventHandler {
 
         case _ =>
       }
+    }
+  }
+
+  @SubscribeEvent
+  def onChunkSent(e: ChunkWatchEvent.Sent): Unit = {
+    e.getChunk.getBlockEntities.values().asScala.foreach {
+      case projector: blockentity.Projector =>
+        ServerPacketSender.sendProjectorFrameToPlayer(projector, e.getPlayer)
+      case _ =>
     }
   }
 }

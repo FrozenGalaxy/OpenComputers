@@ -71,6 +71,13 @@ public class OCBlockStateProvider extends BlockStateProvider {
         simpleBlockWithItem(OCBlocks.HologramTier2().get(), existingModel(OCBlocks.HologramTier2().get()));
         simpleBlockWithItem(OCBlocks.HologramTier3().get(), existingModel(OCBlocks.HologramTier3().get()));
 
+        var projectorModel = existingModel(OCBlocks.Projector().get());
+        getVariantBuilder(OCBlocks.Projector().get()).forAllStates(state -> ConfiguredModel.builder()
+            .modelFile(projectorModel)
+            .rotationY(getYRotation(state.getValue(PropertyRotatable.Facing())))
+            .build());
+        simpleBlockItem(OCBlocks.Projector().get(), projectorModel);
+
         holoScreenBlock(OCBlocks.HoloScreenTier1().get());
         holoScreenBlock(OCBlocks.HoloScreenTier2().get());
         holoScreenBlock(OCBlocks.HoloScreenTier3().get());
